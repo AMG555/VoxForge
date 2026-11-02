@@ -1,0 +1,32 @@
+[package]
+name = "voxforge-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Model Context Protocol (MCP) server implementation for VoxForge"
+
+[dependencies]
+voxforge-core          = { workspace = true }
+voxforge-engine        = { workspace = true }
+voxforge-hardware      = { workspace = true }
+voxforge-audio         = { workspace = true }
+voxforge-asr           = { workspace = true }
+voxforge-catalog       = { workspace = true }
+voxforge-pipeline      = { workspace = true }
+voxforge-worker        = { workspace = true }
+voxforge-pronunciation = { workspace = true }
+async-trait.workspace = true
+tokio                 = { workspace = true, features = ["sync", "rt", "io-util", "macros"] }
+serde.workspace       = true
+serde_json.workspace  = true
+tracing.workspace     = true
+uuid.workspace        = true
+chrono.workspace      = true
+hex.workspace         = true
+regex.workspace       = true
+thiserror.workspace   = true
+anyhow.workspace      = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util"] }

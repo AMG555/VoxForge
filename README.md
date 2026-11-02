@@ -1,6 +1,6 @@
 <div align="center">
 
-# VoxForg
+# VoxForge
 
 **Enterprise-Grade, Self-Hostable, Multi-Engine Text-to-Speech Platform & Visual Pipeline Builder**
 
@@ -35,20 +35,20 @@ For creators, studio producers, and desktop users: download the pre-compiled sta
 
 | Platform | Download | Package Format | File Size | Details |
 | :--- | :--- | :--- | :--- | :--- |
-| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForg/releases/latest/download/VoxForg-Setup-v0.1.0-windows-x64.exe) | Setup Wizard (`.exe`) | ~14 MB | Professional installer with path selection, desktop shortcut, uninstaller |
-| **Windows 10 / 11 (Portable)** | [**Download Standalone .exe**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-windows-x86_64.exe) | Portable Executable | ~13 MB | Single zero-install binary with embedded studio UI |
-| **Windows 10 / 11 (Zip Bundle)** | [**Download .zip**](https://github.com/AMG555/VoxForg/releases/latest/download/VoxForg-Windows-x64.zip) | Portable Bundle (`.zip`) | ~5 MB | Includes `voxforg.exe`, 1-click launcher, and desktop installer |
-| **macOS (Apple Silicon & Intel)** | [**Download Universal**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-macos-universal) | Standalone Binary | ~14 MB | Universal binary with embedded studio UI |
-| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-linux-x86_64.tar.gz) | Tarball Archive | ~12 MB | Zero-dependency glibc standalone executable |
+| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard (`.exe`) | ~14 MB | Professional installer with path selection, desktop shortcut, uninstaller |
+| **Windows 10 / 11 (Portable)** | [**Download Standalone .exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Portable Executable | ~13 MB | Single zero-install binary with embedded studio UI |
+| **Windows 10 / 11 (Zip Bundle)** | [**Download .zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | ~5 MB | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
+| **macOS (Apple Silicon & Intel)** | [**Download Universal**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Standalone Binary | ~14 MB | Universal binary with embedded studio UI |
+| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | ~12 MB | Zero-dependency glibc standalone executable |
 
 ### How to Run & Install on Windows:
 
-1. **Direct Run**: Download [**`voxforg-windows-x86_64.exe`**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-windows-x86_64.exe) and double-click it. It spins up the neural engine server and opens your web browser to `http://localhost:8080`.
-2. **Portable Bundle**: Download [**`VoxForg-Windows-x64.zip`**](https://github.com/AMG555/VoxForg/releases/latest/download/VoxForg-Windows-x64.zip), extract anywhere, and double-click `VoxForg-Start.bat`.
-3. **Install Desktop & Start Menu Icon**: Run `install-desktop.bat` (or run in PowerShell: `irm https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.ps1 | iex`). Adds `VoxForg` icon directly to your Windows Desktop and Start Menu.
+1. **Direct Run**: Download [**`voxforge-windows-x86_64.exe`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) and double-click it. It spins up the neural engine server and opens your web browser to `http://localhost:8080`.
+2. **Portable Bundle**: Download [**`VoxForge-Windows-x64.zip`**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip), extract anywhere, and double-click `VoxForge-Start.bat`.
+3. **Install Desktop & Start Menu Icon**: Run `install-desktop.bat` (or run in PowerShell: `irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex`). Adds `VoxForge` icon directly to your Windows Desktop and Start Menu.
 
 > [!NOTE]
-> **Windows SmartScreen warning?** You may see *"voxforg-windows-x86_64.exe isn't commonly downloaded"* in your browser or *"Windows protected your PC"* on launch. This is normal for any new open-source executable that hasn't yet built download reputation — **VoxForg contains no malware**. The full source code is auditable in this repository.
+> **Windows SmartScreen warning?** You may see *"voxforge-windows-x86_64.exe isn't commonly downloaded"* in your browser or *"Windows protected your PC"* on launch. This is normal for any new open-source executable that hasn't yet built download reputation — **VoxForge contains no malware**. The full source code is auditable in this repository.
 >
 > **To bypass in Edge:** In the Downloads panel click **See more** → **Keep anyway**.
 >
@@ -58,58 +58,58 @@ For creators, studio producers, and desktop users: download the pre-compiled sta
 >
 > **Prefer no warnings at all?** Use the **PowerShell one-liner installer** — it runs entirely in-terminal and bypasses SmartScreen:
 > ```powershell
-> irm https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.ps1 | iex
+> irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
 > ```
 
 ### How to Run & Install on macOS (Apple Silicon & Intel):
 
 1. **One-Line Installer (Recommended)**:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
    ```
    Automatically downloads the Universal binary, configures your PATH, and clears Gatekeeper quarantine.
 
 2. **Direct Download**:
-   Download [**`voxforg-macos-universal`**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-macos-universal), open your Terminal, and run:
+   Download [**`voxforge-macos-universal`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal), open your Terminal, and run:
    ```bash
-   chmod +x voxforg-macos-universal
+   chmod +x voxforge-macos-universal
    # If macOS Gatekeeper displays "developer cannot be verified":
-   xattr -d com.apple.quarantine voxforg-macos-universal
-   ./voxforg-macos-universal
+   xattr -d com.apple.quarantine voxforge-macos-universal
+   ./voxforge-macos-universal
    ```
 
 3. **NPX Instant Runner**:
    ```bash
-   npx voxforg
+   npx voxforge
    ```
 
 ### How to Run & Install on Linux (Ubuntu, Debian, Fedora, Arch):
 
 1. **One-Line Installer (Recommended)**:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
    ```
-   Installs `voxforg` to `~/.local/bin/` and creates a desktop application entry (`voxforg.desktop`).
+   Installs `voxforge` to `~/.local/bin/` and creates a desktop application entry (`voxforge.desktop`).
 
 2. **Tarball Bundle**:
-   Download [**`voxforg-linux-x86_64.tar.gz`**](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-linux-x86_64.tar.gz), extract, and execute:
+   Download [**`voxforge-linux-x86_64.tar.gz`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz), extract, and execute:
    ```bash
-   tar -xzf voxforg-linux-x86_64.tar.gz
-   ./voxforg-linux-x86_64
+   tar -xzf voxforge-linux-x86_64.tar.gz
+   ./voxforge-linux-x86_64
    ```
 
 3. **NPX Instant Runner**:
    ```bash
-   npx voxforg
+   npx voxforge
    ```
 
 ---
 
 ## Quick Start
 
-**VoxForg** is a unified, hardware-adaptive speech synthesis server and visual workflow builder: a modular node-based engine that allows developers and creators to design sophisticated audio pipelines—from chunking multi-page documents to assigning emotional prosody and dynamic voice-swapping across different TTS engines—all behind an OpenAI-compatible API.
+**VoxForge** is a unified, hardware-adaptive speech synthesis server and visual workflow builder: a modular node-based engine that allows developers and creators to design sophisticated audio pipelines—from chunking multi-page documents to assigning emotional prosody and dynamic voice-swapping across different TTS engines—all behind an OpenAI-compatible API.
 
-VoxForg eliminates vendor lock-in by abstracting 10+ local and cloud speech engines behind a unified Rust core with zero-latency streaming.
+VoxForge eliminates vendor lock-in by abstracting 10+ local and cloud speech engines behind a unified Rust core with zero-latency streaming.
 
 ### Key Capabilities
 
@@ -119,7 +119,7 @@ VoxForg eliminates vendor lock-in by abstracting 10+ local and cloud speech engi
 - **Automated Speech Recognition (ASR)**: Native Whisper inference engine with sliding-window VAD energy segmentation, generating OpenAI-compatible transcriptions, word timestamps, and SRT/VTT subtitle files (`POST /v1/audio/transcriptions`).
 - **Zero-Shot Voice Cloning & Studio Pre-Processing**: Studio-grade acoustic pipeline featuring 80Hz Butterworth high-pass filtering, adaptive noise gating, true peak normalization to -0.5 dBFS, and 24kHz linear PCM transcoding to extract 512-D neural speaker identity embeddings (`POST /v1/voices/clone`). Persistent across browser local storage and backend database.
 - **Full Automation Connectivity (n8n & Webhooks)**: Connects natively to n8n workflows via drop-in OpenAI Audio nodes (`http://localhost:8080/v1`), direct HTTP Request binary audio nodes, webhook-triggered DAG pipeline execution (`POST /v1/pipeline/execute`), and programmatic voice cloning.
-- **Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 stdio server (`voxforg mcp`) exposing 8 tools (`synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, `list_models`, `benchmark_engine`, `get_cluster_status`) directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
+- **Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 stdio server (`voxforge mcp`) exposing 8 tools (`synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, `list_models`, `benchmark_engine`, `get_cluster_status`) directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
 - **Production Video Dubbing & Audiobook DAG Workflows**: Turnkey DAG templates chaining ASR, Speaker Diarization, Voice Mapping, Time-Stretch tempo alignment, and Audio Muxing for video tracks and multi-chapter audiobook publishing.
 - **Model Catalog & Weights Manager**: Built-in weights manager validating host RAM and GPU VRAM constraints before installing curated open weights (Kokoro, Piper, Whisper, Qwen3, Silero) with cryptographic SHA-256 verification (`/v1/catalog/models`).
 - **Hardware-Aware Adaptive Dispatch**: Automated hardware probe detecting CPU vector extensions (AVX2, AVX-512, NEON) and GPU accelerators (NVIDIA CUDA, Apple MPS, DirectML) to dynamically allocate optimal engine models.
@@ -130,7 +130,7 @@ VoxForg eliminates vendor lock-in by abstracting 10+ local and cloud speech engi
 - **Automated QA & Voice A/B Benchmarking**:
   - Side-by-side acoustic quality evaluation across engines, voices, and prosody parameters.
   - Measures real-time factor (RTF), TTFB latency, RMS loudness (dBFS), peak amplitude, and digital clipping samples.
-  - Accessible via interactive UI (`A/B & QA Lab`), REST API (`POST /v1/qa/ab-test`), and CLI (`voxforg ab-test`).
+  - Accessible via interactive UI (`A/B & QA Lab`), REST API (`POST /v1/qa/ab-test`), and CLI (`voxforge ab-test`).
 - **Enterprise Security Baseline**:
   - Strict server-side proxying; frontend never handles downstream API credentials.
   - Granular API key permissions (`tts:read`, `tts:write`, `pipeline:admin`).
@@ -149,7 +149,7 @@ VoxForg eliminates vendor lock-in by abstracting 10+ local and cloud speech engi
 - **Voice-to-Voice Conversion & Timbre Morphing**: Pitch contour and harmonic formant morphing node preserving actor cadence and intonation (`NodeType::VoiceConversion`).
 - **Twilio Telephony & Real-Time Voicebot Bridge**: Bidirectional WebSocket gateway connecting Twilio Media Streams (8kHz mu-law) to real-time speech and transcription pipelines (`GET /v1/telephony/twilio/stream`).
 - **Cross-Platform Delivery**:
-  - Standalone single binary (`voxforg-cli`) with embedded workstation UI.
+  - Standalone single binary (`voxforge-cli`) with embedded workstation UI.
   - Official multi-arch Docker containers (`linux/amd64`, `linux/arm64`).
   - Native desktop application built on Tauri v2 (Windows `.msi`, macOS `.dmg`, Linux `.AppImage`).
 
@@ -157,7 +157,7 @@ VoxForg eliminates vendor lock-in by abstracting 10+ local and cloud speech engi
 
 ## System Architecture
 
-VoxForg is built as a high-performance modular workspace in Rust:
+VoxForge is built as a high-performance modular workspace in Rust:
 
 ```
                           ┌────────────────────────┐
@@ -167,28 +167,28 @@ VoxForg is built as a high-performance modular workspace in Rust:
                                       │ HTTP / WebSocket
                                       ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                              VOXFORG DAEMON                            │
+│                              VOXFORGE DAEMON                            │
 │                                                                        │
 │  ┌───────────────────────┐             ┌────────────────────────────┐  │
-│  │     voxforg-api       │             │      voxforg-hardware      │  │
+│  │     voxforge-api       │             │      voxforge-hardware      │  │
 │  │ (Axum 0.8 / Security) │             │ (CUDA/MPS/AVX Auto-Detect) │  │
 │  └───────────┬───────────┘             └─────────────┬──────────────┘  │
 │              │                                       │                 │
 │              ▼                                       ▼                 │
 │  ┌───────────────────────┐             ┌────────────────────────────┐  │
-│  │   voxforg-pipeline    │◄────────────┤      Engine Scheduler      │  │
+│  │   voxforge-pipeline    │◄────────────┤      Engine Scheduler      │  │
 │  │  (DAG Graph Runner)   │             │   (Tiered Auto-Fallback)   │  │
 │  └───────────┬───────────┘             └─────────────┬──────────────┘  │
 │              │                                       │                 │
 │              ▼                                       ▼                 │
 │  ┌───────────────────────┐             ┌────────────────────────────┐  │
-│  │     voxforg-audio     │             │       voxforg-engine       │  │
+│  │     voxforge-audio     │             │       voxforge-engine       │  │
 │  │ (Normalizer/WAV/MP3)  │◄────────────┤  (Piper/Kokoro/Edge/Qwen)  │  │
 │  └───────────┬───────────┘             └────────────────────────────┘  │
 │              │                                                         │
 │              ▼                                                         │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                           voxforg-core                           │  │
+│  │                           voxforge-core                           │  │
 │  │       (DataStore Trait: SQLite / PostgreSQL / Supabase)          │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────┘
@@ -212,7 +212,7 @@ For complete technical specifications, sequence diagrams, and lifecycle document
 Launch the full visual workstation and local server with one command:
 
 ```bash
-npx voxforg
+npx voxforge
 ```
 *Auto-detects platform, fetches matching binary with embedded UI, starts server, and opens your browser to `http://localhost:8080`.*
 
@@ -224,31 +224,31 @@ Install the standalone binary into your system PATH:
 
 **Linux & macOS:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
 ```
 
 **Windows PowerShell:**
 ```powershell
-irm https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
 ```
 
 Start the visual workstation:
 ```bash
-voxforg serve --open
+voxforge serve --open
 ```
 
 ---
 
 ### 3. AI Agent Integration via Model Context Protocol (MCP)
 
-Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForg:
+Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForge:
 
 ```json
 {
   "mcpServers": {
-    "voxforg": {
+    "voxforge": {
       "command": "cargo",
-      "args": ["run", "-p", "voxforg-cli", "--", "mcp"]
+      "args": ["run", "-p", "voxforge-cli", "--", "mcp"]
     }
   }
 }
@@ -262,7 +262,7 @@ Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code direct
 Launch the unified container (backend + embedded visual UI):
 
 ```bash
-docker run -d -p 8080:8080 -v voxforg-data:/app/data ghcr.io/amg555/voxforg
+docker run -d -p 8080:8080 -v voxforge-data:/app/data ghcr.io/amg555/voxforge
 ```
 Open `http://localhost:8080` in your browser.
 
@@ -270,12 +270,12 @@ Open `http://localhost:8080` in your browser.
 
 ### 4. Run via Docker Compose (Multi-Service Stack)
 
-The fastest way to launch VoxForg with database persistence or dedicated neural microservices:
+The fastest way to launch VoxForge with database persistence or dedicated neural microservices:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AMG555/VoxForg.git
-cd VoxForg
+git clone https://github.com/AMG555/VoxForge.git
+cd VoxForge
 
 # Start standard services (Daemon + Database)
 docker compose up -d
@@ -292,24 +292,24 @@ Download the release binary for your platform or build from source:
 
 ```bash
 # Build binary
-cargo build --release --bin voxforg
+cargo build --release --bin voxforge
 
 # Verify hardware environment
-./target/release/voxforg hardware
+./target/release/voxforge hardware
 
 # Run automated QA A/B benchmark between voices
-./target/release/voxforg ab-test --iterations 3
+./target/release/voxforge ab-test --iterations 3
 
 # Start Model Context Protocol (MCP) server for LLM agents
-./target/release/voxforg mcp
+./target/release/voxforge mcp
 
 # Launch HTTP/WS server
-./target/release/voxforg serve --port 8080 --data-dir ./data
+./target/release/voxforge serve --port 8080 --data-dir ./data
 ```
 
 ### 6. OpenAI Drop-In Replacement
 
-VoxForg provides a drop-in replacement for the OpenAI Audio Speech API (`/v1/audio/speech`).
+VoxForge provides a drop-in replacement for the OpenAI Audio Speech API (`/v1/audio/speech`).
 
 Using `curl`:
 
@@ -319,7 +319,7 @@ curl http://localhost:8080/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{
     "model": "edge-tts",
-    "input": "VoxForg is now operational with hardware-accelerated speech synthesis.",
+    "input": "VoxForge is now operational with hardware-accelerated speech synthesis.",
     "voice": "en-US-ChristopherNeural",
     "response_format": "wav",
     "speed": 1.0
@@ -340,7 +340,7 @@ client = OpenAI(
 response = client.audio.speech.create(
     model="edge-tts",
     voice="en-US-AriaNeural",
-    input="Streaming low-latency audio via VoxForg engine."
+    input="Streaming low-latency audio via VoxForge engine."
 )
 
 response.stream_to_file("speech.wav")
@@ -350,7 +350,7 @@ response.stream_to_file("speech.wav")
 
 ### 7. n8n Workflow Automation Integration
 
-Connect VoxForg to [n8n](https://n8n.io) to automate speech pipelines, customer voice replies, and multi-speaker podcast generation:
+Connect VoxForge to [n8n](https://n8n.io) to automate speech pipelines, customer voice replies, and multi-speaker podcast generation:
 
 - **OpenAI Node (Drop-in)**: Point your n8n OpenAI node's Base URL to `http://localhost:8080/v1` to generate speech without changing your existing workflow logic.
 - **HTTP Request Node**: Invoke `POST http://localhost:8080/v1/audio/speech` with response format set to `File (Binary)` to dispatch audio to Telegram, WhatsApp, Slack, or Discord bots.
@@ -361,13 +361,13 @@ Connect VoxForg to [n8n](https://n8n.io) to automate speech pipelines, customer 
 
 ### 8. Model Context Protocol (MCP) Server
 
-VoxForg runs a native JSON-RPC 2.0 stdio server (`voxforg mcp`) allowing LLM coding assistants (Claude Desktop, Cursor, Antigravity, Windsurf) to execute speech tools autonomously:
+VoxForge runs a native JSON-RPC 2.0 stdio server (`voxforge mcp`) allowing LLM coding assistants (Claude Desktop, Cursor, Antigravity, Windsurf) to execute speech tools autonomously:
 
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -380,7 +380,7 @@ Exposes 8 core tools: `synthesize_speech`, `clone_voice`, `transcribe_audio`, `e
 
 ## Hardware Profiler
 
-VoxForg inspects your host hardware on startup to tier model selection automatically:
+VoxForge inspects your host hardware on startup to tier model selection automatically:
 
 | Tier | Minimum Specifications | Recommended Engines | Latency (TTFB) |
 |---|---|---|---|
@@ -392,7 +392,7 @@ VoxForg inspects your host hardware on startup to tier model selection automatic
 To inspect system capability:
 
 ```bash
-voxforg hardware probe
+voxforge hardware probe
 ```
 
 Output:
@@ -422,7 +422,7 @@ The visual workflow editor (`ui/`) supports real-time DAG composition:
 ## Project Structure
 
 ```
-voxforg/
+voxforge/
 ├── Cargo.toml                  # Virtual workspace manifest
 ├── README.md                   # Project overview & documentation index
 ├── docker-compose.yml          # Container configuration
@@ -432,20 +432,20 @@ voxforg/
 │   ├── api.md                  # REST & WebSocket API documentation
 │   └── decisions/              # Architecture Decision Records (ADR-001 - 005)
 ├── crates/
-│   ├── voxforg-core/           # Domain models, DataStore trait, error taxonomy
-│   ├── voxforg-hardware/       # CPU/GPU hardware detection & tier assignment
-│   ├── voxforg-engine/         # TTS Engine traits, registry, Edge-TTS, Qwen3 zero-shot cloning
-│   ├── voxforg-router/         # SLA policy routing and multi-objective scoring
-│   ├── voxforg-pronunciation/  # Text normalization and custom pronunciation dictionary
-│   ├── voxforg-audio/          # Audio manipulation, transcoding, DSP & metrics
-│   ├── voxforg-pipeline/       # DAG execution engine, time stretch, dubbing/audiobook templates
-│   ├── voxforg-benchmark/      # Engine benchmarking sentence suite & scorecard store
-│   ├── voxforg-worker/         # Distributed cluster worker pool & lease management
-│   ├── voxforg-asr/            # Automated Speech Recognition abstraction, Whisper, VAD
-│   ├── voxforg-catalog/        # Open-weights model catalog & hardware validation
-│   ├── voxforg-mcp/            # Model Context Protocol JSON-RPC 2.0 stdio server
-│   ├── voxforg-api/            # Axum REST & WebSocket server, OpenAPI 3.1, metrics
-│   └── voxforg-cli/            # Unified CLI binary (serve, synth, hardware, bench, ab-test, mcp)
+│   ├── voxforge-core/           # Domain models, DataStore trait, error taxonomy
+│   ├── voxforge-hardware/       # CPU/GPU hardware detection & tier assignment
+│   ├── voxforge-engine/         # TTS Engine traits, registry, Edge-TTS, Qwen3 zero-shot cloning
+│   ├── voxforge-router/         # SLA policy routing and multi-objective scoring
+│   ├── voxforge-pronunciation/  # Text normalization and custom pronunciation dictionary
+│   ├── voxforge-audio/          # Audio manipulation, transcoding, DSP & metrics
+│   ├── voxforge-pipeline/       # DAG execution engine, time stretch, dubbing/audiobook templates
+│   ├── voxforge-benchmark/      # Engine benchmarking sentence suite & scorecard store
+│   ├── voxforge-worker/         # Distributed cluster worker pool & lease management
+│   ├── voxforge-asr/            # Automated Speech Recognition abstraction, Whisper, VAD
+│   ├── voxforge-catalog/        # Open-weights model catalog & hardware validation
+│   ├── voxforge-mcp/            # Model Context Protocol JSON-RPC 2.0 stdio server
+│   ├── voxforge-api/            # Axum REST & WebSocket server, OpenAPI 3.1, metrics
+│   └── voxforge-cli/            # Unified CLI binary (serve, synth, hardware, bench, ab-test, mcp)
 └── ui/                         # React 19 + TypeScript + Tailwind UI
 ```
 
@@ -468,9 +468,9 @@ The workspace features a comprehensive 120+ automated test suite covering acoust
 cargo test --workspace
 
 # Run dedicated audio metrics and QA benchmark tests
-cargo test -p voxforg-audio --lib metrics
-cargo test -p voxforg-engine --lib ab_test
-cargo test -p voxforg-api --lib tests
+cargo test -p voxforge-audio --lib metrics
+cargo test -p voxforge-engine --lib ab_test
+cargo test -p voxforge-api --lib tests
 
 # Run security linting
 cargo clippy --workspace -- -D warnings
@@ -480,7 +480,7 @@ cargo clippy --workspace -- -D warnings
 
 ## Security Policy
 
-VoxForg treats audio generation security with enterprise rigor:
+VoxForge treats audio generation security with enterprise rigor:
 - **No Client Secrets**: API keys, storage bucket credentials, and master configurations are strictly server-side.
 - **Input Sanitization**: Text and SSML input is validated against injection attacks and buffer overrun limits.
 - **Path Traversal Protection**: Export directories, custom audio models, and voice assets are strictly scoped to designated storage roots.

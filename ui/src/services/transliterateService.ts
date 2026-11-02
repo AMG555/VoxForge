@@ -1,5 +1,5 @@
 /**
- * VoxForg Transliteration & Phonetic Normalizer Service
+ * VoxForge Transliteration & Phonetic Normalizer Service
  * Provides bidirectional & forward transliteration for Romanized Indic dialects:
  * - Manglish (Malayalam written in Latin script) -> Malayalam Script (മലയാളം)
  * - Hinglish (Hindi written in Latin script) -> Devanagari Script (हिन्दी)
@@ -15,7 +15,7 @@ const MANGLISH_PHRASES: [RegExp, string][] = [
   [/\bente\s+ponno\b/gi, 'എന്റെ പൊന്നോ'],
   [/\bvalare\s+nannayi\b/gi, 'വളരെ നന്നായി'],
   [/\bithu\s+adipoli\s+aano\b/gi, 'ഇത് അടിപൊളി ആണോ'],
-  [/\bvoxforg\s+studio\b/gi, 'വോക്സ്ഫോർജ് സ്റ്റുഡിയോ'],
+  [/\bvoxforge\s+studio\b/gi, 'വോക്സ്ഫോർജ് സ്റ്റുഡിയോ'],
   [/\bparayan\s+pattumo\b/gi, 'പറയാൻ പറ്റുമോ'],
   [/\bnjan\s+ippo\s+varam\b/gi, 'ഞാൻ ഇപ്പോൾ വരാം'],
 ];
@@ -101,7 +101,7 @@ const MANGLISH_WORDS: Record<string, string> = {
   'sound': 'സൗണ്ട്',
   'voice': 'വോയ്സ്',
   'output': 'ഔട്ട്പുട്ട്',
-  'voxforg': 'വോക്സ്ഫോർജ്',
+  'voxforge': 'വോക്സ്ഫോർജ്',
   'studio': 'സ്റ്റുഡിയോ',
   'santhosham': 'സന്തോഷം',
   'kandathil': 'കണ്ടതിൽ',
@@ -179,7 +179,7 @@ const HINGLISH_PHRASES: [RegExp, string][] = [
   [/\bkuch\s+nahin?\b/gi, 'कुछ नहीं'],
   [/\bkaise\s+ho\b/gi, 'कैसे हो'],
   [/\bkahan\s+ho\b/gi, 'कहाँ हो'],
-  [/\bvoxforg\s+studio\b/gi, 'वॉक्सफोर्ज स्टूडियो'],
+  [/\bvoxforge\s+studio\b/gi, 'वॉक्सफोर्ज स्टूडियो'],
 ];
 
 const HINGLISH_WORDS: Record<string, string> = {
@@ -235,7 +235,7 @@ const HINGLISH_WORDS: Record<string, string> = {
   'aap': 'आप',
   'mera': 'मेरा',
   'tera': 'तेरा',
-  'voxforg': 'वॉक्सफोर्ज',
+  'voxforge': 'वॉक्सफोर्ज',
   'studio': 'स्टूडियो',
   'ka': 'का',
   'ki': 'की',
@@ -304,7 +304,7 @@ const TANGLISH_WORDS: Record<string, string> = {
   'ponga': 'போங்க',
   'paaru': 'பாரு',
   'sollu': 'சொல்லு',
-  'voxforg': 'வாக்ஸ்ஃபோர்ஜ்',
+  'voxforge': 'வாக்ஸ்ஃபோர்ஜ்',
 };
 
 function phoneticFallbackMalayalam(rawWord: string): string {

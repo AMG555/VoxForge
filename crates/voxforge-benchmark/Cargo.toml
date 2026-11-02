@@ -1,0 +1,18 @@
+[package]
+name = "voxforge-benchmark"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxforge-core    = { workspace = true }
+voxforge-engine  = { workspace = true }
+voxforge-hardware = { workspace = true }
+async-trait     = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+tokio           = { workspace = true }
+tracing         = { workspace = true }
+thiserror       = { workspace = true }
+chrono          = { workspace = true }

@@ -7,10 +7,10 @@ Accepted
 2026-09-05
 
 ## Context
-TTS engines exhibit vastly different compute profiles. Kokoro-82M and Piper run efficiently on CPU with AVX2/NEON SIMD instructions, whereas heavier models like Qwen3-TTS or StyleTTS2 require dedicated GPU accelerators (CUDA/MPS) with >= 8GB VRAM. If a user runs VoxForg on a modest laptop without a discrete GPU, loading an enterprise model causes out-of-memory errors or system freezing.
+TTS engines exhibit vastly different compute profiles. Kokoro-82M and Piper run efficiently on CPU with AVX2/NEON SIMD instructions, whereas heavier models like Qwen3-TTS or StyleTTS2 require dedicated GPU accelerators (CUDA/MPS) with >= 8GB VRAM. If a user runs VoxForge on a modest laptop without a discrete GPU, loading an enterprise model causes out-of-memory errors or system freezing.
 
 ## Decision
-Implement an automated hardware probe (`voxforg-hardware`) that analyzes host resources at startup:
+Implement an automated hardware probe (`voxforge-hardware`) that analyzes host resources at startup:
 - CPU SIMD flags (AVX2, AVX-512, ARM NEON).
 - Total system RAM and available headroom.
 - GPU presence, compute capability, and VRAM (via CUDA runtime / DirectML / Metal).

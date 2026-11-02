@@ -1,4 +1,4 @@
-# VoxForg .gitignore
+# VoxForge .gitignore
 target/
 **/*.rs.bk
 Cargo.lock
@@ -36,7 +36,7 @@ data/
 *.sqlite
 *.sqlite3
 *.db
-voxforg.db
+voxforge.db
 /storage/
 /models/
 /cache/

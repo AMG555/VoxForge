@@ -1,22 +1,22 @@
 version: '3.8'
 
 services:
-  voxforg-daemon:
+  voxforge-daemon:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: voxforg-daemon
+    container_name: voxforge-daemon
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      - VOXFORG_PORT=8080
-      - VOXFORG_HOST=0.0.0.0
-      - VOXFORG_API_KEY=${VOXFORG_API_KEY:-}
+      - VOXFORGE_PORT=8080
+      - VOXFORGE_HOST=0.0.0.0
+      - VOXFORGE_API_KEY=${VOXFORGE_API_KEY:-}
       - RUST_LOG=info
     volumes:
-      - voxforg-data:/app/data
-      - voxforg-models:/app/models
+      - voxforge-data:/app/data
+      - voxforge-models:/app/models
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 15s
@@ -26,23 +26,23 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: voxforg-postgres
+    container_name: voxforge-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-voxforg}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voxforg_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-voxforg}
+      POSTGRES_USER: ${POSTGRES_USER:-voxforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voxforge_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-voxforge}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U voxforg"]
+      test: ["CMD-SHELL", "pg_isready -U voxforge"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  voxforg-data:
-  voxforg-models:
+  voxforge-data:
+  voxforge-models:
   pgdata:

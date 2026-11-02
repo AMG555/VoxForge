@@ -1,5 +1,5 @@
 /**
- * VoxForg Language Detector
+ * VoxForge Language Detector
  * Real-time script & dialect detection with support for:
  * - Native Indic scripts (Malayalam, Hindi, Tamil, Telugu, Kannada, Bengali, Marathi, Gujarati, Urdu, Punjabi)
  * - Romanized Indic Dialects (Manglish, Hinglish, Tanglish, Kanglish, Tenglish)

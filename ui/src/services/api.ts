@@ -11,7 +11,7 @@ import {
 const BASE_URL = '';
 
 const getHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('voxforg_api_key') : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') : null;
   const headers: Record<string, string> = { ...customHeaders };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;

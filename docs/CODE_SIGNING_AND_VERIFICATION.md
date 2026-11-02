@@ -1,10 +1,10 @@
-# Code Signing & Verified Publisher Guide for VoxForg
+# Code Signing & Verified Publisher Guide for VoxForge
 
 ## Why Windows Shows "Publisher: Unknown" & SmartScreen Warnings
 
-When users download `voxforg-windows-x86_64.exe` or `VoxForg-Setup.exe`, Windows Defender SmartScreen and web browsers (Edge, Chrome) flag:
+When users download `voxforge-windows-x86_64.exe` or `VoxForge-Setup.exe`, Windows Defender SmartScreen and web browsers (Edge, Chrome) flag:
 - **"Publisher: Unknown"**
-- **"voxforg-windows-x86_64.exe isn't commonly downloaded"**
+- **"voxforge-windows-x86_64.exe isn't commonly downloaded"**
 - **"Windows protected your PC"**
 
 ### How Windows Trust Actually Works:
@@ -25,7 +25,7 @@ The **SignPath Foundation** provides free code-signing certificates to qualifyin
 #### Steps to Setup:
 1. Go to [about.signpath.io/open-source](https://about.signpath.io/open-source).
 2. Click **Apply for free code signing**.
-3. Provide your repository link: `https://github.com/AMG555/VoxForg`.
+3. Provide your repository link: `https://github.com/AMG555/VoxForge`.
 4. Once approved, SignPath provides a project token and organization ID.
 5. In GitHub repo **Settings -> Secrets and variables -> Actions**, add:
    - `SIGNPATH_API_TOKEN`
@@ -37,10 +37,10 @@ The **SignPath Foundation** provides free code-signing certificates to qualifyin
 
 ### Option 2: Submit to Windows Package Manager (`winget`) (100% Free & Immediate Trust)
 
-Submitting VoxForg to Microsoft's official `winget-pkgs` catalog bypasses browser download warnings entirely. Users can install VoxForg via PowerShell or Terminal:
+Submitting VoxForge to Microsoft's official `winget-pkgs` catalog bypasses browser download warnings entirely. Users can install VoxForge via PowerShell or Terminal:
 
 ```powershell
-winget install VoxForg
+winget install VoxForge
 ```
 
 #### Why Winget Works So Well:
@@ -56,7 +56,7 @@ winget install VoxForg
    ```
 2. Submit the latest release installer:
    ```powershell
-   wingetcreate new https://github.com/AMG555/VoxForg/releases/download/v0.1.0/VoxForg-Setup-v0.1.0-windows-x64.exe
+   wingetcreate new https://github.com/AMG555/VoxForge/releases/download/v0.1.0/VoxForge-Setup-v0.1.0-windows-x64.exe
    ```
 3. `wingetcreate` will automatically download the binary, calculate the SHA-256 hash, generate the YAML manifests, and submit a Pull Request to `microsoft/winget-pkgs`.
 
@@ -77,4 +77,4 @@ Once you have an exportable `.pfx` certificate file:
 2. Add secrets to GitHub repository:
    - `WINDOWS_CERT_BASE64`: Paste the Base64 string.
    - `WINDOWS_CERT_PASSWORD`: Certificate password.
-3. The VoxForg release workflow automatically signs all `.exe` binaries and installers on every new release.
+3. The VoxForge release workflow automatically signs all `.exe` binaries and installers on every new release.

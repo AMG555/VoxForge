@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "voxforg": {
+    "voxforge": {
       "command": "cargo",
       "args": [
         "run",
         "-p",
-        "voxforg-cli",
+        "voxforge-cli",
         "--",
         "mcp"
       ],

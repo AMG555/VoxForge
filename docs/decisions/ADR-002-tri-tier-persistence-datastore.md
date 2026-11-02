@@ -7,7 +7,7 @@ Accepted
 2026-09-05
 
 ## Context
-VoxForg targets three distinct deployment profiles:
+VoxForge targets three distinct deployment profiles:
 1. **Desktop & Single-Binary**: Standalone local user running on a laptop with zero database setup.
 2. **Self-Hosted Docker**: Developer or company running a private instance with multiple concurrent users and persistent job history.
 3. **Cloud Multi-Tenant**: Managed cloud instance backed by Supabase with Row-Level Security (RLS).
@@ -16,7 +16,7 @@ Hard-coding a single database driver (e.g. Postgres-only or SQLite-only) alienat
 
 ## Decision
 Abstract persistence behind a unified asynchronous Rust trait: `DataStore`. Implement three decoupled backends:
-1. `SqliteStore`: Default for single binary and desktop (`voxforg.db` in WAL mode with embedded migrations).
+1. `SqliteStore`: Default for single binary and desktop (`voxforge.db` in WAL mode with embedded migrations).
 2. `PostgresStore`: Selected when `DATABASE_URL=postgres://...` is set.
 3. `SupabaseStore`: Supports cloud synchronization and Supabase Auth JWT verification.
 

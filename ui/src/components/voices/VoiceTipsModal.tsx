@@ -199,7 +199,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
               </div>
 
               <div className="p-3.5 rounded-lg bg-[#0A0E14] border border-[#242E3D] font-mono text-xs text-[#94A3B8]">
-                💡 <span className="text-white font-semibold">Pro Studio Tip:</span> Click the <strong className="text-amber-400">Assess Audio Quality</strong> button inside the Clone Voice modal before saving. VoxForg will instantly verify SNR ratio, clipping thresholds, and frequency response!
+                💡 <span className="text-white font-semibold">Pro Studio Tip:</span> Click the <strong className="text-amber-400">Assess Audio Quality</strong> button inside the Clone Voice modal before saving. VoxForge will instantly verify SNR ratio, clipping thresholds, and frequency response!
               </div>
             </div>
           )}
@@ -295,7 +295,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
                 <div>
                   <h4 className="font-semibold text-purple-200 text-sm">Paralinguistic Emotional Expression Tags</h4>
                   <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">
-                    VoxForg includes a physiological biometric paralinguistic tag processor. Inserting these bracketed tags inline in your prompt instructs the acoustic synthesis pipeline to inject natural non-verbal human vocal inflections.
+                    VoxForge includes a physiological biometric paralinguistic tag processor. Inserting these bracketed tags inline in your prompt instructs the acoustic synthesis pipeline to inject natural non-verbal human vocal inflections.
                   </p>
                 </div>
               </div>
@@ -405,7 +405,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
                 <div>
                   <h4 className="font-semibold text-cyan-200 text-sm">100% Neural Zero-Shot Diffusion Sidecar</h4>
                   <p className="text-xs text-[#94A3B8] mt-1 leading-relaxed">
-                    By default, VoxForg runs its high-realism biometric DSP engine. For true 100% neural cloning where every breath, accent, and inflection matches your clone sample with zero compromise, VoxForg automatically detects external diffusion sidecars!
+                    By default, VoxForge runs its high-realism biometric DSP engine. For true 100% neural cloning where every breath, accent, and inflection matches your clone sample with zero compromise, VoxForge automatically detects external diffusion sidecars!
                   </p>
                 </div>
               </div>
@@ -442,7 +442,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
               <div className="p-3.5 rounded-xl bg-[#121822] border border-[#242E3D] space-y-2">
                 <h5 className="text-xs font-semibold text-white">How Auto-Detection Works:</h5>
                 <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  Simply run any of the above models locally (or in Docker/WSL). VoxForg continuously probes ports <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">9000</code>, <code className="text-indigo-300 bg-black/40 px-1 py-0.5 rounded">8880</code>, and <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">5000</code>. When detected, VoxForg transparently routes reference audio directly to the neural sidecar with zero manual configuration!
+                  Simply run any of the above models locally (or in Docker/WSL). VoxForge continuously probes ports <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">9000</code>, <code className="text-indigo-300 bg-black/40 px-1 py-0.5 rounded">8880</code>, and <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">5000</code>. When detected, VoxForge transparently routes reference audio directly to the neural sidecar with zero manual configuration!
                 </p>
               </div>
             </div>
@@ -453,7 +453,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
         <div className="p-4 border-t border-[#242E3D] bg-[#121822] shrink-0 flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs text-[#94A3B8] font-mono">
             <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-            <span>VoxForg Biometric Audio Architecture v0.2.0</span>
+            <span>VoxForge Biometric Audio Architecture v0.2.0</span>
           </div>
           <button
             type="button"

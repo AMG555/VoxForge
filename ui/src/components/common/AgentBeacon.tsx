@@ -22,12 +22,12 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
       setIsSpeaking(false);
     };
 
-    window.addEventListener('voxforg:agent-start', handleAgentStart);
-    window.addEventListener('voxforg:agent-end', handleAgentEnd);
+    window.addEventListener('voxforge:agent-start', handleAgentStart);
+    window.addEventListener('voxforge:agent-end', handleAgentEnd);
 
     // Initial MCP readiness ping
     const endpoint = serverUrl ? `${serverUrl}/mcp` : '/mcp';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('voxforg_api_key') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -43,8 +43,8 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
       .catch(() => setMcpHealth('idle'));
 
     return () => {
-      window.removeEventListener('voxforg:agent-start', handleAgentStart);
-      window.removeEventListener('voxforg:agent-end', handleAgentEnd);
+      window.removeEventListener('voxforge:agent-start', handleAgentStart);
+      window.removeEventListener('voxforge:agent-end', handleAgentEnd);
     };
   }, [serverUrl]);
 
@@ -129,7 +129,7 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
               </div>
               <div className="flex items-center justify-between text-[#94A3B8]">
                 <span>Header Binding:</span>
-                <span className="text-amber-400 font-mono">X-VoxForg-Client-Id</span>
+                <span className="text-amber-400 font-mono">X-VoxForge-Client-Id</span>
               </div>
               <div className="flex items-center justify-between text-[#94A3B8]">
                 <span>Supported Clients:</span>

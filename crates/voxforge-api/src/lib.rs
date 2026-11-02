@@ -1,0 +1,1361 @@
+#![recursion_limit = "256"]
+
+pub mod metrics;
+pub mod middleware;
+pub mod routes;
+pub mod state;
+
+use axum::http::HeaderValue;
+use axum::{
+    extract::DefaultBodyLimit, middleware::from_fn, middleware::from_fn_with_state, Router,
+};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::trace::TraceLayer;
+
+pub use state::AppState;
+
+pub fn create_app(state: AppState) -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(
+            |origin: &HeaderValue, _parts: &axum::http::request::Parts| {
+                if let Ok(origin_str) = origin.to_str() {
+                    if origin_str.starts_with("http://localhost")
+                        || origin_str.starts_with("https://localhost")
+                        || origin_str.starts_with("http://127.0.0.1")
+                        || origin_str.starts_with("https://127.0.0.1")
+                        || origin_str.starts_with("http://[::1]")
+                        || origin_str.starts_with("vscode-webview://")
+                        || origin_str.starts_with("app://")
+                    {
+                        return true;
+                    }
+                    if let Ok(allowed) = std::env::var("VOXFORGE_ALLOWED_ORIGINS") {
+                        for item in allowed.split(',') {
+                            if item.trim().eq_ignore_ascii_case(origin_str) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            },
+        ))
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    routes::build_api_router()
+        .layer(from_fn(middleware::host_validation))
+        .layer(from_fn_with_state(
+            state.clone(),
+            middleware::auth_middleware,
+        ))
+        .layer(from_fn(middleware::security_headers))
+        .layer(from_fn_with_state(
+            state.clone(),
+            middleware::request_id_and_metrics,
+        ))
+        .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
+        .layer(cors)
+        .layer(TraceLayer::new_for_http())
+        .fallback(routes::embedded_ui::static_handler)
+        .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use http_body_util::BodyExt;
+    use std::sync::Arc;
+    use tower::ServiceExt;
+    use uuid::Uuid;
+    use voxforge_core::models::{NodeType, PipelineDefinition, PipelineNode};
+    use voxforge_core::store::memory::MemoryStore;
+    use voxforge_engine::{EngineRegistry, MockTtsEngine};
+    use voxforge_hardware::HardwareProbe;
+
+    async fn setup_test_state(api_key: Option<String>) -> AppState {
+        let registry = Arc::new(EngineRegistry::new());
+        let mock_engine = Arc::new(MockTtsEngine::new(24000));
+        registry.register(mock_engine).await;
+
+        let store = Arc::new(MemoryStore::new());
+        let hardware = HardwareProbe::probe();
+        AppState::new(registry, store, hardware, api_key)
+    }
+
+    #[tokio::test]
+    async fn test_health_route() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/health")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers().get("x-content-type-options").unwrap(),
+            "nosniff"
+        );
+        assert_eq!(res.headers().get("x-frame-options").unwrap(), "DENY");
+    }
+
+    #[tokio::test]
+    async fn test_host_header_validation_blocks_rebinding() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let evil_req = Request::builder()
+            .uri("/health")
+            .header("host", "evil-attacker-site.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let evil_res = app.oneshot(evil_req).await.unwrap();
+        assert_eq!(evil_res.status(), StatusCode::FORBIDDEN);
+
+        let state2 = setup_test_state(None).await;
+        let app2 = create_app(state2);
+        let valid_req = Request::builder()
+            .uri("/health")
+            .header("host", "localhost:8080")
+            .body(Body::empty())
+            .unwrap();
+
+        let valid_res = app2.oneshot(valid_req).await.unwrap();
+        assert_eq!(valid_res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_readiness_route() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/health/ready")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "ready");
+        assert!(json["registered_engines"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_models_list_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/v1/models")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["object"], "list");
+        assert!(!json["data"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_voices_list_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/v1/voices")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["total"].as_u64().unwrap() >= 2);
+    }
+
+    #[tokio::test]
+    async fn test_openai_speech_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "input": "Testing OpenAI speech route",
+            "voice": "mock-en-female",
+            "response_format": "wav",
+            "speed": 1.0
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/wav");
+    }
+
+    #[tokio::test]
+    async fn test_openai_speech_with_paralinguistic_emotion_tags() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "input": "That is incredible! [laugh] I really love it. [sigh] Goodbye.",
+            "voice": "mock-en-female",
+            "response_format": "wav",
+            "speed": 1.0,
+            "crossfade_ms": 25
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/wav");
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert!(body.len() > 100);
+        assert_eq!(&body[0..4], b"RIFF");
+    }
+
+    #[tokio::test]
+    async fn test_assess_reference_audio_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let pcm: Vec<i16> = (0..24000)
+            .map(|i| ((i as f32 * 0.05).sin() * 12000.0) as i16)
+            .collect();
+        let wav = voxforge_audio::WavEncoder::encode_pcm16_to_wav(&pcm, 24000, 1).unwrap();
+        let hex_audio = hex::encode(&wav);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/assess")
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "audio_base64": hex_audio
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["sample_rate"], 24000);
+        assert!(!json["is_silent"].as_bool().unwrap());
+        assert!(json["clarity_rating"].is_string());
+    }
+
+    #[tokio::test]
+    async fn test_verify_voice_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let pcm: Vec<i16> = (0..9600)
+            .map(|i| ((i as f32 * 0.05).sin() * 12000.0) as i16)
+            .collect();
+        let wav = voxforge_audio::WavEncoder::encode_pcm16_to_wav(&pcm, 24000, 1).unwrap();
+        let hex_audio = hex::encode(&wav);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/verify")
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "reference_audio_base64": hex_audio,
+                    "test_audio_base64": hex_audio
+                })
+                .to_string(),
+            ))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["is_match"].as_bool().unwrap());
+        let sim = json["similarity_score"].as_f64().unwrap();
+        assert!(sim > 0.95);
+        assert_eq!(json["confidence_rating"], "high");
+    }
+
+    #[tokio::test]
+    async fn test_openai_speech_empty_input_fails() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "input": "   ",
+            "voice": "mock-en-female"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_openai_speech_missing_voice_fails() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "model": "non-existent-engine",
+            "input": "Valid text input",
+            "voice": "non-existent-voice"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_qa_ab_test_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "name": "API QA Evaluation",
+            "text": "Automated evaluation comparison.",
+            "variant_a": {
+                "text": "",
+                "voice_id": "mock-en-female",
+                "speed": 1.0,
+                "pitch": 0.0,
+                "format": "wav"
+            },
+            "variant_b": {
+                "text": "",
+                "voice_id": "mock-en-male",
+                "speed": 1.2,
+                "pitch": 2.0,
+                "format": "wav"
+            }
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/qa/ab-test")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["scenario_name"], "API QA Evaluation");
+        assert!(json["variant_a"]["latency_ms"].is_f64());
+        assert!(json["variant_b"]["latency_ms"].is_f64());
+        assert!(!json["recommended_variant"].as_str().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_qa_ab_test_empty_text_rejected() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let payload = serde_json::json!({
+            "name": "Empty Test",
+            "text": "  ",
+            "variant_a": { "text": "", "voice_id": "mock-en-female" },
+            "variant_b": { "text": "", "voice_id": "mock-en-male" }
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/qa/ab-test")
+            .header("Content-Type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_execute_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let pipeline = PipelineDefinition {
+            id: Uuid::new_v4(),
+            name: "API Pipeline Test".to_string(),
+            description: None,
+            nodes: vec![
+                PipelineNode {
+                    id: "p1".to_string(),
+                    name: "In".to_string(),
+                    node_type: NodeType::TextInput,
+                    params: serde_json::json!({ "text": "Testing pipeline execution via API" }),
+                    position: None,
+                },
+                PipelineNode {
+                    id: "p2".to_string(),
+                    name: "Synth".to_string(),
+                    node_type: NodeType::Synthesizer,
+                    params: serde_json::json!({}),
+                    position: None,
+                },
+                PipelineNode {
+                    id: "p3".to_string(),
+                    name: "Out".to_string(),
+                    node_type: NodeType::OutputSink,
+                    params: serde_json::json!({}),
+                    position: None,
+                },
+            ],
+            edges: vec![
+                voxforge_core::models::PipelineEdge {
+                    id: "e1".to_string(),
+                    from_node: "p1".to_string(),
+                    to_node: "p2".to_string(),
+                    from_port: None,
+                    to_port: None,
+                },
+                voxforge_core::models::PipelineEdge {
+                    id: "e2".to_string(),
+                    from_node: "p2".to_string(),
+                    to_node: "p3".to_string(),
+                    from_port: None,
+                    to_port: None,
+                },
+            ],
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/pipeline/execute")
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&serde_json::json!({
+                    "pipeline": pipeline,
+                    "input_text": null
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/wav");
+    }
+
+    #[tokio::test]
+    async fn test_auth_middleware_flow() {
+        let state = setup_test_state(Some("secret-token-123".to_string())).await;
+        let app = create_app(state);
+
+        // 1. Missing auth header -> 401 Unauthorized
+        let unauth_req = Request::builder()
+            .uri("/v1/models")
+            .body(Body::empty())
+            .unwrap();
+        let res1 = app.clone().oneshot(unauth_req).await.unwrap();
+        assert_eq!(res1.status(), StatusCode::UNAUTHORIZED);
+
+        // 2. Invalid auth token -> 401 Unauthorized
+        let bad_token_req = Request::builder()
+            .uri("/v1/models")
+            .header("Authorization", "Bearer wrong-token")
+            .body(Body::empty())
+            .unwrap();
+        let res2 = app.clone().oneshot(bad_token_req).await.unwrap();
+        assert_eq!(res2.status(), StatusCode::UNAUTHORIZED);
+
+        // 2b. Partial prefix match (timing attack simulation) -> 401 Unauthorized
+        let near_token_req = Request::builder()
+            .uri("/v1/models")
+            .header("Authorization", "Bearer secret-token-124")
+            .body(Body::empty())
+            .unwrap();
+        let res2b = app.clone().oneshot(near_token_req).await.unwrap();
+        assert_eq!(res2b.status(), StatusCode::UNAUTHORIZED);
+
+        // 2c. Substring match (shorter length) -> 401 Unauthorized
+        let short_token_req = Request::builder()
+            .uri("/v1/models")
+            .header("Authorization", "Bearer secret-token")
+            .body(Body::empty())
+            .unwrap();
+        let res2c = app.clone().oneshot(short_token_req).await.unwrap();
+        assert_eq!(res2c.status(), StatusCode::UNAUTHORIZED);
+
+        // 2d. Superstring match (longer length) -> 401 Unauthorized
+        let long_token_req = Request::builder()
+            .uri("/v1/models")
+            .header("Authorization", "Bearer secret-token-123-extended")
+            .body(Body::empty())
+            .unwrap();
+        let res2d = app.clone().oneshot(long_token_req).await.unwrap();
+        assert_eq!(res2d.status(), StatusCode::UNAUTHORIZED);
+
+        // 3. Valid token -> 200 OK
+        let valid_token_req = Request::builder()
+            .uri("/v1/models")
+            .header("Authorization", "Bearer secret-token-123")
+            .body(Body::empty())
+            .unwrap();
+        let res3 = app.clone().oneshot(valid_token_req).await.unwrap();
+        assert_eq!(res3.status(), StatusCode::OK);
+
+        // 4. Public route (/health) bypasses auth -> 200 OK
+        let health_req = Request::builder()
+            .uri("/health")
+            .body(Body::empty())
+            .unwrap();
+        let res4 = app.clone().oneshot(health_req).await.unwrap();
+        assert_eq!(res4.status(), StatusCode::OK);
+
+        // 5. Public routes (/docs and /openapi.json) bypass auth -> 200 OK
+        let docs_req = Request::builder().uri("/docs").body(Body::empty()).unwrap();
+        let res5 = app.clone().oneshot(docs_req).await.unwrap();
+        assert_eq!(res5.status(), StatusCode::OK);
+
+        let openapi_req = Request::builder()
+            .uri("/openapi.json")
+            .body(Body::empty())
+            .unwrap();
+        let res6 = app.oneshot(openapi_req).await.unwrap();
+        assert_eq!(res6.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_scalar_docs_html_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder().uri("/docs").body(Body::empty()).unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers().get("content-type").unwrap(),
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(res.headers().get("x-frame-options").unwrap(), "SAMEORIGIN");
+        let csp = res
+            .headers()
+            .get("content-security-policy")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(csp.contains("https://cdn.jsdelivr.net"));
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let html = String::from_utf8(body.to_vec()).unwrap();
+        assert!(html.contains("VoxForge API Reference"));
+        assert!(html.contains("@scalar/api-reference"));
+    }
+
+    #[tokio::test]
+    async fn test_openapi_spec_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/openapi.json")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers().get("content-type").unwrap(),
+            "application/json"
+        );
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["openapi"], "3.1.0");
+        assert_eq!(json["info"]["title"], "VoxForge Neural Audio Engine API");
+        assert!(json["paths"]["/v1/audio/speech"].is_object());
+        assert!(json["paths"]["/v1/pipeline/execute"].is_object());
+        assert!(json["paths"]["/v1/qa/ab-test"].is_object());
+        assert!(json["components"]["schemas"]["PipelineDefinition"].is_object());
+    }
+
+    #[tokio::test]
+    async fn test_metrics_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+        let req = Request::builder()
+            .uri("/metrics")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert!(res
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("text/plain"));
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("voxforge_active_requests"));
+        assert!(text.contains("voxforge_synthesis_total"));
+        assert!(text.contains("voxforge_cache_hits_total"));
+    }
+
+    #[tokio::test]
+    async fn test_speech_input_limit_and_request_id() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // Input exceeding 50,000 chars should return 422
+        let huge_text = "a".repeat(50_001);
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "voice": "mock-en-female",
+            "input": huge_text
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .header("x-request-id", "test-trace-12345")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            res.headers().get("x-request-id").unwrap(),
+            "test-trace-12345"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_raw_pcm_synthesis_format() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "voice": "mock-en-female",
+            "input": "Testing raw PCM format delivery",
+            "response_format": "pcm"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/pcm");
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert!(!body.is_empty());
+        // Raw PCM has no "RIFF" WAV header
+        assert!(!body.starts_with(b"RIFF"));
+    }
+
+    #[tokio::test]
+    async fn test_readiness_deep_health_probing() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let req = Request::builder()
+            .uri("/health/ready")
+            .body(Body::empty())
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "ready");
+        assert_eq!(json["engine_health"]["mock-tts"], "healthy");
+        assert_eq!(json["healthy_engines"], 1);
+    }
+
+    #[tokio::test]
+    async fn test_streaming_speech_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let payload = serde_json::json!({
+            "model": "mock-tts",
+            "voice": "mock-en-female",
+            "input": "Testing real-time chunked transfer encoding stream"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech/stream")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/pcm");
+
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert!(!body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_voice_identity_crud() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. List initial identities (contains defaults)
+        let req = Request::builder()
+            .uri("/v1/voice-identities")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["count"].as_u64().unwrap() >= 2);
+
+        // 2. Create custom voice identity
+        let custom_identity = serde_json::json!({
+            "id": "narrator-en",
+            "display_name": "Studio Narrator",
+            "quality": "high",
+            "style": "narration",
+            "accent": "en-US",
+            "gender": "male",
+            "engine_mappings": [
+                { "engine_id": "mock-tts", "voice_id": "mock-en-male", "priority": 1 }
+            ]
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voice-identities")
+            .header("content-type", "application/json")
+            .body(Body::from(custom_identity.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        // 3. Fetch single identity
+        let req = Request::builder()
+            .uri("/v1/voice-identities/narrator-en")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["display_name"], "Studio Narrator");
+
+        // 4. Delete identity
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/v1/voice-identities/narrator-en")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_speech_with_voice_identity_resolution() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // "default-female" is registered by default with mock-tts fallback
+        let payload = serde_json::json!({
+            "model": "auto",
+            "voice": "default-female",
+            "input": "Portable voice identity test through speech endpoint"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/wav");
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        assert!(!body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_worker_registration_and_lifecycle() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let worker_id = Uuid::new_v4();
+        let payload = serde_json::json!({
+            "worker_id": worker_id,
+            "hardware": HardwareProbe::probe(),
+            "models": ["qwen3-tts", "piper"],
+            "capacity": 4,
+            "address": "http://127.0.0.1:9099"
+        });
+
+        // 1. Register worker
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/workers/register")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        // 2. List workers
+        let req = Request::builder()
+            .uri("/v1/workers")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["count"], 1);
+
+        // 3. Get single worker
+        let req = Request::builder()
+            .uri(format!("/v1/workers/{worker_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // 4. Heartbeat
+        let req = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/workers/{worker_id}/heartbeat"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // 5. Deregister worker
+        let req = Request::builder()
+            .method("DELETE")
+            .uri(format!("/v1/workers/{worker_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_speech_explicit_worker_missing() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let payload = serde_json::json!({
+            "model": "worker:non-existent-cluster-engine",
+            "voice": "mock-en-female",
+            "input": "Testing explicit worker node routing"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["title"], "No Worker Available");
+    }
+
+    #[tokio::test]
+    async fn test_voice_cloning_and_profile_crud() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. List initial profiles (has seeded base profiles)
+        let req = Request::builder()
+            .uri("/v1/voices/profiles")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["count"].as_u64().unwrap() >= 2);
+
+        // 2. Clone a new voice using mock-tts engine
+        let fake_pcm: Vec<i16> = (0..1600).map(|i| ((i % 50) * 200) as i16).collect();
+        let bytes: Vec<u8> = fake_pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let b64 = hex::encode(bytes);
+
+        let clone_payload = serde_json::json!({
+            "name": "David Reporter",
+            "engine_id": "mock-tts",
+            "reference_audio_base64": b64,
+            "language": "en-US",
+            "description": "Studio investigative reporter voice",
+            "gender": "male"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/clone")
+            .header("content-type", "application/json")
+            .body(Body::from(clone_payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let profile_id = created["id"].as_str().unwrap();
+        assert_eq!(created["name"], "David Reporter");
+
+        // 3. Retrieve created profile
+        let req = Request::builder()
+            .uri(format!("/v1/voices/profiles/{profile_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // 4. Synthesize speech using the cloned profile ID
+        let synth_payload = serde_json::json!({
+            "model": "auto",
+            "voice": profile_id,
+            "input": "Synthesizing audio conditioned on cloned voice profile"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .body(Body::from(synth_payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.headers().get("content-type").unwrap(), "audio/wav");
+        let audio_bytes = res.into_body().collect().await.unwrap().to_bytes();
+        assert!(!audio_bytes.is_empty());
+
+        // 5. Delete profile
+        let req = Request::builder()
+            .method("DELETE")
+            .uri(format!("/v1/voices/profiles/{profile_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn test_asr_transcription_endpoints() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. List registered ASR engines
+        let req = Request::builder()
+            .uri("/v1/asr/engines")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["count"].as_u64().unwrap() >= 2);
+
+        // 2. Synthesize test PCM audio
+        let fake_pcm: Vec<i16> = (0..16000).map(|i| ((i % 50) * 150) as i16).collect();
+        let bytes: Vec<u8> = fake_pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let hex_audio = hex::encode(bytes);
+
+        // 3. Simple JSON transcription with default engine
+        let payload = serde_json::json!({
+            "audio_base64": hex_audio,
+            "prompt": "Testing speech recognition pipeline",
+            "response_format": "json"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/transcriptions")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let res_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(!res_json["text"].as_str().unwrap().is_empty());
+
+        // 4. Verbose JSON with word and segment timestamps
+        let payload = serde_json::json!({
+            "audio_base64": hex_audio,
+            "model": "mock-asr",
+            "response_format": "verbose_json",
+            "timestamp_granularities": ["word", "segment"]
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/transcriptions")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let verbose: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(verbose["task"], "transcribe");
+        assert!(verbose["duration_seconds"].as_f64().unwrap() > 0.0);
+        assert!(!verbose["segments"].as_array().unwrap().is_empty());
+        assert!(!verbose["words"].as_array().unwrap().is_empty());
+
+        // 5. SubRip (.srt) subtitle formatting
+        let payload = serde_json::json!({
+            "audio_base64": hex_audio,
+            "response_format": "srt"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/transcriptions")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let srt_text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(srt_text.contains("-->"));
+
+        // 6. Non-existent engine returns 404
+        let payload = serde_json::json!({
+            "audio_base64": hex_audio,
+            "model": "non-existent-asr"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/transcriptions")
+            .header("content-type", "application/json")
+            .body(Body::from(payload.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_catalog_management_endpoints() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. List all catalog models
+        let req = Request::builder()
+            .uri("/v1/catalog/models")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["count"].as_u64().unwrap() >= 6);
+
+        // 2. Filter by type=tts
+        let req = Request::builder()
+            .uri("/v1/catalog/models?type=tts")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        for m in json["models"].as_array().unwrap() {
+            assert_eq!(m["model_type"], "tts");
+        }
+
+        // 3. Install kokoro-v0_19
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/catalog/models/kokoro-v0_19/install")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "installed");
+        assert!(json["local_path"].as_str().is_some());
+
+        // 4. Retrieve single model
+        let req = Request::builder()
+            .uri("/v1/catalog/models/kokoro-v0_19")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "installed");
+
+        // 5. Uninstall model
+        let req = Request::builder()
+            .method("DELETE")
+            .uri("/v1/catalog/models/kokoro-v0_19")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "available");
+
+        // 6. Non-existent model returns 404
+        let req = Request::builder()
+            .uri("/v1/catalog/models/non-existent-model")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_embedded_ui_serving_and_spa_fallback() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. Root path serves HTML
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("text/html"));
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let html_str = String::from_utf8_lossy(&body);
+        assert!(
+            html_str.contains("root") || html_str.contains("VoxForge") || html_str.contains("html")
+        );
+
+        // 2. SPA client route (/canvas) serves index.html via fallback
+        let req = Request::builder()
+            .uri("/canvas")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("text/html"));
+
+        // 3. API route precedence (/v1/voices returns JSON, not SPA)
+        let req = Request::builder()
+            .uri("/v1/voices")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("application/json"));
+    }
+
+    #[tokio::test]
+    async fn test_favicon_ico_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let req = Request::builder()
+            .uri("/favicon.ico")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert_eq!(ct, "image/x-icon");
+    }
+
+    #[tokio::test]
+    async fn test_mcp_http_endpoints() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 1. GET /mcp returns SSE stream
+        let req = Request::builder()
+            .method("GET")
+            .uri("/mcp")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("text/event-stream"));
+
+        // 2. POST /mcp with JSON-RPC tools/list returns JSON response
+        let mcp_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+            "params": {}
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header("content-type", "application/json")
+            .header("x-voxforge-client-id", "test-agent")
+            .body(Body::from(mcp_req.to_string()))
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let ct = res.headers().get("content-type").unwrap().to_str().unwrap();
+        assert_eq!(ct, "application/json");
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json_resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json_resp["jsonrpc"], "2.0");
+        assert_eq!(json_resp["id"], 1);
+        assert!(json_resp["result"]["tools"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_refine_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let refine_body = serde_json::json!({
+            "text": "Um, like, basically testing neural refinement.",
+            "strip_fillers": true,
+            "fix_punctuation": true,
+            "strip_hallucinations": true
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/refine")
+            .header("content-type", "application/json")
+            .body(Body::from(refine_body.to_string()))
+            .unwrap();
+
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json_resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json_resp["fillers_removed"].as_u64().unwrap() >= 2);
+        assert!(!json_resp["refined_text"]
+            .as_str()
+            .unwrap()
+            .contains("basically"));
+    }
+
+    #[tokio::test]
+    async fn test_mcp_auth_hardening() {
+        let state = setup_test_state(Some("secret-mcp-key".to_string())).await;
+        let app = create_app(state);
+
+        let mcp_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/list",
+            "params": {}
+        });
+
+        // 1. Unauthenticated request to /mcp must be rejected with 401
+        let unauth_req = Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header("content-type", "application/json")
+            .body(Body::from(mcp_req.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(unauth_req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // 2. Request with Bearer authorization must succeed
+        let auth_req = Request::builder()
+            .method("POST")
+            .uri("/mcp")
+            .header("content-type", "application/json")
+            .header("authorization", "Bearer secret-mcp-key")
+            .body(Body::from(mcp_req.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(auth_req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // 3. SSE GET /mcp with query token must succeed
+        let sse_req = Request::builder()
+            .method("GET")
+            .uri("/mcp?api_key=secret-mcp-key")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.oneshot(sse_req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cors_hardening_blocks_evil_origin() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // Evil website origin must not get Access-Control-Allow-Origin header
+        let evil_req = Request::builder()
+            .method("OPTIONS")
+            .uri("/v1/models")
+            .header("origin", "https://malicious-attacker-site.com")
+            .header("access-control-request-method", "GET")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(evil_req).await.unwrap();
+        assert!(res.headers().get("access-control-allow-origin").is_none());
+
+        // Localhost origin must be permitted
+        let local_req = Request::builder()
+            .method("OPTIONS")
+            .uri("/v1/models")
+            .header("origin", "http://localhost:3000")
+            .header("access-control-request-method", "GET")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.oneshot(local_req).await.unwrap();
+        assert_eq!(
+            res.headers().get("access-control-allow-origin").unwrap(),
+            "http://localhost:3000"
+        );
+    }
+}

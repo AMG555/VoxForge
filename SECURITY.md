@@ -11,7 +11,7 @@ Only the latest active release and development branches receive security updates
 
 ## Reporting a Vulnerability
 
-The VoxForg development team takes security vulnerabilities seriously. We appreciate the responsible disclosure of security issues by researchers and contributors.
+The VoxForge development team takes security vulnerabilities seriously. We appreciate the responsible disclosure of security issues by researchers and contributors.
 
 ### How to Report
 
@@ -20,7 +20,7 @@ Please do **NOT** report security vulnerabilities via public GitHub issues or pu
 Instead, submit your report privately via one of the following channels:
 
 - **Security Email:** [amgt503@gmail.com](mailto:amgt503@gmail.com)
-- **GitHub Private Vulnerability Reporting:** Open a private advisory under the Security tab of the [VoxForg Repository](https://github.com/AMG555/VoxForg/security/advisories).
+- **GitHub Private Vulnerability Reporting:** Open a private advisory under the Security tab of the [VoxForge Repository](https://github.com/AMG555/VoxForge/security/advisories).
 
 ### What to Include
 
@@ -43,7 +43,7 @@ To help us triage and resolve your report quickly, please provide:
 
 ## Security Baseline & Architecture
 
-VoxForg adheres to an enterprise security baseline:
+VoxForge adheres to an enterprise security baseline:
 
 ### 1. Server-Side Request Forgery (SSRF) Prevention (CWE-918)
 - **Cloud Metadata Blocking:** The model router (`OpenAiRouterEngine`) unconditionally rejects all requests targeting cloud instance metadata services (`169.254.169.254`, `metadata.google.internal`, link-local IPv6).
@@ -83,6 +83,6 @@ VoxForg adheres to an enterprise security baseline:
 
 ### 8. Model Context Protocol (MCP) & Agentic IDE Hardening (CWE-306, CWE-346, CWE-22, CWE-400)
 - **Unified Authentication:** The `/mcp` HTTP and SSE endpoints enforce strict authentication whenever an API key is configured. Requests must supply a valid token via `Authorization: Bearer <token>`, `x-api-key: <token>`, or `?api_key=<token>` / `?token=<token>` (for SSE streams), verified via constant-time comparisons (`subtle::ConstantTimeEq`).
-- **Restricted CORS Policy:** Wildcard origins are strictly forbidden. CORS is restricted to local loopbacks (`localhost`, `127.0.0.1`, `[::1]`), IDE webview extensions (`vscode-webview://`, `app://`), and explicit `VOXFORG_ALLOWED_ORIGINS`, preventing cross-origin drive-by attacks from untrusted websites.
+- **Restricted CORS Policy:** Wildcard origins are strictly forbidden. CORS is restricted to local loopbacks (`localhost`, `127.0.0.1`, `[::1]`), IDE webview extensions (`vscode-webview://`, `app://`), and explicit `VOXFORGE_ALLOWED_ORIGINS`, preventing cross-origin drive-by attacks from untrusted websites.
 - **Path Sandboxing:** Tool parameters specifying filesystem paths (`output_file`, `audio_path`, `reference_audio_path`) reject directory traversal (`..`), null bytes (`\0`), and sensitive OS directories (`C:\Windows`, `/etc`, etc.), with extension allowlisting.
 - **Payload Limits:** Audio payloads (base64/hex) are capped at 32MB and input text is capped at 100,000 characters before allocation to prevent memory exhaustion DoS.

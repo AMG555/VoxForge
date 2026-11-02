@@ -1,12 +1,12 @@
-# VoxForg Turnkey One-Line Installer for Windows PowerShell
-# Usage: irm https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.ps1 | iex
+# VoxForge Turnkey One-Line Installer for Windows PowerShell
+# Usage: irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "AMG555/VoxForg"
-$InstallBase = "$env:LOCALAPPDATA\Programs\VoxForg"
+$Repo = "AMG555/VoxForge"
+$InstallBase = "$env:LOCALAPPDATA\Programs\VoxForge"
 $BinDir = "$InstallBase\bin"
-$TargetExe = "$BinDir\voxforg.exe"
+$TargetExe = "$BinDir\voxforge.exe"
 
 Write-Host @"
   _    _            ______                 
@@ -19,17 +19,17 @@ Write-Host @"
                                  |___/    
 "@ -ForegroundColor Yellow
 
-Write-Host "VoxForg Standalone Workstation Installer for Windows" -ForegroundColor White
+Write-Host "VoxForge Standalone Workstation Installer for Windows" -ForegroundColor White
 Write-Host ""
 
 # 1. Architecture check
 $Arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
 if ($Arch -ne "X64" -and $Arch -ne "Arm64") {
-    Write-Error "Unsupported CPU architecture: $Arch. VoxForg requires x64 or Arm64 Windows."
+    Write-Error "Unsupported CPU architecture: $Arch. VoxForge requires x64 or Arm64 Windows."
     exit 1
 }
 
-$BinaryName = "voxforg-windows-x86_64.exe"
+$BinaryName = "voxforge-windows-x86_64.exe"
 Write-Host "Detected Architecture: $Arch" -ForegroundColor Cyan
 
 # 2. Ensure install directory exists
@@ -40,7 +40,7 @@ if (-not (Test-Path $BinDir)) {
 # 3. Retrieve latest release tag
 $LatestTag = "v0.2.0"
 try {
-    $ReleaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="VoxForg-Installer"} -ErrorAction SilentlyContinue
+    $ReleaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="VoxForge-Installer"} -ErrorAction SilentlyContinue
     if ($ReleaseInfo -and $ReleaseInfo.tag_name) {
         $LatestTag = $ReleaseInfo.tag_name
     }
@@ -49,16 +49,16 @@ try {
 }
 
 $LocalCandidates = @(
-    "$PSScriptRoot\..\target\release\voxforg.exe",
-    "$PSScriptRoot\..\dist\voxforg.exe",
-    "$PSScriptRoot\voxforg.exe",
-    ".\target\release\voxforg.exe"
+    "$PSScriptRoot\..\target\release\voxforge.exe",
+    "$PSScriptRoot\..\dist\voxforge.exe",
+    "$PSScriptRoot\voxforge.exe",
+    ".\target\release\voxforge.exe"
 )
 
 $LocalIcoCandidates = @(
-    "$PSScriptRoot\..\assets\voxforg.ico",
-    "$PSScriptRoot\voxforg.ico",
-    ".\assets\voxforg.ico"
+    "$PSScriptRoot\..\assets\voxforge.ico",
+    "$PSScriptRoot\voxforge.ico",
+    ".\assets\voxforge.ico"
 )
 
 $FoundLocal = $false
@@ -73,7 +73,7 @@ foreach ($Cand in $LocalCandidates) {
 
 if (-not $FoundLocal) {
     $DownloadUrl = "https://github.com/$Repo/releases/download/$LatestTag/$BinaryName"
-    Write-Host "Downloading VoxForg $LatestTag..." -ForegroundColor Cyan
+    Write-Host "Downloading VoxForge $LatestTag..." -ForegroundColor Cyan
 
     try {
         Invoke-WebRequest -Uri $DownloadUrl -OutFile $TargetExe -UseBasicParsing
@@ -81,7 +81,7 @@ if (-not $FoundLocal) {
     } catch {
         Write-Warning "Direct release download unavailable. Checking for local cargo installation..."
         if (Get-Command cargo -ErrorAction SilentlyContinue) {
-            cargo install --git "https://github.com/$Repo.git" voxforg-cli --root $InstallBase
+            cargo install --git "https://github.com/$Repo.git" voxforge-cli --root $InstallBase
             Write-Host "Successfully built and installed via cargo." -ForegroundColor Green
         } else {
             Write-Error "Failed to download binary and cargo was not found. Please install Rust or check release assets."
@@ -91,7 +91,7 @@ if (-not $FoundLocal) {
 }
 
 # 4. Copy icon file alongside exe for reliable shortcut display
-$IcoTarget = "$BinDir\voxforg.ico"
+$IcoTarget = "$BinDir\voxforge.ico"
 foreach ($IcoCand in $LocalIcoCandidates) {
     if (Test-Path $IcoCand) {
         Copy-Item -Path $IcoCand -Destination $IcoTarget -Force
@@ -102,7 +102,7 @@ foreach ($IcoCand in $LocalIcoCandidates) {
 # Fallback: fetch from GitHub release if not found locally
 if (-not (Test-Path $IcoTarget)) {
     try {
-        Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$LatestTag/voxforg.ico" -OutFile $IcoTarget -UseBasicParsing -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$LatestTag/voxforge.ico" -OutFile $IcoTarget -UseBasicParsing -ErrorAction SilentlyContinue
     } catch { }
 }
 
@@ -125,24 +125,24 @@ try {
     $StartMenuPath = [Environment]::GetFolderPath("Programs")
 
     # Create silent GUI launcher script so non-developers see zero terminal window
-    $VbsLauncher = "$BinDir\voxforg-gui.vbs"
-    Set-Content -Path $VbsLauncher -Value 'CreateObject("Wscript.Shell").Run "cmd /c voxforg serve --open", 0, False' -Force
+    $VbsLauncher = "$BinDir\voxforge-gui.vbs"
+    Set-Content -Path $VbsLauncher -Value 'CreateObject("Wscript.Shell").Run "cmd /c voxforge serve --open", 0, False' -Force
 
     # Desktop Shortcut
-    $DesktopShortcut = $WshShell.CreateShortcut("$DesktopPath\VoxForg.lnk")
+    $DesktopShortcut = $WshShell.CreateShortcut("$DesktopPath\VoxForge.lnk")
     $DesktopShortcut.TargetPath = "wscript.exe"
     $DesktopShortcut.Arguments = "`"$VbsLauncher`""
     $DesktopShortcut.WorkingDirectory = "$InstallBase"
-    $DesktopShortcut.Description = "VoxForg Neural Speech Studio"
+    $DesktopShortcut.Description = "VoxForge Neural Speech Studio"
     $DesktopShortcut.IconLocation = $IconSource
     $DesktopShortcut.Save()
 
     # Start Menu Shortcut
-    $StartShortcut = $WshShell.CreateShortcut("$StartMenuPath\VoxForg.lnk")
+    $StartShortcut = $WshShell.CreateShortcut("$StartMenuPath\VoxForge.lnk")
     $StartShortcut.TargetPath = "wscript.exe"
     $StartShortcut.Arguments = "`"$VbsLauncher`""
     $StartShortcut.WorkingDirectory = "$InstallBase"
-    $StartShortcut.Description = "VoxForg Neural Speech Studio"
+    $StartShortcut.Description = "VoxForge Neural Speech Studio"
     $StartShortcut.IconLocation = $IconSource
     $StartShortcut.Save()
 
@@ -158,12 +158,12 @@ Write-Host "`nProbing system hardware..." -ForegroundColor Cyan
 Write-Host @"
 
 ==================================================
-  VoxForg Standalone Workstation Ready!
+  VoxForge Standalone Workstation Ready!
 ==================================================
 
-Desktop App:          Double-click 'VoxForg' on your Desktop
-Run via Terminal:     voxforg serve --open
-Direct synthesis:     voxforg synth "Hello from VoxForg"
+Desktop App:          Double-click 'VoxForge' on your Desktop
+Run via Terminal:     voxforge serve --open
+Direct synthesis:     voxforge synth "Hello from VoxForge"
 Documentation & API:  http://localhost:8080/docs
 
 "@ -ForegroundColor Green
