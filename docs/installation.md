@@ -1,12 +1,12 @@
-# VoxForg Installation & Deployment Guide
+# VoxForge Installation & Deployment Guide
 
-Comprehensive setup and deployment guide for the VoxForg Speech Synthesis Workstation, DAG Pipeline Engine, and Turnkey Runtime.
+Comprehensive setup and deployment guide for the VoxForge Speech Synthesis Workstation, DAG Pipeline Engine, and Turnkey Runtime.
 
 ---
 
 ## 1. Turnkey Quick Start (Zero-Setup)
 
-For the vast majority of users, developers, and creators, VoxForg can be launched or installed immediately with a single command without configuring compilers, Node.js, or external database services.
+For the vast majority of users, developers, and creators, VoxForge can be launched or installed immediately with a single command without configuring compilers, Node.js, or external database services.
 
 ### 1.1 Pre-Compiled Standalone Releases (Direct Download)
 
@@ -14,11 +14,11 @@ Download zero-install executables directly from GitHub Releases:
 
 | Platform | Asset Name | Format | Instructions |
 | :--- | :--- | :--- | :--- |
-| **Windows 10/11** | [`VoxForg-Setup-v0.1.0-windows-x64.exe`](https://github.com/AMG555/VoxForg/releases/latest/download/VoxForg-Setup-v0.1.0-windows-x64.exe) | Setup Wizard | Double click setup wizard to install with desktop icons |
-| **Windows 10/11** | [`VoxForg-Windows-x64.zip`](https://github.com/AMG555/VoxForg/releases/latest/download/VoxForg-Windows-x64.zip) | Portable Bundle | Extract zip, double-click `VoxForg-Start.bat` |
-| **Windows 10/11** | [`voxforg-windows-x86_64.exe`](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-windows-x86_64.exe) | Standalone .exe | Zero-install standalone binary |
-| **macOS** (Universal) | [`voxforg-macos-universal`](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-macos-universal) | Mach-O FAT Binary | `chmod +x voxforg-macos-universal && ./voxforg-macos-universal` |
-| **Linux** (x86_64) | [`voxforg-linux-x86_64.tar.gz`](https://github.com/AMG555/VoxForg/releases/latest/download/voxforg-linux-x86_64.tar.gz) | Tarball | `tar -xzf voxforg-linux-x86_64.tar.gz && ./voxforg-linux-x86_64` |
+| **Windows 10/11** | [`VoxForge-Setup-v0.1.0-windows-x64.exe`](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard | Double click setup wizard to install with desktop icons |
+| **Windows 10/11** | [`VoxForge-Windows-x64.zip`](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle | Extract zip, double-click `VoxForge-Start.bat` |
+| **Windows 10/11** | [`voxforge-windows-x86_64.exe`](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Standalone .exe | Zero-install standalone binary |
+| **macOS** (Universal) | [`voxforge-macos-universal`](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Mach-O FAT Binary | `chmod +x voxforge-macos-universal && ./voxforge-macos-universal` |
+| **Linux** (x86_64) | [`voxforge-linux-x86_64.tar.gz`](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball | `tar -xzf voxforge-linux-x86_64.tar.gz && ./voxforge-linux-x86_64` |
 
 ---
 
@@ -27,12 +27,12 @@ Download zero-install executables directly from GitHub Releases:
 Launch the unified workstation and local engine server immediately:
 
 ```bash
-npx voxforg
+npx voxforge
 ```
 
 What this does:
 1. Automatically queries system OS (`linux`, `darwin`, `win32`) and CPU architecture (`x64`, `arm64`).
-2. Downloads the native pre-compiled binary with embedded UI assets into `~/.voxforg/bin/`.
+2. Downloads the native pre-compiled binary with embedded UI assets into `~/.voxforge/bin/`.
 3. Clears macOS Gatekeeper quarantine flags automatically.
 4. Starts the local daemon on `http://localhost:8080`.
 5. Automatically opens your default web browser to the visual workstation.
@@ -41,21 +41,21 @@ What this does:
 
 ### 1.2 One-Line Terminal Installers
 
-Install the standalone `voxforg` executable permanently into your system `PATH`:
+Install the standalone `voxforge` executable permanently into your system `PATH`:
 
 #### Linux & macOS (POSIX Shell)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
 ```
 
 #### Windows (PowerShell)
 ```powershell
-irm https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
 ```
 
 Once installed, start the visual workstation anytime with:
 ```bash
-voxforg serve --open
+voxforge serve --open
 ```
 
 ---
@@ -67,9 +67,9 @@ Launch the self-contained workstation (daemon + embedded visual UI) in a single 
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -v voxforg_data:/app/data \
-  --name voxforg \
-  ghcr.io/amg555/voxforg:latest
+  -v voxforge_data:/app/data \
+  --name voxforge \
+  ghcr.io/amg555/voxforge:latest
 ```
 
 Open `http://localhost:8080` in your web browser.
@@ -131,12 +131,12 @@ source "$HOME/.cargo/env"
 
 #### Step 1: Clone Repository
 ```bash
-git clone https://github.com/AMG555/VoxForg.git
-cd VoxForg
+git clone https://github.com/AMG555/VoxForge.git
+cd VoxForge
 ```
 
 #### Step 2: (Optional) Recompile Webstation UI
-The repository includes pre-built production assets in `crates/voxforg-api/ui_dist/`. If you modified the React application in `ui/`:
+The repository includes pre-built production assets in `crates/voxforge-api/ui_dist/`. If you modified the React application in `ui/`:
 ```bash
 cd ui
 npm install
@@ -144,17 +144,17 @@ npm run build
 cd ..
 
 # Copy updated distribution to API crate for binary embedding
-cp -r ui/dist/* crates/voxforg-api/ui_dist/
+cp -r ui/dist/* crates/voxforge-api/ui_dist/
 ```
 
 #### Step 3: Build Rust Workspace
 ```bash
 # Build optimized release binary
-cargo build --release --bin voxforg
+cargo build --release --bin voxforge
 
 # Binary location:
-# Linux/macOS: ./target/release/voxforg
-# Windows:     .\target\release\voxforg.exe
+# Linux/macOS: ./target/release/voxforge
+# Windows:     .\target\release\voxforge.exe
 ```
 
 #### Step 4: Verify Workspace Tests
@@ -167,30 +167,30 @@ cargo test --workspace
 
 ## 3. Hardware Acceleration Setup
 
-VoxForg auto-probes compute hardware on initialization. You can verify available tiers using:
+VoxForge auto-probes compute hardware on initialization. You can verify available tiers using:
 
 ```bash
-./target/release/voxforg hardware
+./target/release/voxforge hardware
 ```
 
 ### 3.1 NVIDIA CUDA Setup (Linux / Windows)
 - Install NVIDIA Driver 550+ and CUDA Toolkit 12.0+.
 - Verify driver with `nvidia-smi`.
-- VoxForg's `HardwareProbe` detects CUDA VRAM and enables local heavy neural models.
+- VoxForge's `HardwareProbe` detects CUDA VRAM and enables local heavy neural models.
 
 ### 3.2 Apple Silicon (Metal / MPS)
 - macOS Apple Silicon systems (M1 through M4) automatically leverage unified memory and Accelerate framework vector accelerators.
 
 ### 3.3 AVX2 / AVX-512 CPU SIMD
-- On x86_64 CPUs, VoxForg detects AVX2 and AVX-512 instruction sets for real-time DSP biquad filtering and gain normalization.
+- On x86_64 CPUs, VoxForge detects AVX2 and AVX-512 instruction sets for real-time DSP biquad filtering and gain normalization.
 
 ---
 
 ## 4. Multi-Service Container Orchestration
 
 ### 4.1 Turnkey Neural Stack (`docker-compose.neural.yml`)
-To launch VoxForg with dedicated offline neural containers:
-- **VoxForg Daemon**: HTTP API, WebSocket streaming, and embedded Webstation UI on port `8080`.
+To launch VoxForge with dedicated offline neural containers:
+- **VoxForge Daemon**: HTTP API, WebSocket streaming, and embedded Webstation UI on port `8080`.
 - **Faster-Whisper Container**: Local OpenAI-compatible ASR engine on port `8000`.
 - **Kokoro-FastAPI Container**: Ultra-fast local neural TTS engine on port `8880`.
 
@@ -199,7 +199,7 @@ docker compose -f docker-compose.neural.yml up -d
 ```
 
 ### 4.2 Standard Database Stack (`docker-compose.yml`)
-To launch VoxForg with dedicated PostgreSQL storage:
+To launch VoxForge with dedicated PostgreSQL storage:
 
 ```bash
 docker compose up -d
@@ -211,23 +211,23 @@ docker compose up -d
 
 1. **Check Hardware Profiler**:
    ```bash
-   voxforg hardware
+   voxforge hardware
    ```
 2. **List Registered Engines & Voices**:
    ```bash
-   voxforg engines
+   voxforge engines
    ```
 3. **List Curated Neural Models**:
    ```bash
-   voxforg models list
+   voxforge models list
    ```
 4. **Synthesize Test Audio**:
    ```bash
-   voxforg synth "VoxForg workstation operational." --voice en-US-AriaNeural --out test.wav
+   voxforge synth "VoxForge workstation operational." --voice en-US-AriaNeural --out test.wav
    ```
 5. **Launch Server with Browser Auto-Launch**:
    ```bash
-   voxforg serve --open
+   voxforge serve --open
    ```
 6. **Verify Endpoints**:
    - Webstation Workstation: `http://localhost:8080/`

@@ -1,4 +1,4 @@
-# VoxForg UI/UX Design System & Wireframes
+# VoxForge UI/UX Design System & Wireframes
 
 **Design Direction:** High-density, dark engineering workstation.  
 **Inspiration:** Professional Digital Audio Workstation (DAW) and modular graph interfaces — responsive, tactile, high contrast, zero unnecessary fluff.  
@@ -47,7 +47,7 @@ The central workstation screen where users build complex multi-speaker, chunked 
 
 ```
 +---------------------------------------------------------------------------------------------------------------+
-| [VOXFORG]  File  Edit  View  Pipeline: [ Audiobook Narrative v2.4 (Saved) v ]     [Test Run]  [Export Master] |
+| [VOXFORGE]  File  Edit  View  Pipeline: [ Audiobook Narrative v2.4 (Saved) v ]     [Test Run]  [Export Master] |
 +---------------------------------------------------------------------------------------------------------------+
 | TOOLBOX      | CANVAS (Infinite pan & zoom, 16px dot grid)                               | NODE INSPECTOR     |
 |              |                                                                           |                    |
@@ -103,7 +103,7 @@ Interactive sandbox for testing voice engines, tuning phonetic pronunciations, a
 
 ```
 +---------------------------------------------------------------------------------------------------------------+
-| [VOXFORG]  Dashboard   Pipelines   [Voice Lab]   Batch Queue   Engines   Settings                 v1.0.0-stable |
+| [VOXFORGE]  Dashboard   Pipelines   [Voice Lab]   Batch Queue   Engines   Settings                 v1.0.0-stable |
 +---------------------------------------------------------------------------------------------------------------+
 | INSTALLED ENGINES & VOICES (42 Available)   | VOICE SYNTHESIS PLAYGROUND                                      |
 |                                             |                                                                 |
@@ -145,7 +145,7 @@ Bulk conversion dashboard for podcasts, audiobooks, and bulk API job monitoring.
 
 ```
 +---------------------------------------------------------------------------------------------------------------+
-| [VOXFORG]  Dashboard   Pipelines   Voice Lab   [Batch Queue]   Engines   Settings                 v1.0.0-stable |
+| [VOXFORGE]  Dashboard   Pipelines   Voice Lab   [Batch Queue]   Engines   Settings                 v1.0.0-stable |
 +---------------------------------------------------------------------------------------------------------------+
 | QUEUE OVERVIEW: Active Jobs: 3 | Queued: 14 | Completed: 1,842 | Throughput: 14.8x Realtime | Workers: 8/8    |
 +---------------------------------------------------------------------------------------------------------------+
@@ -177,7 +177,7 @@ Detailed hardware telemetry panel with automated capability benchmark.
 
 ```
 +---------------------------------------------------------------------------------------------------------------+
-| [VOXFORG]  Dashboard   Pipelines   Voice Lab   Batch Queue   [Engines & Hardware]   Settings      v1.0.0-stable |
+| [VOXFORGE]  Dashboard   Pipelines   Voice Lab   Batch Queue   [Engines & Hardware]   Settings      v1.0.0-stable |
 +---------------------------------------------------------------------------------------------------------------+
 | HOST TELEMETRY                                   | ENGINE CAPABILITY MATRIX                                   |
 |                                                  |                                                            |

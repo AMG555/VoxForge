@@ -18,14 +18,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: voxforg-windows-x86_64.exe
-            zip_name: VoxForg-Windows-x64.zip
+            artifact_name: voxforge-windows-x86_64.exe
+            zip_name: VoxForge-Windows-x64.zip
           - os: ubuntu-latest
-            artifact_name: voxforg-linux-x86_64
-            zip_name: voxforg-linux-x86_64.tar.gz
+            artifact_name: voxforge-linux-x86_64
+            zip_name: voxforge-linux-x86_64.tar.gz
           - os: macos-latest
-            artifact_name: voxforg-macos-universal
-            zip_name: voxforg-macos-universal.tar.gz
+            artifact_name: voxforge-macos-universal
+            zip_name: voxforge-macos-universal.tar.gz
 
     steps:
       - uses: actions/checkout@v4
@@ -43,8 +43,8 @@ jobs:
       - name: Sync UI to Embedded API Crate
         shell: bash
         run: |
-          mkdir -p crates/voxforg-api/ui_dist
-          cp -r ui/dist/* crates/voxforg-api/ui_dist/
+          mkdir -p crates/voxforge-api/ui_dist
+          cp -r ui/dist/* crates/voxforge-api/ui_dist/
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -58,30 +58,30 @@ jobs:
 
       - name: Build Standalone Rust Binary (Windows & Linux)
         if: runner.os != 'macOS'
-        run: cargo build --release --bin voxforg
+        run: cargo build --release --bin voxforge
 
       - name: Build Standalone Rust Binary (macOS Universal via lipo)
         if: runner.os == 'macOS'
         run: |
-          cargo build --release --bin voxforg --target aarch64-apple-darwin
-          cargo build --release --bin voxforg --target x86_64-apple-darwin
+          cargo build --release --bin voxforge --target aarch64-apple-darwin
+          cargo build --release --bin voxforge --target x86_64-apple-darwin
 
       - name: Package Windows Release (.exe and .zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           mkdir dist -Force
-          Copy-Item target/release/voxforg.exe -Destination dist/voxforg-windows-x86_64.exe -Force
-          Copy-Item target/release/voxforg.exe -Destination dist/voxforg.exe -Force
-          Copy-Item assets/voxforg.ico -Destination dist/voxforg.ico -Force
+          Copy-Item target/release/voxforge.exe -Destination dist/voxforge-windows-x86_64.exe -Force
+          Copy-Item target/release/voxforge.exe -Destination dist/voxforge.exe -Force
+          Copy-Item assets/voxforge.ico -Destination dist/voxforge.ico -Force
 
           # Create batch launcher
-          Set-Content -Path dist/VoxForg-Start.bat -Value "@echo off`r`nstart `"`" `"%~dp0voxforg.exe`" serve --open" -Force
+          Set-Content -Path dist/VoxForge-Start.bat -Value "@echo off`r`nstart `"`" `"%~dp0voxforge.exe`" serve --open" -Force
 
           # Create installer script with offline check and online fallback
           Set-Content -Path dist/install-desktop.bat -Value "@echo off`r`nif exist `"%~dp0..\scripts\install.ps1`" (`r`n    powershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0..\scripts\install.ps1`"`r`n) else (`r`n    powershell -NoProfile -ExecutionPolicy Bypass -Command `"& { irm https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.ps1 | iex }`"`r`n)`r`npause" -Force
 
-          Compress-Archive -Path dist/voxforg.exe, dist/voxforg.ico, dist/VoxForg-Start.bat, dist/install-desktop.bat -DestinationPath dist/VoxForg-Windows-x64.zip -Force
+          Compress-Archive -Path dist/voxforge.exe, dist/voxforge.ico, dist/VoxForge-Start.bat, dist/install-desktop.bat -DestinationPath dist/VoxForge-Windows-x64.zip -Force
 
       - name: Build Inno Setup Installer (.Setup.exe)
         if: runner.os == 'Windows'
@@ -89,7 +89,7 @@ jobs:
         run: |
           choco install innosetup -y --no-progress
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc scripts/installer/voxforg.iss
+          & $iscc scripts/installer/voxforge.iss
           Write-Host "Installer built successfully"
 
       - name: Sign Windows Binaries (if certificate configured)
@@ -123,24 +123,24 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          lipo -create -output dist/voxforg-macos-universal \
-            target/aarch64-apple-darwin/release/voxforg \
-            target/x86_64-apple-darwin/release/voxforg
+          lipo -create -output dist/voxforge-macos-universal \
+            target/aarch64-apple-darwin/release/voxforge \
+            target/x86_64-apple-darwin/release/voxforge
           # Provide arch-specific copies so install.sh and npm runner succeed on any architecture
-          cp dist/voxforg-macos-universal dist/voxforg-macos-aarch64
-          cp dist/voxforg-macos-universal dist/voxforg-macos-x86_64
-          cp dist/voxforg-macos-universal dist/voxforg-macos-arm64
-          chmod +x dist/voxforg-macos*
-          tar -czvf dist/voxforg-macos-universal.tar.gz -C dist voxforg-macos-universal
+          cp dist/voxforge-macos-universal dist/voxforge-macos-aarch64
+          cp dist/voxforge-macos-universal dist/voxforge-macos-x86_64
+          cp dist/voxforge-macos-universal dist/voxforge-macos-arm64
+          chmod +x dist/voxforge-macos*
+          tar -czvf dist/voxforge-macos-universal.tar.gz -C dist voxforge-macos-universal
 
       - name: Package Linux Release (.tar.gz and Standalone)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           mkdir -p dist
-          cp target/release/voxforg dist/voxforg-linux-x86_64
-          chmod +x dist/voxforg-linux-x86_64
-          tar -czvf dist/voxforg-linux-x86_64.tar.gz -C dist voxforg-linux-x86_64
+          cp target/release/voxforge dist/voxforge-linux-x86_64
+          chmod +x dist/voxforge-linux-x86_64
+          tar -czvf dist/voxforge-linux-x86_64.tar.gz -C dist voxforge-linux-x86_64
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2

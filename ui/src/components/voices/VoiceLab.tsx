@@ -253,7 +253,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
   // Pro Studio Audio Mastering and Cadence Humanizer state
   const [studioMode, setStudioMode] = useState<boolean>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('voxforg_studio_pro_mode') === 'true' : false;
+    return typeof window !== 'undefined' ? localStorage.getItem('voxforge_studio_pro_mode') === 'true' : false;
   });
   const [studioConfig, setStudioConfig] = useState<StudioMasteringConfig>(() => {
     return { ...DEFAULT_STUDIO_MASTERING, enabled: true };
@@ -361,7 +361,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
     const next = !studioMode;
     setStudioMode(next);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('voxforg_studio_pro_mode', String(next));
+      localStorage.setItem('voxforge_studio_pro_mode', String(next));
     }
   };
 
@@ -455,7 +455,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       });
       if (!studioMode) {
         setStudioMode(true);
-        if (typeof window !== 'undefined') localStorage.setItem('voxforg_studio_pro_mode', 'true');
+        if (typeof window !== 'undefined') localStorage.setItem('voxforge_studio_pro_mode', 'true');
       }
     }
     setPresetUploadStatus(`Preset "${preset.name}" loaded and active!`);
@@ -538,16 +538,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
   // Router Multi-Platform config state
   const [routerProvider, setRouterProvider] = useState<'openrouter' | 'openai' | 'groq' | 'together' | 'custom'>(() => {
-    return (typeof window !== 'undefined' ? (localStorage.getItem('voxforg_router_provider') as any) : null) || 'openrouter';
+    return (typeof window !== 'undefined' ? (localStorage.getItem('voxforge_router_provider') as any) : null) || 'openrouter';
   });
   const [apiKeyInput, setApiKeyInput] = useState<string>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('voxforg_api_key') || '' : '';
+    return typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') || '' : '';
   });
   const [routerModelInput, setRouterModelInput] = useState<string>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('voxforg_router_model') || 'openai/tts-1' : 'openai/tts-1';
+    return typeof window !== 'undefined' ? localStorage.getItem('voxforge_router_model') || 'openai/tts-1' : 'openai/tts-1';
   });
   const [routerCustomUrl, setRouterCustomUrl] = useState<string>(() => {
-    return typeof window !== 'undefined' ? localStorage.getItem('voxforg_router_url') || '' : '';
+    return typeof window !== 'undefined' ? localStorage.getItem('voxforge_router_url') || '' : '';
   });
   const [keySaved, setKeySaved] = useState<boolean>(false);
 
@@ -733,18 +733,18 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
     setRouterModelInput(defaultModel);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('voxforg_router_provider', provider);
-      localStorage.setItem('voxforg_router_model', defaultModel);
+      localStorage.setItem('voxforge_router_provider', provider);
+      localStorage.setItem('voxforge_router_model', defaultModel);
     }
   };
 
   const handleSaveRouterConfig = () => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('voxforg_router_provider', routerProvider);
-      localStorage.setItem('voxforg_api_key', apiKeyInput.trim());
-      localStorage.setItem('voxforg_router_model', routerModelInput.trim());
+      localStorage.setItem('voxforge_router_provider', routerProvider);
+      localStorage.setItem('voxforge_api_key', apiKeyInput.trim());
+      localStorage.setItem('voxforge_router_model', routerModelInput.trim());
       if (routerCustomUrl.trim()) {
-        localStorage.setItem('voxforg_router_url', routerCustomUrl.trim());
+        localStorage.setItem('voxforge_router_url', routerCustomUrl.trim());
       }
       setKeySaved(true);
       setTimeout(() => setKeySaved(false), 2500);
@@ -2073,7 +2073,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   </div>
                   <div>
                     <h3 className="text-xs font-bold text-white flex items-center space-x-2">
-                      <span>VOXFORG PRO STUDIO MASTERING RACK</span>
+                      <span>VOXFORGE PRO STUDIO MASTERING RACK</span>
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
                         DSP 24kHz
                       </span>
@@ -2990,7 +2990,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
                           <a
                             href={take.audioUrl}
-                            download={`voxforg_take_${take.takeNumber}_${take.voiceId}.wav`}
+                            download={`voxforge_take_${take.takeNumber}_${take.voiceId}.wav`}
                             className="p-1.5 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white border border-[#242E3D] transition-colors"
                             title="Download Take WAV"
                           >

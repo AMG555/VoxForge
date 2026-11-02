@@ -1,0 +1,41 @@
+[package]
+name = "voxforge-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+voxforge-core          = { workspace = true }
+voxforge-engine        = { workspace = true }
+voxforge-hardware      = { workspace = true }
+voxforge-audio         = { workspace = true }
+voxforge-pipeline      = { workspace = true }
+voxforge-router        = { workspace = true }
+voxforge-pronunciation = { workspace = true }
+voxforge-benchmark     = { workspace = true }
+voxforge-worker        = { workspace = true }
+voxforge-asr           = { workspace = true }
+voxforge-catalog       = { workspace = true }
+voxforge-mcp           = { workspace = true }
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tokio = { workspace = true, features = ["full"] }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+subtle.workspace = true
+futures.workspace = true
+hex.workspace = true
+hound.workspace = true
+regex.workspace = true
+rust-embed = { version = "8.5", features = ["interpolate-folder-path"] }
+mime_guess = "2.0"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+reqwest = { workspace = true, features = ["json"] }
+http-body-util = { workspace = true }

@@ -1,12 +1,12 @@
 # Model Context Protocol (MCP) & AI Agent Integration Guide
 
-VoxForg provides a first-class, enterprise-hardened **Model Context Protocol (MCP)** implementation (`crates/voxforg-mcp`). This enables any agentic IDE or AI coding framework (Cursor, Claude Desktop, Google Antigravity, Windsurf, VSCode Cline / Roo Code, AutoGen, CrewAI, LangChain) to connect to VoxForg, discover capabilities, inspect real-time compute hardware, synthesize studio-quality speech, clone voices, transcribe media, and orchestrate complex audio DAG pipelines.
+VoxForge provides a first-class, enterprise-hardened **Model Context Protocol (MCP)** implementation (`crates/voxforge-mcp`). This enables any agentic IDE or AI coding framework (Cursor, Claude Desktop, Google Antigravity, Windsurf, VSCode Cline / Roo Code, AutoGen, CrewAI, LangChain) to connect to VoxForge, discover capabilities, inspect real-time compute hardware, synthesize studio-quality speech, clone voices, transcribe media, and orchestrate complex audio DAG pipelines.
 
 ---
 
 ## 1. Architectural Transports
 
-VoxForg supports two distinct MCP communication transports:
+VoxForge supports two distinct MCP communication transports:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ VoxForg supports two distinct MCP communication transports:
                │ (JSON-RPC 2.0 via STDIO)   │ (Streamable HTTP / SSE)
                ▼                            ▼
 ┌──────────────────────────────┐ ┌─────────────────────────┐
-│     voxforg-cli (mcp)        │ │   voxforg-api (serve)   │
+│     voxforge-cli (mcp)        │ │   voxforge-api (serve)   │
 │  - Dedicated stdio pipes     │ │  - /mcp (HTTP POST)     │
 │  - Stderr-routed logging     │ │  - /mcp (SSE GET)       │
 │  - Zero network port binding │ │  - Constant-time Auth   │
@@ -26,7 +26,7 @@ VoxForg supports two distinct MCP communication transports:
                │                            │
                ▼                            ▼
 ┌──────────────────────────────────────────────────────────┐
-│                   VoxForg Core Runtimes                  │
+│                   VoxForge Core Runtimes                  │
 │  - Engines: Edge, Kokoro, Piper, Qwen3-TTS, OpenAI Router │
 │  - Whisper ASR & Video Demuxer                           │
 │  - Audio DSP: Watermarking, Time-Stretch, Equalizer      │
@@ -35,13 +35,13 @@ VoxForg supports two distinct MCP communication transports:
 ```
 
 ### Transport 1: Local Standard I/O (`stdio`)
-- **Invocation:** `voxforg mcp` or `cargo run -p voxforg-cli -- mcp`
+- **Invocation:** `voxforge mcp` or `cargo run -p voxforge-cli -- mcp`
 - **Mechanism:** Standard JSON-RPC 2.0 messages delimited by newlines over `stdin` and `stdout`.
 - **Log Isolation:** All internal tracing and debug logs are routed strictly to `stderr` (`.with_writer(std::io::stderr)`), guaranteeing zero non-JSON pollution on `stdout`.
 - **Security:** Zero network exposure. Bounded entirely to the local operating system process permissions and IDE lifecycle.
 
 ### Transport 2: Streamable HTTP POST & Server-Sent Events (SSE)
-- **Invocation:** `voxforg serve --port 8080 --api-key <secret>`
+- **Invocation:** `voxforge serve --port 8080 --api-key <secret>`
 - **HTTP POST Endpoint:** `POST /mcp` — processes individual JSON-RPC requests.
 - **SSE Stream Endpoint:** `GET /mcp` — emits SSE events announcing endpoint availability.
 - **Security:** Enforced token authentication, DNS rebinding validation, payload length limits, and strict origin allowlists.
@@ -50,7 +50,7 @@ VoxForg supports two distinct MCP communication transports:
 
 ## 2. Complete MCP Tool Registry (14 Tools)
 
-VoxForg exposes 14 tools covering the full spectrum of speech engineering:
+VoxForge exposes 14 tools covering the full spectrum of speech engineering:
 
 ### 1. `synthesize_speech`
 Synthesizes speech using local neural TTS engines (Edge-TTS, Kokoro, Piper, Qwen3-TTS), upstream routers, or cloned voices.
@@ -176,10 +176,10 @@ Agents can read system state directly without invoking tools:
 
 | Resource URI | Description | MIME Type |
 |---|---|---|
-| `voxforg://voices` | Complete JSON inventory of voices, engines, and cloned profiles | `application/json` |
-| `voxforg://models` | Neural models in catalogue and their installation state | `application/json` |
-| `voxforg://hardware` | CPU SIMD features, system memory, GPUs, VRAM allocations | `application/json` |
-| `voxforg://cluster` | Active distributed worker nodes, status, and health metrics | `application/json` |
+| `voxforge://voices` | Complete JSON inventory of voices, engines, and cloned profiles | `application/json` |
+| `voxforge://models` | Neural models in catalogue and their installation state | `application/json` |
+| `voxforge://hardware` | CPU SIMD features, system memory, GPUs, VRAM allocations | `application/json` |
+| `voxforge://cluster` | Active distributed worker nodes, status, and health metrics | `application/json` |
 
 ---
 
@@ -196,9 +196,9 @@ Pre-engineered prompt workflows available to agents:
 The MCP implementation follows a defense-in-depth security model:
 
 1. **Authentication Enforcement (`auth_middleware`):**
-   When `VOXFORG_API_KEY` is configured, both `/v1/*` and `/mcp` endpoints require authentication. Tokens can be provided via `Authorization: Bearer <key>`, `x-api-key: <key>`, or `?api_key=<key>` (query parameter support enables SSE browser connections). Tokens are compared strictly using constant-time equality (`subtle::ConstantTimeEq`).
+   When `VOXFORGE_API_KEY` is configured, both `/v1/*` and `/mcp` endpoints require authentication. Tokens can be provided via `Authorization: Bearer <key>`, `x-api-key: <key>`, or `?api_key=<key>` (query parameter support enables SSE browser connections). Tokens are compared strictly using constant-time equality (`subtle::ConstantTimeEq`).
 2. **Restricted CORS Policy:**
-   Wildcard CORS (`*`) is strictly blocked. Only requests from `localhost`, `127.0.0.1`, `[::1]`, IDE extension origins (`vscode-webview://`, `app://`), or explicit `VOXFORG_ALLOWED_ORIGINS` are accepted. Prevents malicious web pages from interacting with local VoxForg instances.
+   Wildcard CORS (`*`) is strictly blocked. Only requests from `localhost`, `127.0.0.1`, `[::1]`, IDE extension origins (`vscode-webview://`, `app://`), or explicit `VOXFORGE_ALLOWED_ORIGINS` are accepted. Prevents malicious web pages from interacting with local VoxForge instances.
 3. **Host Header Validation:**
    Protects local loopback endpoints from DNS rebinding attacks. Rejects requests with non-whitelisted Host headers.
 4. **Strict Path Sandboxing:**
@@ -218,13 +218,13 @@ The MCP implementation follows a defense-in-depth security model:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
+    "voxforge": {
       "command": "cargo",
-      "args": ["run", "-p", "voxforg-cli", "--", "mcp"],
+      "args": ["run", "-p", "voxforge-cli", "--", "mcp"],
       "env": {
         "RUST_LOG": "info",
-        "VOXFORG_PROFILES_DIR": "./data/profiles",
-        "VOXFORG_MODELS_DIR": "./data/models"
+        "VOXFORGE_PROFILES_DIR": "./data/profiles",
+        "VOXFORGE_MODELS_DIR": "./data/models"
       }
     }
   }
@@ -235,8 +235,8 @@ The MCP implementation follows a defense-in-depth security model:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "d:\\PROJECTS\\AI_BASED_PROJECTS\\VoxForg\\target\\debug\\voxforg.exe",
+    "voxforge": {
+      "command": "d:\\PROJECTS\\AI_BASED_PROJECTS\\VoxForge\\target\\debug\\voxforge.exe",
       "args": ["mcp"]
     }
   }
@@ -247,8 +247,8 @@ The MCP implementation follows a defense-in-depth security model:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -259,9 +259,9 @@ The MCP implementation follows a defense-in-depth security model:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
+    "voxforge": {
       "command": "cargo",
-      "args": ["run", "-p", "voxforg-cli", "--", "mcp"]
+      "args": ["run", "-p", "voxforge-cli", "--", "mcp"]
     }
   }
 }
@@ -270,13 +270,13 @@ The MCP implementation follows a defense-in-depth security model:
 ### E. Remote / Daemon SSE Mode (Any Client)
 Start server:
 ```bash
-cargo run -p voxforg-cli -- serve --port 8080 --api-key your-secure-token
+cargo run -p voxforge-cli -- serve --port 8080 --api-key your-secure-token
 ```
 Client configuration:
 ```json
 {
   "mcpServers": {
-    "voxforg-remote": {
+    "voxforge-remote": {
       "url": "http://127.0.0.1:8080/mcp?api_key=your-secure-token"
     }
   }

@@ -112,7 +112,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           id: 'clip-1',
           startSec: 0.5,
           durationSec: 4.5,
-          text: 'Welcome to VoxForg Studio. Today we examine neural synthesis and high-performance audio graphs.',
+          text: 'Welcome to VoxForge Studio. Today we examine neural synthesis and high-performance audio graphs.',
           voiceId: voices[0]?.id || 'en-US-AriaNeural',
           isSynthesized: false,
         },
@@ -508,7 +508,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
               </button>
               <a
                 href={masterAudioUrl}
-                download="voxforg_stories_master_mix.wav"
+                download="voxforge_stories_master_mix.wav"
                 className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-colors"
                 title="Download Master Mix"
               >

@@ -29,7 +29,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
     id: 'preset-broadcast-master',
     name: '🎙️ Studio Broadcaster Master',
     description: 'Deep analog warmth with +3.5dB chest resonance and 3:1 broadcast limiter.',
-    author: 'VoxForg Audio Lab',
+    author: 'VoxForge Audio Lab',
     version: '1.0',
     createdAt: new Date().toISOString(),
     voiceId: 'en-US-AriaNeural',
@@ -38,7 +38,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
     engineId: 'edge-tts',
     speed: 1.02,
     pitch: 0.0,
-    sampleText: 'Good evening. You are tuned in to VoxForg Studio. Today we review acoustic workflows and neural speech synthesis.',
+    sampleText: 'Good evening. You are tuned in to VoxForge Studio. Today we review acoustic workflows and neural speech synthesis.',
     humanizeCadence: true,
     studioConfig: {
       enabled: true,
@@ -60,7 +60,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
     id: 'preset-crisp-narrator',
     name: '✨ Crisp Audiobook Narrator',
     description: 'High air sheen, 50% de-esser, and subtle vocal booth acoustic profile.',
-    author: 'VoxForg Audio Lab',
+    author: 'VoxForge Audio Lab',
     version: '1.0',
     createdAt: new Date().toISOString(),
     voiceId: 'en-GB-SoniaNeural',
@@ -91,7 +91,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
     id: 'preset-tokyo-cyberpunk',
     name: '⚡ Cyberpunk Radio Voice',
     description: 'Punchy 1.2kHz vocal presence with tape drive and live broadcast room acoustic.',
-    author: 'VoxForg Audio Lab',
+    author: 'VoxForge Audio Lab',
     version: '1.0',
     createdAt: new Date().toISOString(),
     voiceId: 'ja-JP-NanamiNeural',
@@ -122,7 +122,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
     id: 'preset-malayalam-storyteller',
     name: '🎙️ Kerala Malayalam Storyteller (മലയാളം)',
     description: 'Rich Malayalam neural delivery with warm chest resonance and smooth conversational cadence.',
-    author: 'VoxForg Audio Lab',
+    author: 'VoxForge Audio Lab',
     version: '1.0',
     createdAt: new Date().toISOString(),
     voiceId: 'ml-IN-SobhanaNeural',
@@ -151,7 +151,7 @@ export const STARTER_PRESETS: CustomVoicePreset[] = [
   },
 ];
 
-const STORAGE_KEY = 'voxforg_custom_voice_presets';
+const STORAGE_KEY = 'voxforge_custom_voice_presets';
 
 export class PresetService {
   static loadCustomPresets(): CustomVoicePreset[] {
@@ -207,7 +207,7 @@ export class PresetService {
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `voxforg-preset-${safeName || 'custom'}.json`);
+    downloadAnchor.setAttribute('download', `voxforge-preset-${safeName || 'custom'}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();

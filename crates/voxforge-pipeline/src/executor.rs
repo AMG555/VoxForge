@@ -1,0 +1,1017 @@
+use std::sync::Arc;
+use voxforge_asr::AsrRegistry;
+use voxforge_audio::{
+    AudioMerger, AudioNormalizer, BrickwallLimiter, DynamicCompressor, ParametricEq,
+    SilenceTrimmer, WavEncoder,
+};
+use voxforge_core::error::{Result, VoxForgeError};
+use voxforge_core::models::{NodeType, PipelineDefinition};
+use voxforge_engine::{EngineRegistry, SynthesisRequest};
+
+use crate::context::{ExecutionContext, ScriptSegment};
+use crate::graph::GraphValidator;
+
+pub struct PipelineExecutor {
+    engine_registry: Arc<EngineRegistry>,
+    asr_registry: Arc<AsrRegistry>,
+}
+
+impl PipelineExecutor {
+    pub fn new(engine_registry: Arc<EngineRegistry>) -> Self {
+        Self {
+            engine_registry,
+            asr_registry: Arc::new(AsrRegistry::with_defaults()),
+        }
+    }
+
+    pub fn with_asr_registry(mut self, asr_registry: Arc<AsrRegistry>) -> Self {
+        self.asr_registry = asr_registry;
+        self
+    }
+
+    pub async fn execute(
+        &self,
+        pipeline: &PipelineDefinition,
+        initial_text: Option<String>,
+    ) -> Result<Vec<u8>> {
+        let mut ctx = ExecutionContext::new();
+        if let Some(text) = initial_text {
+            ctx.raw_text = Some(text);
+        }
+        self.execute_with_context(pipeline, ctx).await
+    }
+
+    pub async fn execute_with_context(
+        &self,
+        pipeline: &PipelineDefinition,
+        mut ctx: ExecutionContext,
+    ) -> Result<Vec<u8>> {
+        // If input video path provided and input audio is empty, extract audio track from video
+        if let Some(ref video_in) = ctx.input_video_path {
+            if ctx.input_audio_pcm.is_empty() {
+                let v_path = std::path::Path::new(video_in);
+                if v_path.exists() {
+                    match voxforge_audio::MediaProcessor::extract_audio_to_pcm(
+                        v_path,
+                        ctx.sample_rate.max(16000),
+                    ) {
+                        Ok((pcm, sr, ch)) => {
+                            ctx.input_audio_pcm = pcm;
+                            ctx.sample_rate = sr;
+                            ctx.channels = ch;
+                            tracing::info!(video = %video_in, "Extracted audio from video container for pipeline processing");
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, video = %video_in, "Failed extracting audio from video container");
+                        }
+                    }
+                }
+            }
+        }
+
+        let order = GraphValidator::topological_sort(pipeline)?;
+
+        for node_id in order {
+            let node = pipeline
+                .nodes
+                .iter()
+                .find(|n| n.id == node_id)
+                .ok_or_else(|| VoxForgeError::PipelineExecution {
+                    node_id: node_id.clone(),
+                    reason: "Node missing in definition".to_string(),
+                })?;
+
+            self.execute_node(node, &mut ctx).await.map_err(|e| {
+                VoxForgeError::PipelineExecution {
+                    node_id: node.id.clone(),
+                    reason: e.to_string(),
+                }
+            })?;
+        }
+
+        // Format master audio buffer
+        let wav_bytes = WavEncoder::encode_pcm16_to_wav(
+            &ctx.master_audio_pcm,
+            ctx.sample_rate.max(8000),
+            ctx.channels.max(1),
+        )?;
+
+        // If output video path provided, mux master audio into video container
+        if let Some(ref video_out) = ctx.output_video_path {
+            let in_video = ctx
+                .input_video_path
+                .as_deref()
+                .unwrap_or(video_out.as_str());
+            let in_path = std::path::Path::new(in_video);
+            let out_path = std::path::Path::new(video_out);
+            if in_path.exists() {
+                if let Err(e) =
+                    voxforge_audio::MediaProcessor::mux_video_bytes(in_path, &wav_bytes, out_path)
+                {
+                    tracing::warn!(error = %e, output_video = %video_out, "Failed muxing master audio into video container");
+                } else {
+                    tracing::info!(output_video = %video_out, "Successfully muxed master audio into output video container");
+                }
+            }
+        }
+
+        Ok(wav_bytes)
+    }
+
+    async fn execute_node(
+        &self,
+        node: &voxforge_core::models::PipelineNode,
+        ctx: &mut ExecutionContext,
+    ) -> Result<()> {
+        match node.node_type {
+            NodeType::TextInput => {
+                if let Some(text_val) = node.params.get("text").and_then(|t| t.as_str()) {
+                    if text_val.len() > 50_000 {
+                        return Err(VoxForgeError::PipelineExecution {
+                            node_id: node.id.clone(),
+                            reason:
+                                "TextInput exceeds maximum supported length of 50,000 characters"
+                                    .to_string(),
+                        });
+                    }
+                    ctx.raw_text = Some(text_val.to_string());
+                }
+                Ok(())
+            }
+
+            NodeType::CharacterVoice => {
+                let character = node
+                    .params
+                    .get("character_name")
+                    .or_else(|| node.params.get("character"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&node.name);
+                let text = node
+                    .params
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let voice_id = node
+                    .params
+                    .get("voice_id")
+                    .or_else(|| node.params.get("voice"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let speed = node
+                    .params
+                    .get("speed")
+                    .and_then(|v| v.as_f64())
+                    .map(|f| f as f32);
+                let pitch = node
+                    .params
+                    .get("pitch")
+                    .and_then(|v| v.as_f64())
+                    .map(|f| f as f32);
+
+                if !text.trim().is_empty() {
+                    ctx.segments.push(ScriptSegment {
+                        speaker: character.to_string(),
+                        text: text.trim().to_string(),
+                        voice_id,
+                        speed,
+                        pitch,
+                        target_duration_ms: None,
+                    });
+                }
+                Ok(())
+            }
+
+            NodeType::SpeakerParser => {
+                let text = ctx.raw_text.as_deref().unwrap_or_default();
+                let mut segments = Vec::new();
+
+                // Check for dialog rules or fallback to paragraph chunking
+                let lines: Vec<&str> = text
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                for line in lines {
+                    if let Some((speaker, utterance)) = line.split_once(':') {
+                        segments.push(ScriptSegment {
+                            speaker: speaker.trim().to_string(),
+                            text: utterance.trim().to_string(),
+                            voice_id: None,
+                            speed: None,
+                            pitch: None,
+                            target_duration_ms: None,
+                        });
+                    } else if let Some((speaker, utterance)) =
+                        line.strip_prefix('[').and_then(|s| s.split_once(']'))
+                    {
+                        segments.push(ScriptSegment {
+                            speaker: speaker.trim().to_string(),
+                            text: utterance.trim().to_string(),
+                            voice_id: None,
+                            speed: None,
+                            pitch: None,
+                            target_duration_ms: None,
+                        });
+                    } else if let Some((speaker, utterance)) =
+                        line.strip_prefix('(').and_then(|s| s.split_once(')'))
+                    {
+                        segments.push(ScriptSegment {
+                            speaker: speaker.trim().to_string(),
+                            text: utterance.trim().to_string(),
+                            voice_id: None,
+                            speed: None,
+                            pitch: None,
+                            target_duration_ms: None,
+                        });
+                    } else {
+                        segments.push(ScriptSegment {
+                            speaker: "Narrator".to_string(),
+                            text: line.to_string(),
+                            voice_id: None,
+                            speed: None,
+                            pitch: None,
+                            target_duration_ms: None,
+                        });
+                    }
+                }
+
+                if segments.is_empty() && !text.is_empty() {
+                    segments.push(ScriptSegment {
+                        speaker: "Narrator".to_string(),
+                        text: text.to_string(),
+                        voice_id: None,
+                        speed: None,
+                        pitch: None,
+                        target_duration_ms: None,
+                    });
+                }
+
+                ctx.segments = segments;
+                Ok(())
+            }
+
+            NodeType::VoiceAssigner => {
+                let default_voice = node
+                    .params
+                    .get("default_voice")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("en-US-AriaNeural");
+
+                let speaker_map = node.params.get("speaker_map");
+
+                for segment in &mut ctx.segments {
+                    let mut assigned = default_voice.to_string();
+                    if let Some(map) = speaker_map.and_then(|m| m.as_object()) {
+                        if let Some(v) = map.get(&segment.speaker).and_then(|val| val.as_str()) {
+                            assigned = v.to_string();
+                        } else if let Some((_, v)) = map
+                            .iter()
+                            .find(|(k, _)| k.eq_ignore_ascii_case(&segment.speaker))
+                        {
+                            if let Some(val) = v.as_str() {
+                                assigned = val.to_string();
+                            }
+                        }
+                    }
+                    segment.voice_id = Some(assigned);
+                }
+                Ok(())
+            }
+
+            NodeType::Synthesizer => {
+                // If ctx.segments is empty, synthesize raw_text directly or create single segment
+                if ctx.segments.is_empty() {
+                    if let Some(ref text) = ctx.raw_text {
+                        let lines: Vec<&str> = text
+                            .lines()
+                            .map(|l| l.trim())
+                            .filter(|l| !l.is_empty())
+                            .collect();
+                        if !lines.is_empty() {
+                            for line in lines {
+                                let (speaker, utterance) =
+                                    if let Some((s, u)) = line.split_once(':') {
+                                        (s.trim().to_string(), u.trim().to_string())
+                                    } else {
+                                        ("Host".to_string(), line.to_string())
+                                    };
+                                ctx.segments.push(ScriptSegment {
+                                    speaker,
+                                    text: utterance,
+                                    voice_id: node
+                                        .params
+                                        .get("voice")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string()),
+                                    speed: node
+                                        .params
+                                        .get("speed")
+                                        .and_then(|s| s.as_f64())
+                                        .map(|f| f as f32),
+                                    pitch: node
+                                        .params
+                                        .get("pitch")
+                                        .and_then(|p| p.as_f64())
+                                        .map(|f| f as f32),
+                                    target_duration_ms: None,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                ctx.audio_segments.clear();
+                for segment in &ctx.segments {
+                    let voice_id = segment
+                        .voice_id
+                        .as_deref()
+                        .or_else(|| node.params.get("voice").and_then(|v| v.as_str()))
+                        .unwrap_or("en-US-AriaNeural");
+
+                    let (engine, voice) = match self.engine_registry.resolve_voice(voice_id).await {
+                        Ok(pair) => pair,
+                        Err(_) => {
+                            // Fallback to first available registered voice
+                            if let Ok(all) = self.engine_registry.list_all_voices().await {
+                                if let Some(first) = all.first() {
+                                    self.engine_registry.resolve_voice(&first.id).await?
+                                } else {
+                                    return Err(VoxForgeError::VoiceNotFound(format!(
+                                        "Voice '{}' not found and no engine voices registered",
+                                        voice_id
+                                    )));
+                                }
+                            } else {
+                                return Err(VoxForgeError::VoiceNotFound(format!(
+                                    "Voice '{}' not found",
+                                    voice_id
+                                )));
+                            }
+                        }
+                    };
+                    let actual_voice_id = voice.id.clone();
+                    ctx.sample_rate = voice.sample_rate_hz;
+
+                    let speed = segment
+                        .speed
+                        .or_else(|| {
+                            node.params
+                                .get("speed")
+                                .and_then(|s| s.as_f64())
+                                .map(|f| f as f32)
+                        })
+                        .unwrap_or(1.0);
+                    let pitch = segment
+                        .pitch
+                        .or_else(|| {
+                            node.params
+                                .get("pitch")
+                                .and_then(|p| p.as_f64())
+                                .map(|f| f as f32)
+                        })
+                        .unwrap_or(0.0);
+
+                    let req = SynthesisRequest {
+                        text: segment.text.clone(),
+                        voice_id: actual_voice_id,
+                        speed,
+                        pitch,
+                        format: voxforge_core::models::AudioContainerFormat::Pcm,
+                    };
+
+                    let chunk = engine.synthesize(&req).await?;
+                    ctx.audio_segments.push(chunk.pcm_data);
+                }
+                Ok(())
+            }
+
+            NodeType::AudioFilter => {
+                // 1. Peak normalization
+                if let Some(norm_val) = node.params.get("normalize_peak").and_then(|p| p.as_f64()) {
+                    let target = norm_val as f32;
+                    for segment_pcm in &mut ctx.audio_segments {
+                        AudioNormalizer::peak_normalize(segment_pcm, target);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        AudioNormalizer::peak_normalize(&mut ctx.master_audio_pcm, target);
+                    }
+                } else if node
+                    .params
+                    .get("normalize")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
+                    || node.params.get("filter_type").and_then(|t| t.as_str()) == Some("normalize")
+                    || node.params.is_null()
+                    || node.params.as_object().is_none_or(|o| o.is_empty())
+                {
+                    for segment_pcm in &mut ctx.audio_segments {
+                        AudioNormalizer::peak_normalize(segment_pcm, 0.95);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        AudioNormalizer::peak_normalize(&mut ctx.master_audio_pcm, 0.95);
+                    }
+                }
+
+                // 2. Gain in dB
+                if let Some(gain_val) = node.params.get("gain_db").and_then(|g| g.as_f64()) {
+                    let gain_db = gain_val as f32;
+                    for segment_pcm in &mut ctx.audio_segments {
+                        AudioNormalizer::apply_gain_db(segment_pcm, gain_db);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        AudioNormalizer::apply_gain_db(&mut ctx.master_audio_pcm, gain_db);
+                    }
+                }
+
+                // 3. Silence trimmer (supports both nested object and flat parameters)
+                let trim_enabled = node
+                    .params
+                    .get("trim_silence")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
+                    || node.params.get("silence_trim").is_some();
+                if trim_enabled {
+                    let threshold = node
+                        .params
+                        .get("silence_trim")
+                        .and_then(|o| o.get("threshold_dbfs").and_then(|t| t.as_f64()))
+                        .or_else(|| {
+                            node.params
+                                .get("silence_threshold_db")
+                                .and_then(|t| t.as_f64())
+                        })
+                        .unwrap_or(-45.0) as f32;
+                    let padding = node
+                        .params
+                        .get("silence_trim")
+                        .and_then(|o| o.get("padding_ms").and_then(|p| p.as_u64()))
+                        .or_else(|| node.params.get("silence_pad_ms").and_then(|p| p.as_u64()))
+                        .unwrap_or(30) as u32;
+
+                    for segment_pcm in &mut ctx.audio_segments {
+                        *segment_pcm =
+                            SilenceTrimmer::trim(segment_pcm, ctx.sample_rate, threshold, padding);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        ctx.master_audio_pcm = SilenceTrimmer::trim(
+                            &ctx.master_audio_pcm,
+                            ctx.sample_rate,
+                            threshold,
+                            padding,
+                        );
+                    }
+                }
+
+                // 4. 3-Band Parametric Equalizer (supports both nested object and flat parameters)
+                let eq_enabled = node
+                    .params
+                    .get("enable_eq")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
+                    || node.params.get("eq").is_some();
+                if eq_enabled {
+                    let low = node
+                        .params
+                        .get("eq")
+                        .and_then(|o| o.get("low_gain_db").and_then(|v| v.as_f64()))
+                        .or_else(|| node.params.get("eq_low_gain_db").and_then(|v| v.as_f64()))
+                        .unwrap_or(0.0) as f32;
+                    let mid = node
+                        .params
+                        .get("eq")
+                        .and_then(|o| o.get("mid_gain_db").and_then(|v| v.as_f64()))
+                        .or_else(|| node.params.get("eq_mid_gain_db").and_then(|v| v.as_f64()))
+                        .unwrap_or(0.0) as f32;
+                    let high = node
+                        .params
+                        .get("eq")
+                        .and_then(|o| o.get("high_gain_db").and_then(|v| v.as_f64()))
+                        .or_else(|| node.params.get("eq_high_gain_db").and_then(|v| v.as_f64()))
+                        .unwrap_or(0.0) as f32;
+
+                    for segment_pcm in &mut ctx.audio_segments {
+                        ParametricEq::process_3band(segment_pcm, ctx.sample_rate, low, mid, high);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        ParametricEq::process_3band(
+                            &mut ctx.master_audio_pcm,
+                            ctx.sample_rate,
+                            low,
+                            mid,
+                            high,
+                        );
+                    }
+                }
+
+                // 5. Dynamic Range Compressor (supports both nested object and flat parameters)
+                let comp_enabled = node
+                    .params
+                    .get("enable_compressor")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
+                    || node.params.get("compressor").is_some();
+                if comp_enabled {
+                    let threshold = node
+                        .params
+                        .get("compressor")
+                        .and_then(|o| o.get("threshold_dbfs").and_then(|v| v.as_f64()))
+                        .or_else(|| {
+                            node.params
+                                .get("compressor_threshold_db")
+                                .and_then(|v| v.as_f64())
+                        })
+                        .unwrap_or(-18.0) as f32;
+                    let ratio = node
+                        .params
+                        .get("compressor")
+                        .and_then(|o| o.get("ratio").and_then(|v| v.as_f64()))
+                        .or_else(|| node.params.get("compressor_ratio").and_then(|v| v.as_f64()))
+                        .unwrap_or(3.0) as f32;
+                    let attack = node
+                        .params
+                        .get("compressor")
+                        .and_then(|o| o.get("attack_ms").and_then(|v| v.as_f64()))
+                        .unwrap_or(15.0) as f32;
+                    let release = node
+                        .params
+                        .get("compressor")
+                        .and_then(|o| o.get("release_ms").and_then(|v| v.as_f64()))
+                        .unwrap_or(100.0) as f32;
+                    let makeup = node
+                        .params
+                        .get("compressor")
+                        .and_then(|o| o.get("makeup_gain_db").and_then(|v| v.as_f64()))
+                        .unwrap_or(0.0) as f32;
+
+                    for segment_pcm in &mut ctx.audio_segments {
+                        DynamicCompressor::process(
+                            segment_pcm,
+                            ctx.sample_rate,
+                            threshold,
+                            ratio,
+                            attack,
+                            release,
+                            makeup,
+                        );
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        DynamicCompressor::process(
+                            &mut ctx.master_audio_pcm,
+                            ctx.sample_rate,
+                            threshold,
+                            ratio,
+                            attack,
+                            release,
+                            makeup,
+                        );
+                    }
+                }
+
+                // 6. Brickwall Limiter (supports both nested object and flat parameters)
+                let limiter_enabled = node
+                    .params
+                    .get("enable_limiter")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false)
+                    || node.params.get("limiter").is_some();
+                if limiter_enabled {
+                    let ceiling = node
+                        .params
+                        .get("limiter")
+                        .and_then(|o| o.get("ceiling_dbfs").and_then(|v| v.as_f64()))
+                        .or_else(|| {
+                            node.params
+                                .get("limiter_ceiling_db")
+                                .and_then(|v| v.as_f64())
+                        })
+                        .unwrap_or(-0.5) as f32;
+                    for segment_pcm in &mut ctx.audio_segments {
+                        BrickwallLimiter::process(segment_pcm, ceiling);
+                    }
+                    if !ctx.master_audio_pcm.is_empty() {
+                        BrickwallLimiter::process(&mut ctx.master_audio_pcm, ceiling);
+                    }
+                }
+
+                Ok(())
+            }
+
+            NodeType::AudioMerge => {
+                let pause_ms = node
+                    .params
+                    .get("pause_ms")
+                    .and_then(|p| p.as_u64())
+                    .unwrap_or(150) as u32;
+
+                let refs: Vec<&[i16]> = ctx.audio_segments.iter().map(|s| s.as_slice()).collect();
+                let merged = AudioMerger::concatenate_with_pause(&refs, ctx.sample_rate, pause_ms);
+                ctx.master_audio_pcm = merged;
+                Ok(())
+            }
+
+            NodeType::OutputSink => {
+                // If master audio not merged yet, merge with default 100ms pause
+                if ctx.master_audio_pcm.is_empty() && !ctx.audio_segments.is_empty() {
+                    let refs: Vec<&[i16]> =
+                        ctx.audio_segments.iter().map(|s| s.as_slice()).collect();
+                    ctx.master_audio_pcm =
+                        AudioMerger::concatenate_with_pause(&refs, ctx.sample_rate, 100);
+                }
+                Ok(())
+            }
+
+            NodeType::AsrTranscriber => {
+                let model_id = node.params.get("model").and_then(|m| m.as_str());
+                let engine = if let Some(id) = model_id {
+                    self.asr_registry.get(id).await
+                } else {
+                    self.asr_registry.default_engine().await
+                }
+                .ok_or_else(|| VoxForgeError::PipelineExecution {
+                    node_id: node.id.clone(),
+                    reason: "No ASR engine found in registry".to_string(),
+                })?;
+
+                let sample_rate = if ctx.sample_rate == 0 {
+                    16000
+                } else {
+                    ctx.sample_rate
+                };
+                let pcm = if !ctx.input_audio_pcm.is_empty() {
+                    ctx.input_audio_pcm.clone()
+                } else if !ctx.master_audio_pcm.is_empty() {
+                    ctx.master_audio_pcm.clone()
+                } else {
+                    let sample_count = (sample_rate as usize) * 2;
+                    (0..sample_count)
+                        .map(|i| ((i % 100) as i16 - 50) * 100)
+                        .collect()
+                };
+
+                let opts = voxforge_asr::TranscriptionOptions {
+                    language: node
+                        .params
+                        .get("language")
+                        .and_then(|l| l.as_str())
+                        .map(|s| s.to_string()),
+                    temperature: node
+                        .params
+                        .get("temperature")
+                        .and_then(|t| t.as_f64())
+                        .map(|f| f as f32),
+                    prompt: ctx.raw_text.clone(),
+                    word_timestamps: node
+                        .params
+                        .get("word_timestamps")
+                        .and_then(|w| w.as_bool())
+                        .unwrap_or(true),
+                    response_format: "verbose_json".to_string(),
+                };
+
+                let res = engine
+                    .transcribe(&pcm, sample_rate, &opts)
+                    .await
+                    .map_err(|e| VoxForgeError::PipelineExecution {
+                        node_id: node.id.clone(),
+                        reason: format!("ASR transcription failed: {e}"),
+                    })?;
+
+                let mut segments = Vec::new();
+                for seg in res.segments {
+                    let duration_ms = seg.end_ms.saturating_sub(seg.start_ms).max(100);
+                    segments.push(ScriptSegment {
+                        speaker: seg.speaker.unwrap_or_else(|| "Narrator".to_string()),
+                        text: seg.text,
+                        voice_id: None,
+                        speed: None,
+                        pitch: None,
+                        target_duration_ms: Some(duration_ms),
+                    });
+                }
+
+                if !segments.is_empty() {
+                    ctx.segments = segments;
+                }
+                Ok(())
+            }
+
+            NodeType::Diarization => {
+                let num_speakers = node
+                    .params
+                    .get("num_speakers")
+                    .and_then(|n| n.as_u64())
+                    .unwrap_or(2) as usize;
+                let default_speaker = node
+                    .params
+                    .get("default_speaker")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("Narrator");
+
+                for (i, seg) in ctx.segments.iter_mut().enumerate() {
+                    if seg.speaker.is_empty()
+                        || seg.speaker == "Narrator"
+                        || seg.speaker.starts_with("SPEAKER_")
+                    {
+                        seg.speaker = format!("SPEAKER_{:02}", i % num_speakers);
+                    }
+                }
+
+                if ctx.segments.is_empty() && ctx.raw_text.is_some() {
+                    ctx.segments.push(ScriptSegment {
+                        speaker: default_speaker.to_string(),
+                        text: ctx.raw_text.clone().unwrap(),
+                        voice_id: None,
+                        speed: None,
+                        pitch: None,
+                        target_duration_ms: None,
+                    });
+                }
+                Ok(())
+            }
+
+            NodeType::DocumentChunker => {
+                let text = ctx.raw_text.as_deref().unwrap_or_default();
+                let default_speaker = node
+                    .params
+                    .get("default_speaker")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("Narrator");
+                let mut segments = Vec::new();
+
+                for line in text.lines().map(|l| l.trim()).filter(|l| !l.is_empty()) {
+                    if line.starts_with('"') || line.starts_with('“') || line.contains(':') {
+                        if let Some((spk, utt)) = line.split_once(':') {
+                            segments.push(ScriptSegment {
+                                speaker: spk.trim().to_string(),
+                                text: utt
+                                    .trim()
+                                    .trim_matches('"')
+                                    .trim_matches('“')
+                                    .trim_matches('”')
+                                    .to_string(),
+                                voice_id: None,
+                                speed: None,
+                                pitch: None,
+                                target_duration_ms: None,
+                            });
+                        } else {
+                            segments.push(ScriptSegment {
+                                speaker: "Character".to_string(),
+                                text: line
+                                    .trim_matches('"')
+                                    .trim_matches('“')
+                                    .trim_matches('”')
+                                    .to_string(),
+                                voice_id: None,
+                                speed: None,
+                                pitch: None,
+                                target_duration_ms: None,
+                            });
+                        }
+                    } else {
+                        segments.push(ScriptSegment {
+                            speaker: default_speaker.to_string(),
+                            text: line.to_string(),
+                            voice_id: None,
+                            speed: None,
+                            pitch: None,
+                            target_duration_ms: None,
+                        });
+                    }
+                }
+
+                if segments.is_empty() && !text.is_empty() {
+                    segments.push(ScriptSegment {
+                        speaker: default_speaker.to_string(),
+                        text: text.to_string(),
+                        voice_id: None,
+                        speed: None,
+                        pitch: None,
+                        target_duration_ms: None,
+                    });
+                }
+                ctx.segments = segments;
+                Ok(())
+            }
+
+            NodeType::AudioTimeStretch => {
+                let wsola = voxforge_audio::dsp::WsolaTimeStretch::new(ctx.sample_rate);
+                for (i, pcm) in ctx.audio_segments.iter_mut().enumerate() {
+                    if let Some(seg) = ctx.segments.get(i) {
+                        if let Some(target_ms) = seg.target_duration_ms {
+                            let current_samples = pcm.len();
+                            let target_samples =
+                                (target_ms as f64 / 1000.0 * ctx.sample_rate as f64) as usize;
+                            if target_samples > 0
+                                && current_samples > 0
+                                && target_samples != current_samples
+                            {
+                                *pcm = wsola.stretch_to_len(pcm, target_samples);
+                            }
+                        }
+                    }
+                }
+                Ok(())
+            }
+
+            NodeType::AudioMux => {
+                let voice_vol = node
+                    .params
+                    .get("voice_volume")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(1.0) as f32;
+                let bg_vol = node
+                    .params
+                    .get("background_volume")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.15) as f32;
+                let ducking = node
+                    .params
+                    .get("ducking")
+                    .and_then(|d| d.as_bool())
+                    .unwrap_or(true);
+
+                if ctx.master_audio_pcm.is_empty() && !ctx.audio_segments.is_empty() {
+                    let refs: Vec<&[i16]> =
+                        ctx.audio_segments.iter().map(|s| s.as_slice()).collect();
+                    ctx.master_audio_pcm =
+                        AudioMerger::concatenate_with_pause(&refs, ctx.sample_rate, 100);
+                }
+
+                // Check if a background audio file is provided
+                if ctx.background_audio_pcm.is_empty() {
+                    if let Some(bg_path) = node
+                        .params
+                        .get("background_audio_path")
+                        .and_then(|p| p.as_str())
+                    {
+                        if let Ok(bytes) = std::fs::read(bg_path) {
+                            if bytes.starts_with(b"RIFF") {
+                                if let Ok((pcm, _sr, _ch)) =
+                                    voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
+                                {
+                                    ctx.background_audio_pcm = pcm;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If no background audio track is present, cleanly scale master audio without injecting synthetic noise
+                if ctx.background_audio_pcm.is_empty() {
+                    for sample in &mut ctx.master_audio_pcm {
+                        *sample = (*sample as f32 * voice_vol)
+                            .clamp(i16::MIN as f32, i16::MAX as f32)
+                            as i16;
+                    }
+                    return Ok(());
+                }
+
+                let max_len = ctx
+                    .master_audio_pcm
+                    .len()
+                    .max(ctx.background_audio_pcm.len());
+                let mut mixed = Vec::with_capacity(max_len);
+
+                for i in 0..max_len {
+                    let v = if i < ctx.master_audio_pcm.len() {
+                        ctx.master_audio_pcm[i] as f32 * voice_vol
+                    } else {
+                        0.0
+                    };
+
+                    let effective_bg_vol = if ducking && v.abs() > 300.0 {
+                        bg_vol * 0.3
+                    } else {
+                        bg_vol
+                    };
+
+                    let bg = if i < ctx.background_audio_pcm.len() {
+                        ctx.background_audio_pcm[i] as f32 * effective_bg_vol
+                    } else {
+                        0.0
+                    };
+
+                    let sample = (v + bg).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+                    mixed.push(sample);
+                }
+
+                ctx.master_audio_pcm = mixed;
+                Ok(())
+            }
+
+            NodeType::Watermark => {
+                let payload = node
+                    .params
+                    .get("payload")
+                    .and_then(|p| p.as_u64())
+                    .map(|v| v as u16)
+                    .unwrap_or(voxforge_audio::dsp::DEFAULT_SIGNATURE_PAYLOAD);
+
+                let strength = node
+                    .params
+                    .get("strength")
+                    .and_then(|s| s.as_f64())
+                    .map(|v| v as f32)
+                    .unwrap_or(0.0035);
+
+                let wm = voxforge_audio::dsp::AudioWatermark::new(ctx.sample_rate)
+                    .with_strength(strength);
+
+                // Watermark master audio if present
+                if !ctx.master_audio_pcm.is_empty() {
+                    let mut float_buf: Vec<f32> = ctx
+                        .master_audio_pcm
+                        .iter()
+                        .map(|&s| s as f32 / 32768.0)
+                        .collect();
+                    wm.embed(&mut float_buf, payload);
+                    for (dst, src) in ctx.master_audio_pcm.iter_mut().zip(float_buf.iter()) {
+                        *dst = (src * 32768.0).clamp(-32768.0, 32767.0) as i16;
+                    }
+                }
+
+                // Also watermark individual segments
+                for segment in &mut ctx.audio_segments {
+                    if !segment.is_empty() {
+                        let mut float_buf: Vec<f32> =
+                            segment.iter().map(|&s| s as f32 / 32768.0).collect();
+                        wm.embed(&mut float_buf, payload);
+                        for (dst, src) in segment.iter_mut().zip(float_buf.iter()) {
+                            *dst = (src * 32768.0).clamp(-32768.0, 32767.0) as i16;
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+
+            NodeType::VoiceConversion => {
+                let pitch_shift = node
+                    .params
+                    .get("pitch_shift_semitones")
+                    .and_then(|p| p.as_f64())
+                    .unwrap_or(0.0) as f32;
+                let warmth_amount = node
+                    .params
+                    .get("timbre_warmth")
+                    .and_then(|w| w.as_f64())
+                    .unwrap_or(0.5) as f32;
+
+                let process_samples = |samples: &mut [i16]| {
+                    // 1. Apply harmonic warmth to shift vocal timbre
+                    voxforge_audio::dsp::HarmonicWarmth::process(samples, warmth_amount, 0.4);
+
+                    // 2. If pitch shift requested, apply WSOLA resampling
+                    if pitch_shift.abs() > 0.05 {
+                        let ratio = 2.0f32.powf(pitch_shift / 12.0);
+                        if ratio > 0.5 && ratio < 2.0 {
+                            let orig_len = samples.len();
+                            let target_len = (orig_len as f32 / ratio) as usize;
+                            if target_len > 0 {
+                                let stretched = time_stretch_linear(samples, target_len);
+                                // Resample back to original length
+                                let restored = time_stretch_linear(&stretched, orig_len);
+                                samples.copy_from_slice(&restored[..orig_len.min(restored.len())]);
+                            }
+                        }
+                    }
+                };
+
+                if !ctx.master_audio_pcm.is_empty() {
+                    process_samples(&mut ctx.master_audio_pcm);
+                }
+
+                for segment in &mut ctx.audio_segments {
+                    if !segment.is_empty() {
+                        process_samples(segment);
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
+fn time_stretch_linear(input: &[i16], target_len: usize) -> Vec<i16> {
+    if input.is_empty() || target_len == 0 {
+        return Vec::new();
+    }
+    if input.len() == target_len {
+        return input.to_vec();
+    }
+    let mut output = Vec::with_capacity(target_len);
+    let scale = (input.len() - 1) as f64 / (target_len - 1).max(1) as f64;
+    for i in 0..target_len {
+        let src_pos = i as f64 * scale;
+        let idx0 = src_pos.floor() as usize;
+        let idx1 = (idx0 + 1).min(input.len() - 1);
+        let frac = (src_pos - idx0 as f64) as f32;
+        let s0 = input[idx0] as f32;
+        let s1 = input[idx1] as f32;
+        let sample = s0 + frac * (s1 - s0);
+        output.push(sample.clamp(i16::MIN as f32, i16::MAX as f32) as i16);
+    }
+    output
+}

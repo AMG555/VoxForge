@@ -1,14 +1,14 @@
-# VoxForg Architecture Specification
+# VoxForge Architecture Specification
 
 **Version:** 1.0.0  
 **Status:** Stable / Active  
-**Author:** VoxForg Core Engineering  
+**Author:** VoxForge Core Engineering  
 
 ---
 
 ## 1. System Overview
 
-VoxForg is an open-source, modular, hardware-adaptive speech synthesis server and visual workflow orchestration platform. The system operates in three deployment topologies:
+VoxForge is an open-source, modular, hardware-adaptive speech synthesis server and visual workflow orchestration platform. The system operates in three deployment topologies:
 1. **Single Binary Embedded**: Single executable with integrated SQLite database and embedded static UI bundle.
 2. **Containerized Cluster**: Multi-container Docker / Kubernetes deployment with PostgreSQL persistence and Redis task queue.
 3. **Native Desktop**: Cross-platform desktop runtime powered by Tauri v2 with OS native file system access and system audio sink.
@@ -21,22 +21,22 @@ VoxForg is an open-source, modular, hardware-adaptive speech synthesis server an
 
 ```mermaid
 C4Context
-    title System Context Diagram for VoxForg
+    title System Context Diagram for VoxForge
 
-    Person(developer, "Developer / Creator", "Uses VoxForg for voiceover, podcasting, automated audio generation, and game dialogue.")
-    Person(api_consumer, "External Service / Client", "Invokes VoxForg via OpenAI-compatible REST API or WebSocket stream.")
+    Person(developer, "Developer / Creator", "Uses VoxForge for voiceover, podcasting, automated audio generation, and game dialogue.")
+    Person(api_consumer, "External Service / Client", "Invokes VoxForge via OpenAI-compatible REST API or WebSocket stream.")
 
-    System(voxforg, "VoxForg Workstation", "Orchestrates speech synthesis pipelines, hardware-accelerated inference, and audio mastering.")
+    System(voxforge, "VoxForge Workstation", "Orchestrates speech synthesis pipelines, hardware-accelerated inference, and audio mastering.")
 
     System_Ext(edge_tts, "Microsoft Edge TTS", "Upstream cloud relay for free high-fidelity speech synthesis.")
     System_Ext(huggingface, "Model Registries (HF / Local)", "Stores ONNX and safetensors weights for Piper, Kokoro, Qwen3-TTS.")
     System_Ext(postgres, "PostgreSQL / Supabase", "External relational persistence for pipelines, voices, and audio metadata.")
 
-    Rel(developer, voxforg, "Designs audio DAG pipelines & manages models", "HTTPS / WebSocket")
-    Rel(api_consumer, voxforg, "Calls /v1/audio/speech", "HTTPS / gRPC")
-    Rel(voxforg, edge_tts, "Streams audio tokens via WSS", "TLS WSS")
-    Rel(voxforg, huggingface, "Downloads model checkpoints", "HTTPS")
-    Rel(voxforg, postgres, "Reads/writes pipelines & tenant data", "SQL / Pool")
+    Rel(developer, voxforge, "Designs audio DAG pipelines & manages models", "HTTPS / WebSocket")
+    Rel(api_consumer, voxforge, "Calls /v1/audio/speech", "HTTPS / gRPC")
+    Rel(voxforge, edge_tts, "Streams audio tokens via WSS", "TLS WSS")
+    Rel(voxforge, huggingface, "Downloads model checkpoints", "HTTPS")
+    Rel(voxforge, postgres, "Reads/writes pipelines & tenant data", "SQL / Pool")
 ```
 
 ---
@@ -45,11 +45,11 @@ C4Context
 
 ```mermaid
 C4Container
-    title Container Diagram for VoxForg
+    title Container Diagram for VoxForge
 
     Container(web_ui, "Web UI / Desktop Frontend", "React 19, TypeScript, Tailwind CSS", "Visual node-based DAG builder, voice playground, and telemetry dashboard.")
 
-    Container_Boundary(core_boundary, "VoxForg Core Daemon (Rust)")
+    Container_Boundary(core_boundary, "VoxForge Core Daemon (Rust)")
         Container(api_server, "API Gateway", "Axum 0.8, Tower, Hyper", "Handles HTTP REST routes, OpenAI /v1/audio/speech compatibility, CORS, and auth.")
         Container(pipeline_runner, "Pipeline DAG Runner", "Rayon, Tokio", "Compiles node graph, executes topological sort, schedules parallel node tasks.")
         Container(engine_dispatcher, "Engine Scheduler", "Rust async trait", "Routes audio requests to appropriate TTS engine based on hardware tier.")
@@ -79,16 +79,16 @@ The daemon is structured into clean, decoupled Rust crates inside a virtual work
 
 ```
 crates/
-├── voxforg-core
+├── voxforge-core
 │   ├── src/models/        # Domain entities: Voice, Engine, Pipeline, Node, Edge, VoiceProfile
 │   ├── src/store/         # DataStore trait, SqliteStore, PostgresStore
-│   ├── src/error/         # Unified VoxForgError with RFC 7807 problem details
+│   ├── src/error/         # Unified VoxForgeError with RFC 7807 problem details
 │   └── src/auth/          # API key validation, token bucket rate limiter
-├── voxforg-hardware
+├── voxforge-hardware
 │   ├── src/probe.rs       # OS-level hardware detection (CPU features, RAM, GPU)
 │   ├── src/profile.rs     # HardwareProfile and HardwareTier definitions
 │   └── src/allocator.rs   # Engine recommendation matrix
-├── voxforg-engine
+├── voxforge-engine
 │   ├── src/traits.rs      # TtsEngine trait (supports_cloning, clone_voice, synthesize_cloned)
 │   ├── src/registry.rs    # Thread-safe EngineRegistry with LRU audio cache
 │   ├── src/identity.rs    # [Phase 2B] VoiceIdentityResolver: portable voices across engines
@@ -102,23 +102,23 @@ crates/
 │   ├── src/edge_tts/      # Microsoft Edge TTS WebSocket client
 │   ├── src/router.rs      # OpenAI-compatible pass-through engine
 │   └── src/mock.rs        # Deterministic synthetic engine for tests
-├── voxforg-router         # [Phase 2A] SLA-policy-based engine selection
+├── voxforge-router         # [Phase 2A] SLA-policy-based engine selection
 │   ├── src/policy.rs      # SynthesisPolicy, VoiceStyle, RoutingDecision types
 │   ├── src/scorer.rs      # Weighted multi-objective engine scoring algorithm
 │   └── src/router.rs      # VoiceRouter: scores engines, health-checks, falls back
-├── voxforg-pronunciation  # [Phase 2C] Pre-synthesis text normalization
+├── voxforge-pronunciation  # [Phase 2C] Pre-synthesis text normalization
 │   ├── src/dictionary.rs  # Thread-safe runtime-editable custom pronunciation dict
 │   ├── src/normalizer.rs  # Symbol/currency/scale-suffix/percent normalization
 │   └── src/processor.rs   # PronunciationProcessor: chain entry point
-├── voxforg-benchmark      # [Phase 3A] Engine benchmarking and scoring
+├── voxforge-benchmark      # [Phase 3A] Engine benchmarking and scoring
 │   ├── src/sentences.rs   # Canonical sentence suite (prose, numbers, acronyms, technical)
 │   ├── src/runner.rs      # BenchmarkRunner: exercises all engines, computes scorecards
 │   └── src/store.rs       # BenchmarkStore: thread-safe in-memory result persistence
-├── voxforg-worker         # [Phase 4] Distributed worker nodes
+├── voxforge-worker         # [Phase 4] Distributed worker nodes
 │   ├── src/types.rs       # WorkerRegistration, WorkerNode, WorkerStatus
 │   ├── src/pool.rs        # WorkerPool: load-balanced worker selection, leases, stale detection
 │   └── src/client.rs      # WorkerClient: HTTP dispatch to remote worker cluster nodes
-├── voxforg-asr            # [Phase 6] Automated Speech Recognition layer
+├── voxforge-asr            # [Phase 6] Automated Speech Recognition layer
 │   ├── src/traits.rs      # AsrEngine trait and AsrEngineInfo metadata
 │   ├── src/types.rs       # TranscriptionOptions, TranscriptionResult, WordTimestamp, SRT/VTT
 │   ├── src/ass_export.rs  # AssSubtitleExporter: Timed karaoke .ass subtitles with centisecond tags
@@ -126,7 +126,7 @@ crates/
 │   ├── src/whisper.rs     # WhisperAsrEngine with VAD energy segmentation & upstream delegation
 │   ├── src/mock.rs        # MockAsrEngine for deterministic CI testing
 │   └── src/registry.rs    # Thread-safe multi-engine AsrRegistry
-├── voxforg-audio
+├── voxforge-audio
 │   ├── src/dsp/fit_planner.rs  # SmartFitPlanner: dubbing silence absorption & geometric 50/50 split
 │   ├── src/dsp/time_stretch.rs # WsolaTimeStretch: pitch-preserving audio tempo scaling
 │   ├── src/dsp/aec.rs          # AcousticEchoCanceller: adaptive NLMS filter with Double-Talk Detection
@@ -137,17 +137,17 @@ crates/
 │   ├── src/normalizer.rs  # EBU R128 loudness normalization
 │   ├── src/concat.rs      # Cross-fade and pause insertion
 │   └── src/media.rs       # MediaProcessor: FFmpeg audio extraction & video container remuxing
-├── voxforg-pipeline
+├── voxforge-pipeline
 │   ├── src/graph.rs       # Directed Acyclic Graph validator and topological sorter
 │   ├── src/context.rs     # ExecutionContext with multi-track audio buffers & timing
 │   ├── src/checkpoint.rs  # JobCheckpointManifest: content-addressable chapter caching & auto-resume
 │   ├── src/templates.rs   # [Phase 7] Video dubbing and audiobook production DAG templates
 │   └── src/executor.rs    # PipelineExecutor (ASR, Diarization, Chunker, TimeStretch, Mux, Watermark, VoiceConversion)
-├── voxforg-catalog       # [Phase 8] Model weights catalogue & manager
+├── voxforge-catalog       # [Phase 8] Model weights catalogue & manager
 │   ├── src/mirror_race.rs # MirrorRaceManager: concurrent latency racing across mirrors & CDNs
 │   ├── src/models.rs      # CatalogItem, ModelType, ModelFormat, ModelStatus
 │   └── src/store.rs       # ModelCatalogStore with hardware constraint validation
-├── voxforg-api
+├── voxforge-api
 │   ├── src/routes/        # /v1/audio/speech, /v1/models, /v1/voices, /v1/pipeline,
 │   │                      # /v1/pronunciation/dictionary, /v1/voice-identities,
 │   │                      # /v1/benchmark, /v1/voice-ci, /v1/workers,
@@ -157,11 +157,11 @@ crates/
 │   │                      # src/routes/embedded_ui.rs (RustEmbed SPA fallback router)
 │   ├── src/middleware/    # Strict CORS, security headers, rate limiting
 │   └── src/server.rs      # Axum HTTP/WS server bootstrap
-├── voxforg-mcp            # [Phase 9] Model Context Protocol JSON-RPC 2.0 Server
+├── voxforge-mcp            # [Phase 9] Model Context Protocol JSON-RPC 2.0 Server
 │   ├── src/protocol.rs    # MCP JSON-RPC protocol types, request/response models
 │   ├── src/tools.rs       # 8 MCP tools schema & definitions
 │   └── src/server.rs      # McpServer: in-process tool dispatch and stdio stream loop
-└── voxforg-cli
+└── voxforge-cli
     └── src/main.rs        # CLI entry point (serve [--open], synth, hardware, engines, bench, ab-test, mcp, transcribe, clone, models)
 ```
 
@@ -169,16 +169,16 @@ crates/
 
 ## 3. Hardware Probing & Engine Dispatch Lifecycle
 
-VoxForg inspects host hardware at boot and continuously balances synthesis workloads:
+VoxForge inspects host hardware at boot and continuously balances synthesis workloads:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Boot as VoxForg Bootstrapper
-    participant Probe as voxforg-hardware
+    participant Boot as VoxForge Bootstrapper
+    participant Probe as voxforge-hardware
     participant Registry as EngineRegistry
     participant Client as API Client
-    participant API as voxforg-api
+    participant API as voxforge-api
     participant Engine as Selected TTS Engine
 
     Boot->>Probe: probe_system_hardware()
@@ -203,7 +203,7 @@ sequenceDiagram
 
 ## 4. Pipeline Execution Graph (DAG)
 
-Visual workflows in VoxForg are represented as Directed Acyclic Graphs:
+Visual workflows in VoxForge are represented as Directed Acyclic Graphs:
 
 ```mermaid
 flowchart LR
@@ -239,7 +239,7 @@ flowchart LR
 
 ## 5. Storage Abstraction Layer
 
-VoxForg implements a clean storage boundary via the `DataStore` trait to support single-binary, self-hosted, and cloud deployments without code divergence:
+VoxForge implements a clean storage boundary via the `DataStore` trait to support single-binary, self-hosted, and cloud deployments without code divergence:
 
 ```mermaid
 classDiagram
@@ -341,19 +341,19 @@ flowchart TD
    - Serves repeated prompt requests in `< 1ms` with zero CPU/network cost.
 
 2. **Zero-Dependency Prometheus Exporter (`GET /metrics`)**:
-   - Reports `voxforg_requests_total{endpoint, status}`, `voxforg_synthesis_duration_seconds_total`, `voxforg_audio_samples_total`, `voxforg_cache_hits_total`, `voxforg_cache_misses_total`, and `voxforg_active_requests`.
+   - Reports `voxforge_requests_total{endpoint, status}`, `voxforge_synthesis_duration_seconds_total`, `voxforge_audio_samples_total`, `voxforge_cache_hits_total`, `voxforge_cache_misses_total`, and `voxforge_active_requests`.
    - Fully compatible with Prometheus, VictoriaMetrics, and Datadog agents.
 
 ---
 
 ## 8. Turnkey Distribution & Embedded Webstation Architecture
 
-VoxForg provides a zero-friction distribution pipeline where the full React/TypeScript Webstation frontend is embedded directly inside the compiled Rust binary:
+VoxForge provides a zero-friction distribution pipeline where the full React/TypeScript Webstation frontend is embedded directly inside the compiled Rust binary:
 
 ```mermaid
 flowchart TD
-    Build["UI Build Stage (ui/dist)"] --> Embed["rust-embed in voxforg-api"]
-    Embed --> Binary["Single Executable (voxforg)"]
+    Build["UI Build Stage (ui/dist)"] --> Embed["rust-embed in voxforge-api"]
+    Embed --> Binary["Single Executable (voxforge)"]
     
     Binary --> WebstationRouter{"HTTP Request Router"}
     WebstationRouter -->|"/v1/*, /health, /metrics, /docs"| ApiHandlers["Axum REST/WS Handlers"]
@@ -362,19 +362,19 @@ flowchart TD
     WebstationRouter -->|"Other paths (*)"| FallbackHandler["SPA HTML5 History Fallback (index.html)"]
 
     Binary --> CLI["CLI Subcommands (10 Tools)"]
-    CLI --> Serve["voxforg serve --open"]
+    CLI --> Serve["voxforge serve --open"]
     Serve --> WebBrowser["System Default Browser (http://localhost:8080)"]
 ```
 
 1. **Compile-Time Asset Inlining (`rust-embed`)**:
-   - The compiled SPA bundle in `ui/dist` is embedded into the `voxforg-api` crate via `RustEmbed`.
+   - The compiled SPA bundle in `ui/dist` is embedded into the `voxforge-api` crate via `RustEmbed`.
    - In single-binary release mode, zero external node dependencies or web servers (e.g. Nginx, Caddy) are required.
 
 2. **SPA History Fallback Router**:
    - Routes not matching API prefixes (`/v1/`, `/health`, `/metrics`, `/docs`, `/api-docs`) return `index.html` with HTTP 200, enabling clean client-side routing across Webstation tabs (`/studio`, `/voices`, `/cloning`, `/transcribe`, `/pipeline`, `/catalog`, `/benchmarks`, `/settings`).
 
 3. **Multi-Channel Distribution**:
-   - **`npx voxforg`**: Zero-install runner downloading architecture-specific binaries directly to cache.
+   - **`npx voxforge`**: Zero-install runner downloading architecture-specific binaries directly to cache.
    - **`curl | sh` / `irm | iex`**: Automated shell installers detecting host OS and architecture.
    - **Single-Container Docker**: Multi-stage Docker image packaging native binary and embedded frontend in a self-contained container.
 
@@ -382,7 +382,7 @@ flowchart TD
 
 ## 9. Multi-Voice Audio Studio DAG Pipeline Architecture
 
-VoxForg includes a high-performance Directed Acyclic Graph (DAG) pipeline execution engine (`voxforg-pipeline`) optimized for multi-voice combining workflows (podcasts, tactical communications, radio broadcasting, narrative audiobooks, and video dubbing).
+VoxForge includes a high-performance Directed Acyclic Graph (DAG) pipeline execution engine (`voxforge-pipeline`) optimized for multi-voice combining workflows (podcasts, tactical communications, radio broadcasting, narrative audiobooks, and video dubbing).
 
 ```mermaid
 flowchart TD

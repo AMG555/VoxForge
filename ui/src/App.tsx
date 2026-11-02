@@ -35,7 +35,7 @@ export const App: React.FC = () => {
 
     const getCustomVoices = (): Voice[] => {
       try {
-        const stored = localStorage.getItem('voxforg_custom_voices');
+        const stored = localStorage.getItem('voxforge_custom_voices');
         return stored ? JSON.parse(stored) : [];
       } catch {
         return [];
@@ -198,7 +198,7 @@ export const App: React.FC = () => {
       const updated = [newVoice, ...prev.filter((v) => v.id !== newVoice.id)];
       try {
         const customVoices = updated.filter(isCustomVoice);
-        localStorage.setItem('voxforg_custom_voices', JSON.stringify(customVoices));
+        localStorage.setItem('voxforge_custom_voices', JSON.stringify(customVoices));
       } catch {}
       return updated;
     });
@@ -209,7 +209,7 @@ export const App: React.FC = () => {
       const updated = prev.filter((v) => v.id !== voiceId);
       try {
         const customVoices = updated.filter(isCustomVoice);
-        localStorage.setItem('voxforg_custom_voices', JSON.stringify(customVoices));
+        localStorage.setItem('voxforge_custom_voices', JSON.stringify(customVoices));
       } catch {}
       return updated;
     });

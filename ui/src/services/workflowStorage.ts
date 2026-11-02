@@ -17,9 +17,9 @@ export interface StoredWorkflow extends PipelineDefinition {
   is_active?: boolean;
 }
 
-const STORAGE_KEY = 'voxforg_workflows_v2';
-const ACTIVE_ID_KEY = 'voxforg_active_workflow_id';
-const OPEN_TABS_KEY = 'voxforg_open_tabs_v2';
+const STORAGE_KEY = 'voxforge_workflows_v2';
+const ACTIVE_ID_KEY = 'voxforge_active_workflow_id';
+const OPEN_TABS_KEY = 'voxforge_open_tabs_v2';
 
 const DEFAULT_PRESETS: StoredWorkflow[] = [
   {
@@ -468,7 +468,7 @@ export class WorkflowStorage {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(workflow, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `${workflow.name.toLowerCase().replace(/\s+/g, '-')}.voxforg.json`);
+    downloadAnchor.setAttribute('download', `${workflow.name.toLowerCase().replace(/\s+/g, '-')}.voxforge.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();

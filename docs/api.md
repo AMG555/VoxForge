@@ -1,4 +1,4 @@
-# VoxForg API Specification
+# VoxForge API Specification
 
 **Version:** 1.0.0  
 **OpenAPI Specification:** 3.1.0  
@@ -28,7 +28,7 @@ Authorization: Bearer <api_key>
 
 ### `POST /v1/audio/speech`
 
-Synthesizes speech audio from text. Fully compliant with OpenAI Speech API specifications with extended VoxForg parameters.
+Synthesizes speech audio from text. Fully compliant with OpenAI Speech API specifications with extended VoxForge parameters.
 
 #### Request Headers
 ```http
@@ -40,7 +40,7 @@ Authorization: Bearer <api_key>
 ```json
 {
   "model": "edge-tts",
-  "input": "VoxForg is now operational with hardware-accelerated speech synthesis.",
+  "input": "VoxForge is now operational with hardware-accelerated speech synthesis.",
   "voice": "en-US-AriaNeural",
   "response_format": "wav",
   "speed": 1.0,
@@ -125,21 +125,21 @@ Lists all available speech engines and models.
       "id": "edge-tts",
       "object": "model",
       "created": 1700000000,
-      "owned_by": "voxforg-cloud",
+      "owned_by": "voxforge-cloud",
       "hardware_tier": "TIER_1_MINIMAL"
     },
     {
       "id": "kokoro-82m",
       "object": "model",
       "created": 1700000000,
-      "owned_by": "voxforg-local",
+      "owned_by": "voxforge-local",
       "hardware_tier": "TIER_3_PRO"
     },
     {
       "id": "piper",
       "object": "model",
       "created": 1700000000,
-      "owned_by": "voxforg-local",
+      "owned_by": "voxforge-local",
       "hardware_tier": "TIER_2_STANDARD"
     }
   ]
@@ -327,33 +327,33 @@ Inspects local engine readiness and database connectivity:
 Standard Prometheus text format (`text/plain; version=0.0.4; charset=utf-8`) output for Grafana, VictoriaMetrics, and Prometheus scrapers:
 
 ```prometheus
-# HELP voxforg_active_requests Currently in-flight HTTP requests
-# TYPE voxforg_active_requests gauge
-voxforg_active_requests 0
+# HELP voxforge_active_requests Currently in-flight HTTP requests
+# TYPE voxforge_active_requests gauge
+voxforge_active_requests 0
 
-# HELP voxforg_requests_total Total number of HTTP requests processed by endpoint and status
-# TYPE voxforg_requests_total counter
-voxforg_requests_total{endpoint="/v1/audio/speech",status="200"} 24
+# HELP voxforge_requests_total Total number of HTTP requests processed by endpoint and status
+# TYPE voxforge_requests_total counter
+voxforge_requests_total{endpoint="/v1/audio/speech",status="200"} 24
 
-# HELP voxforg_synthesis_total Total number of completed speech syntheses
-# TYPE voxforg_synthesis_total counter
-voxforg_synthesis_total 18
+# HELP voxforge_synthesis_total Total number of completed speech syntheses
+# TYPE voxforge_synthesis_total counter
+voxforge_synthesis_total 18
 
-# HELP voxforg_synthesis_duration_seconds_total Total duration in seconds spent synthesizing audio
-# TYPE voxforg_synthesis_duration_seconds_total counter
-voxforg_synthesis_duration_seconds_total 1.2940
+# HELP voxforge_synthesis_duration_seconds_total Total duration in seconds spent synthesizing audio
+# TYPE voxforge_synthesis_duration_seconds_total counter
+voxforge_synthesis_duration_seconds_total 1.2940
 
-# HELP voxforg_audio_samples_total Total 16-bit PCM audio samples generated
-# TYPE voxforg_audio_samples_total counter
-voxforg_audio_samples_total 169920
+# HELP voxforge_audio_samples_total Total 16-bit PCM audio samples generated
+# TYPE voxforge_audio_samples_total counter
+voxforge_audio_samples_total 169920
 
-# HELP voxforg_cache_hits_total In-memory audio synthesis LRU cache hits
-# TYPE voxforg_cache_hits_total counter
-voxforg_cache_hits_total 6
+# HELP voxforge_cache_hits_total In-memory audio synthesis LRU cache hits
+# TYPE voxforge_cache_hits_total counter
+voxforge_cache_hits_total 6
 
-# HELP voxforg_cache_misses_total In-memory audio synthesis LRU cache misses
-# TYPE voxforg_cache_misses_total counter
-voxforg_cache_misses_total 18
+# HELP voxforge_cache_misses_total In-memory audio synthesis LRU cache misses
+# TYPE voxforge_cache_misses_total counter
+voxforge_cache_misses_total 18
 ```
 
 ---
@@ -371,7 +371,7 @@ All non-2xx responses conform to RFC 7807 Problem Details:
 
 ```json
 {
-  "type": "https://voxforg.org/errors/input-too-large",
+  "type": "https://voxforge.org/errors/input-too-large",
   "title": "Input Text Exceeds Limit",
   "status": 422,
   "detail": "The 'input' parameter cannot exceed 10,000 characters per request",
@@ -523,7 +523,7 @@ Returns all active pronunciation overrides.
 Add or update a pronunciation entry. Returns `201 Created` on insert, `200 OK` on update.
 
 ```json
-{ "term": "VoxForg", "replacement": "Vox Forge", "note": "brand name" }
+{ "term": "VoxForge", "replacement": "Vox Forge", "note": "brand name" }
 ```
 
 ### `DELETE /v1/pronunciation/dictionary/{term}`
@@ -699,7 +699,7 @@ Update worker liveness and timestamp. If worker was offline, restores status to 
 
 ## 15. Voice Cloning & Persistent Voice Profiles
 
-VoxForg enables zero-shot voice cloning and persistent profile management. Engines supporting zero-shot speaker conditioning (such as `qwen3-tts`) extract high-dimensional speaker embeddings from reference audio (raw PCM/WAV encoded in base64 or file path) and condition synthesis dynamically.
+VoxForge enables zero-shot voice cloning and persistent profile management. Engines supporting zero-shot speaker conditioning (such as `qwen3-tts`) extract high-dimensional speaker embeddings from reference audio (raw PCM/WAV encoded in base64 or file path) and condition synthesis dynamically.
 
 ### `GET /v1/voices/profiles`
 
@@ -803,7 +803,7 @@ Any persistent profile ID or name can be passed directly to `POST /v1/audio/spee
 
 ## 16. Automated Speech Recognition (ASR) Layer
 
-VoxForg provides an OpenAI-compatible speech-to-text transcription engine layer supporting both Whisper-compatible neural ASR engines and custom speech inference runtimes.
+VoxForge provides an OpenAI-compatible speech-to-text transcription engine layer supporting both Whisper-compatible neural ASR engines and custom speech inference runtimes.
 
 ### `GET /v1/asr/engines`
 
@@ -856,7 +856,7 @@ Transcribes speech audio into text or timed subtitles (SRT/VTT). Fully compatibl
 #### Response (`response_format: "verbose_json"`)
 ```json
 {
-  "text": "Welcome to VoxForg intelligent voice system.",
+  "text": "Welcome to VoxForge intelligent voice system.",
   "task": "transcribe",
   "language": "en",
   "duration_seconds": 2.45,
@@ -866,7 +866,7 @@ Transcribes speech audio into text or timed subtitles (SRT/VTT). Fully compatibl
       "seek": 0,
       "start_ms": 0,
       "end_ms": 2450,
-      "text": "Welcome to VoxForg intelligent voice system.",
+      "text": "Welcome to VoxForge intelligent voice system.",
       "tokens": [50364, 1000, 50424],
       "temperature": 0.0,
       "avg_logprob": -0.18,
@@ -888,7 +888,7 @@ Transcribes speech audio into text or timed subtitles (SRT/VTT). Fully compatibl
 
 ## 17. Model Catalog & Local Weights Manager
 
-VoxForg provides local lifecycle management for open-weights TTS, ASR, and VAD models. It validates host hardware constraints (RAM, GPU accelerators) and verifies cryptographic checksums (SHA-256) upon installation.
+VoxForge provides local lifecycle management for open-weights TTS, ASR, and VAD models. It validates host hardware constraints (RAM, GPU accelerators) and verifies cryptographic checksums (SHA-256) upon installation.
 
 ### `GET /v1/catalog/models`
 
@@ -942,12 +942,12 @@ Uninstalls local model weights, freeing host storage. Returns `200 OK` with `sta
 
 ## 18. Model Context Protocol (MCP) Server
 
-VoxForg embeds a compliant Model Context Protocol (MCP) server conforming to JSON-RPC 2.0 specifications. LLM agents (e.g. Claude Desktop, Cursor, AI assistants) can connect over standard I/O (`stdio`) to orchestrate speech generation, voice cloning, transcription, DAG pipeline execution, and model catalog inspection natively.
+VoxForge embeds a compliant Model Context Protocol (MCP) server conforming to JSON-RPC 2.0 specifications. LLM agents (e.g. Claude Desktop, Cursor, AI assistants) can connect over standard I/O (`stdio`) to orchestrate speech generation, voice cloning, transcription, DAG pipeline execution, and model catalog inspection natively.
 
 ### Launching MCP Server via CLI
 
 ```bash
-voxforg mcp
+voxforge mcp
 ```
 
 ### Supported MCP Protocol Methods
@@ -975,8 +975,8 @@ voxforg mcp
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -987,7 +987,7 @@ voxforg mcp
 
 ## 19. Embedded Webstation Static Assets & SPA Fallback
 
-When running `voxforg serve`, the API server automatically mounts the embedded React/TypeScript Webstation frontend. Requests matching API routes, health checks, metrics, or OpenAPI documentation are handled by Axum REST services, while all other requests stream static web assets or fall back to client-side application routing.
+When running `voxforge serve`, the API server automatically mounts the embedded React/TypeScript Webstation frontend. Requests matching API routes, health checks, metrics, or OpenAPI documentation are handled by Axum REST services, while all other requests stream static web assets or fall back to client-side application routing.
 
 ### `GET /`
 
@@ -1202,5 +1202,5 @@ Authorization: Bearer <api_key>
 
 ### Model Context Protocol (MCP)
 
-For integrating agentic IDEs (Cursor, Claude Desktop, Antigravity, Windsurf, Roo Code) with VoxForg, see the dedicated [Model Context Protocol (MCP) Integration Guide](mcp.md).
+For integrating agentic IDEs (Cursor, Claude Desktop, Antigravity, Windsurf, Roo Code) with VoxForge, see the dedicated [Model Context Protocol (MCP) Integration Guide](mcp.md).
 

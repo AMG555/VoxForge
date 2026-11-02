@@ -22,5 +22,5 @@ Developers already have extensive tooling built around the OpenAI Audio API (`/v
 - **Rejected:** Axum has direct first-class Tokio alignment and superior middleware ergonomics.
 
 ## Consequences
-- Existing scripts written for OpenAI Audio API work with VoxForg simply by changing `base_url`.
+- Existing scripts written for OpenAI Audio API work with VoxForge simply by changing `base_url`.
 - Built-in Tower middleware enables fine-grained rate limiting, CORS controls, and security headers out of the box.

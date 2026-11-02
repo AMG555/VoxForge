@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
-# VoxForg Turnkey One-Line Installer for Linux & macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForg/main/scripts/install.sh | sh
+# VoxForge Turnkey One-Line Installer for Linux & macOS
+# Usage: curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
 
 set -e
 
-REPO="AMG555/VoxForg"
-INSTALL_DIR="${VOXFORG_INSTALL_DIR:-$HOME/.local/bin}"
+REPO="AMG555/VoxForge"
+INSTALL_DIR="${VOXFORGE_INSTALL_DIR:-$HOME/.local/bin}"
 
 printf "\033[1;33m"
 cat << 'EOF'
@@ -19,7 +19,7 @@ cat << 'EOF'
                                  |___/    
 EOF
 printf "\033[0m"
-printf "\033[1;37mVoxForg Standalone Workstation Installer\033[0m\n\n"
+printf "\033[1;37mVoxForge Standalone Workstation Installer\033[0m\n\n"
 
 # 1. Detect OS and Architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -51,7 +51,7 @@ case "$ARCH" in
         ;;
 esac
 
-BINARY_NAME="voxforg-${PLATFORM}-${TARGET_ARCH}"
+BINARY_NAME="voxforge-${PLATFORM}-${TARGET_ARCH}"
 if [ "$PLATFORM" = "windows" ]; then
     BINARY_NAME="${BINARY_NAME}.exe"
 fi
@@ -60,7 +60,7 @@ printf "Detected Platform: \033[1;32m%s\033[0m (%s)\n" "$PLATFORM" "$TARGET_ARCH
 
 # 2. Determine target install directory
 mkdir -p "$INSTALL_DIR"
-TARGET_FILE="$INSTALL_DIR/voxforg"
+TARGET_FILE="$INSTALL_DIR/voxforge"
 
 # 3. Fetch latest release version
 LATEST_TAG=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || true)
@@ -71,9 +71,9 @@ fi
 # 4. Resolve candidate asset filenames for platform
 if [ "$PLATFORM" = "macos" ]; then
     # Universal FAT binary preferred, followed by arch-specific fallbacks
-    CANDIDATES="voxforg-macos-universal voxforg-macos-${TARGET_ARCH} voxforg-macos-arm64 voxforg-macos-x86_64"
+    CANDIDATES="voxforge-macos-universal voxforge-macos-${TARGET_ARCH} voxforge-macos-arm64 voxforge-macos-x86_64"
 else
-    CANDIDATES="voxforg-linux-${TARGET_ARCH} voxforg-linux-x86_64"
+    CANDIDATES="voxforge-linux-${TARGET_ARCH} voxforge-linux-x86_64"
 fi
 
 printf "Fetching release \033[1;36m%s\033[0m from GitHub...\n" "$LATEST_TAG"
@@ -88,7 +88,7 @@ for CANDIDATE in $CANDIDATES; do
             # Strip macOS quarantine attribute to prevent Gatekeeper popup
             xattr -d com.apple.quarantine "$TARGET_FILE" 2>/dev/null || true
         fi
-        printf "\033[1;32mSuccessfully installed voxforg binary to %s\033[0m\n" "$TARGET_FILE"
+        printf "\033[1;32mSuccessfully installed voxforge binary to %s\033[0m\n" "$TARGET_FILE"
         DOWNLOAD_SUCCESS=1
         break
     fi
@@ -98,7 +98,7 @@ if [ "$DOWNLOAD_SUCCESS" -eq 0 ]; then
     # Fallback to local source compilation if binary release asset is unavailable
     printf "\033[1;33mRelease binary not directly downloadable; attempting local cargo build...\033[0m\n"
     if command -v cargo >/dev/null 2>&1; then
-        cargo install --git "https://github.com/${REPO}.git" voxforg-cli --root "$HOME/.local"
+        cargo install --git "https://github.com/${REPO}.git" voxforge-cli --root "$HOME/.local"
         printf "\033[1;32mSuccessfully compiled and installed via cargo.\033[0m\n"
     else
         printf "\033[1;31mDownload failed and cargo was not found. Please install Rust or check repository releases.\033[0m\n"
@@ -138,10 +138,10 @@ esac
 if [ "$PLATFORM" = "linux" ]; then
     APPS_DIR="$HOME/.local/share/applications"
     mkdir -p "$APPS_DIR"
-    DESKTOP_ENTRY="$APPS_DIR/voxforg.desktop"
+    DESKTOP_ENTRY="$APPS_DIR/voxforge.desktop"
     cat <<EOF > "$DESKTOP_ENTRY"
 [Desktop Entry]
-Name=VoxForg Studio
+Name=VoxForge Studio
 Comment=Neural Speech Synthesis & Voice Workstation
 Exec=$TARGET_FILE serve --open
 Icon=audio-card
@@ -157,7 +157,7 @@ fi
 printf "\nValidating installation...\n"
 "$TARGET_FILE" hardware || true
 
-printf "\n\033[1;32m=== VoxForg installation ready! ===\033[0m\n"
-printf "Run visual workstation:  \033[1;37mvoxforg serve --open\033[0m\n"
-printf "Run speech synthesis:    \033[1;37mvoxforg synth \"Hello from VoxForg\"\033[0m\n"
+printf "\n\033[1;32m=== VoxForge installation ready! ===\033[0m\n"
+printf "Run visual workstation:  \033[1;37mvoxforge serve --open\033[0m\n"
+printf "Run speech synthesis:    \033[1;37mvoxforge synth \"Hello from VoxForge\"\033[0m\n"
 printf "Documentation & API:     \033[1;37mhttp://localhost:8080/docs\033[0m\n\n"

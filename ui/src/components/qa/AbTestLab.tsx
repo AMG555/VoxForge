@@ -540,7 +540,7 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
                 {watermarkResult.is_detected && watermarkResult.signature_match ? (
                   <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center space-x-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>AUTHENTIC VOXFORG SIGNATURE</span>
+                    <span>AUTHENTIC VOXFORGE SIGNATURE</span>
                   </span>
                 ) : (
                   <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center space-x-1">

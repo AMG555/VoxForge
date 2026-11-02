@@ -1,0 +1,200 @@
+use crate::state::AppState;
+use axum::{
+    extract::{Request, State},
+    http::{header, HeaderName, HeaderValue, StatusCode},
+    middleware::Next,
+    response::Response,
+    Json,
+};
+use subtle::ConstantTimeEq;
+use voxforge_core::error::ProblemDetails;
+
+pub async fn request_id_and_metrics(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let req_id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+    let path = req.uri().path().to_string();
+    state.metrics.inc_active_requests();
+
+    let mut response = next.run(req).await;
+
+    state.metrics.dec_active_requests();
+    let status = response.status().as_u16();
+    state.metrics.record_request(&path, status).await;
+
+    if let Ok(val) = HeaderValue::from_str(&req_id) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static("x-request-id"), val);
+    }
+
+    response
+}
+
+pub async fn security_headers(req: Request, next: Next) -> Response {
+    let path = req.uri().path().to_string();
+    let is_docs = path == "/docs" || path.starts_with("/docs/");
+    let mut response = next.run(req).await;
+    let headers = response.headers_mut();
+
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::X_FRAME_OPTIONS,
+        if is_docs {
+            HeaderValue::from_static("SAMEORIGIN")
+        } else {
+            HeaderValue::from_static("DENY")
+        },
+    );
+    headers.insert(
+        header::STRICT_TRANSPORT_SECURITY,
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        if is_docs {
+            HeaderValue::from_static(
+                "default-src 'self' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https:;"
+            )
+        } else {
+            HeaderValue::from_static(
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; media-src 'self' blob: data:; connect-src 'self' ws: wss: http: https:; img-src 'self' data: https:;"
+            )
+        },
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+
+    response
+}
+
+pub async fn auth_middleware(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, Json<ProblemDetails>)> {
+    let expected_key = match &state.api_key {
+        Some(key) if !key.is_empty() => key,
+        _ => return Ok(next.run(req).await),
+    };
+
+    let path = req.uri().path();
+    // Allow static UI assets, health checks, metrics, and documentation without API key
+    let requires_auth = path.starts_with("/v1/") || path == "/mcp" || path.starts_with("/mcp/");
+    if !requires_auth {
+        return Ok(next.run(req).await);
+    }
+
+    let auth_header = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok());
+
+    let api_key_header = req
+        .headers()
+        .get("x-api-key")
+        .or_else(|| req.headers().get("x-voxforge-api-key"))
+        .and_then(|h| h.to_str().ok());
+
+    let query_token = req.uri().query().and_then(|q| {
+        q.split('&').find_map(|pair| {
+            let mut parts = pair.split('=');
+            let key = parts.next()?;
+            let val = parts.next()?;
+            if key == "api_key" || key == "token" {
+                Some(val)
+            } else {
+                None
+            }
+        })
+    });
+
+    let token = if let Some(auth) = auth_header {
+        if let Some(stripped) = auth.strip_prefix("Bearer ") {
+            Some(stripped)
+        } else {
+            Some(auth)
+        }
+    } else if let Some(key) = api_key_header {
+        Some(key)
+    } else {
+        query_token
+    };
+
+    let is_authorized = match token {
+        Some(t) => {
+            let token_bytes = t.as_bytes();
+            let expected_bytes = expected_key.as_bytes();
+            token_bytes.ct_eq(expected_bytes).into()
+        }
+        None => false,
+    };
+
+    if is_authorized {
+        Ok(next.run(req).await)
+    } else {
+        let err = ProblemDetails {
+            problem_type: "https://voxforge.org/errors/unauthorized".to_string(),
+            title: "Unauthorized".to_string(),
+            status: StatusCode::UNAUTHORIZED.as_u16(),
+            detail: "Invalid or missing Bearer API token or x-api-key".to_string(),
+            instance: path.to_string(),
+        };
+        Err((StatusCode::UNAUTHORIZED, Json(err)))
+    }
+}
+
+/// Protect local endpoints against DNS rebinding and malicious browser origins.
+pub async fn host_validation(
+    req: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, Json<ProblemDetails>)> {
+    if let Some(host) = req
+        .headers()
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok())
+    {
+        let hostname = host.split(':').next().unwrap_or("").trim();
+
+        let is_local = hostname == "localhost"
+            || hostname == "127.0.0.1"
+            || hostname == "[::1]"
+            || hostname.ends_with(".localhost")
+            || hostname.is_empty();
+
+        let allowed_env = std::env::var("VOXFORGE_ALLOWED_HOSTS").unwrap_or_default();
+        let is_allowed_by_env = !allowed_env.is_empty()
+            && allowed_env
+                .split(',')
+                .any(|allowed| allowed.trim().eq_ignore_ascii_case(hostname));
+
+        if !is_local && !is_allowed_by_env {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/forbidden-host".to_string(),
+                title: "Invalid Host Header".to_string(),
+                status: StatusCode::FORBIDDEN.as_u16(),
+                detail: format!(
+                    "Host '{}' is not permitted. Blocked to prevent DNS rebinding attacks.",
+                    hostname
+                ),
+                instance: req.uri().path().to_string(),
+            };
+            return Err((StatusCode::FORBIDDEN, Json(err)));
+        }
+    }
+
+    Ok(next.run(req).await)
+}

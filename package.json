@@ -1,17 +1,17 @@
 {
-  "name": "voxforg",
+  "name": "voxforge",
   "version": "0.2.0",
   "description": "Hardware-adaptive neural speech synthesis workstation, voice cloning & visual pipeline engine",
-  "main": "packages/voxforg/bin/voxforg.js",
+  "main": "packages/voxforge/bin/voxforge.js",
   "bin": {
-    "voxforg": "./packages/voxforg/bin/voxforg.js"
+    "voxforge": "./packages/voxforge/bin/voxforge.js"
   },
   "scripts": {
-    "start": "node ./packages/voxforg/bin/voxforg.js serve --open",
-    "voxforg": "node ./packages/voxforg/bin/voxforg.js",
+    "start": "node ./packages/voxforge/bin/voxforge.js serve --open",
+    "voxforge": "node ./packages/voxforge/bin/voxforge.js",
     "ui:dev": "npm --prefix ui run dev",
-    "ui:build": "npm --prefix ui run build && node -e \"fs.rmSync('crates/voxforg-api/ui_dist', {recursive: true, force: true}); fs.cpSync('ui/dist', 'crates/voxforg-api/ui_dist', {recursive: true, force: true})\"",
-    "build:all": "npm run ui:build && cargo build --release --bin voxforg"
+    "ui:build": "npm --prefix ui run build && node -e \"fs.rmSync('crates/voxforge-api/ui_dist', {recursive: true, force: true}); fs.cpSync('ui/dist', 'crates/voxforge-api/ui_dist', {recursive: true, force: true})\"",
+    "build:all": "npm run ui:build && cargo build --release --bin voxforge"
   },
   "keywords": [
     "tts",
@@ -24,11 +24,11 @@
     "whisper",
     "rust"
   ],
-  "author": "VoxForg Core Contributors",
+  "author": "VoxForge Core Contributors",
   "license": "Apache-2.0 OR MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AMG555/VoxForg.git"
+    "url": "https://github.com/AMG555/VoxForge.git"
   },
   "engines": {
     "node": ">=16.0.0"

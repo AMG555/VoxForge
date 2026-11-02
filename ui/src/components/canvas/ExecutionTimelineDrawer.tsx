@@ -80,7 +80,7 @@ export const ExecutionTimelineDrawer: React.FC<ExecutionTimelineDrawerProps> = (
           {audioUrl && (
             <a
               href={audioUrl}
-              download="voxforg-master-output.wav"
+              download="voxforge-master-output.wav"
               onClick={(e) => e.stopPropagation()}
               className="flex items-center space-x-1 px-2 py-1 rounded bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white text-[11px] transition-colors"
             >

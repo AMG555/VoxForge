@@ -1,4 +1,4 @@
-# VoxForg User Guide & Manual
+# VoxForge User Guide & Manual
 
 Complete operational manual for developers, sound engineers, and system administrators.
 
@@ -6,42 +6,42 @@ Complete operational manual for developers, sound engineers, and system administ
 
 ## 1. CLI Reference Manual
 
-The `voxforg` binary provides a unified command line interface for workstation operations, speech synthesis, hardware diagnostics, voice cloning, automated transcription, model management, benchmarking, and automated A/B evaluation.
+The `voxforge` binary provides a unified command line interface for workstation operations, speech synthesis, hardware diagnostics, voice cloning, automated transcription, model management, benchmarking, and automated A/B evaluation.
 
 ```bash
-voxforg <COMMAND> [OPTIONS]
+voxforge <COMMAND> [OPTIONS]
 ```
 
 ### 1.1 Commands Summary
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
-| `serve` | Start HTTP REST, WebSocket, and embedded Webstation UI server | `voxforg serve --open` |
-| `synth` | Synthesize speech text directly to audio file | `voxforg synth "Hello world" --voice alloy --out out.wav` |
-| `transcribe` | Transcribe speech audio/video to text, SRT, VTT, or JSON subtitles | `voxforg transcribe clip.wav --format srt --out clip.srt` |
-| `clone` | Extract zero-shot speaker embedding profile from reference audio | `voxforg clone --name "Rachel" --audio sample.wav` |
-| `models` | Manage local neural model packages and download weights | `voxforg models list` |
-| `hardware` | Inspect host CPU, SIMD, RAM, and GPU compute capabilities | `voxforg hardware` |
-| `engines` | List registered speech engines and available voices | `voxforg engines` |
-| `bench` | Run synthesis latency benchmark across iterations | `voxforg bench --iterations 10` |
-| `ab-test` | Run automated objective A/B acoustic quality comparison | `voxforg ab-test --voice-a en-US-AriaNeural --voice-b alloy` |
-| `mcp` | Start Model Context Protocol (MCP) JSON-RPC 2.0 stdio server | `voxforg mcp` |
+| `serve` | Start HTTP REST, WebSocket, and embedded Webstation UI server | `voxforge serve --open` |
+| `synth` | Synthesize speech text directly to audio file | `voxforge synth "Hello world" --voice alloy --out out.wav` |
+| `transcribe` | Transcribe speech audio/video to text, SRT, VTT, or JSON subtitles | `voxforge transcribe clip.wav --format srt --out clip.srt` |
+| `clone` | Extract zero-shot speaker embedding profile from reference audio | `voxforge clone --name "Rachel" --audio sample.wav` |
+| `models` | Manage local neural model packages and download weights | `voxforge models list` |
+| `hardware` | Inspect host CPU, SIMD, RAM, and GPU compute capabilities | `voxforge hardware` |
+| `engines` | List registered speech engines and available voices | `voxforge engines` |
+| `bench` | Run synthesis latency benchmark across iterations | `voxforge bench --iterations 10` |
+| `ab-test` | Run automated objective A/B acoustic quality comparison | `voxforge ab-test --voice-a en-US-AriaNeural --voice-b alloy` |
+| `mcp` | Start Model Context Protocol (MCP) JSON-RPC 2.0 stdio server | `voxforge mcp` |
 
 ---
 
-### 1.2 `voxforg serve`
+### 1.2 `voxforge serve`
 
-Launches the VoxForg application daemon and embedded visual workstation.
+Launches the VoxForge application daemon and embedded visual workstation.
 
 ```bash
-voxforg serve [OPTIONS]
+voxforge serve [OPTIONS]
 ```
 
 #### Options:
 - `-p, --port <PORT>`: Port to bind server to (Default: `8080`).
 - `--host <HOST>`: Network interface address (Default: `0.0.0.0`).
 - `--open`: Automatically open default web browser to workstation interface on startup.
-- `--api-key <KEY>`: Optional Bearer token for API authentication (or via `VOXFORG_API_KEY`).
+- `--api-key <KEY>`: Optional Bearer token for API authentication (or via `VOXFORGE_API_KEY`).
 - `--data-dir <PATH>`: Directory for pipeline persistence and cache (Default: `./data`).
 - `--router-url <URL>`: Upstream model router endpoint URL (e.g. `https://api.openai.com/v1` or `http://localhost:8000/v1`).
 - `--router-api-key <KEY>`: API key for upstream model router.
@@ -49,12 +49,12 @@ voxforg serve [OPTIONS]
 
 ---
 
-### 1.3 `voxforg synth`
+### 1.3 `voxforge synth`
 
 Generates audio directly to disk without running the daemon.
 
 ```bash
-voxforg synth "<TEXT>" [OPTIONS]
+voxforge synth "<TEXT>" [OPTIONS]
 ```
 
 #### Options:
@@ -67,12 +67,12 @@ voxforg synth "<TEXT>" [OPTIONS]
 
 ---
 
-### 1.4 `voxforg transcribe`
+### 1.4 `voxforge transcribe`
 
 Transcribes speech audio or extracts audio from video containers, generating formatted text, word-level timestamps, or subtitle files (SRT / VTT).
 
 ```bash
-voxforg transcribe <AUDIO_PATH> [OPTIONS]
+voxforge transcribe <AUDIO_PATH> [OPTIONS]
 ```
 
 #### Options:
@@ -83,20 +83,20 @@ voxforg transcribe <AUDIO_PATH> [OPTIONS]
 #### Examples:
 ```bash
 # Generate subtitle file for video
-voxforg transcribe interview.mp4 --format srt --out interview.srt
+voxforge transcribe interview.mp4 --format srt --out interview.srt
 
 # Verbose JSON with word timestamps
-voxforg transcribe lecture.wav --format json --out timestamps.json
+voxforge transcribe lecture.wav --format json --out timestamps.json
 ```
 
 ---
 
-### 1.5 `voxforg clone`
+### 1.5 `voxforge clone`
 
 Extracts a 512-dimensional zero-shot speaker acoustic embedding vector from a short clean reference audio sample (3-15 seconds) and saves a reusable `VoiceProfile` JSON file.
 
 ```bash
-voxforg clone --name "<NAME>" --audio <PATH> [OPTIONS]
+voxforge clone --name "<NAME>" --audio <PATH> [OPTIONS]
 ```
 
 #### Options:
@@ -109,33 +109,33 @@ voxforg clone --name "<NAME>" --audio <PATH> [OPTIONS]
 
 ---
 
-### 1.6 `voxforg models`
+### 1.6 `voxforge models`
 
 Inspects the curated open-weights model catalogue, checks host hardware compatibility against RAM/VRAM requirements, and triggers streaming downloads from HuggingFace.
 
 ```bash
 # List available and installed models
-voxforg models list [--filter tts|asr|vad|diarizer] [--installed-only]
+voxforge models list [--filter tts|asr|vad|diarizer] [--installed-only]
 
 # Download and install model weights
-voxforg models install <MODEL_ID>
+voxforge models install <MODEL_ID>
 ```
 
 #### Example:
 ```bash
-voxforg models list
-voxforg models install kokoro-v0_19
-voxforg models install piper-en-lessac-medium
+voxforge models list
+voxforge models install kokoro-v0_19
+voxforge models install piper-en-lessac-medium
 ```
 
 ---
 
-### 1.7 `voxforg ab-test`
+### 1.7 `voxforge ab-test`
 
 Runs automated acoustic quality, latency, and distortion comparisons between two engines or voices.
 
 ```bash
-voxforg ab-test \
+voxforge ab-test \
   --name "Neural vs Cloud Comparison" \
   --text "The quick brown fox jumps over the lazy dog." \
   --voice-a en-US-AriaNeural \
@@ -153,20 +153,20 @@ voxforg ab-test \
  
 ---
 
-### 1.8 `voxforg mcp`
+### 1.8 `voxforge mcp`
 
 Launches an in-process Model Context Protocol (MCP) server adhering to JSON-RPC 2.0 over standard I/O (`stdio`). This exposes 8 core tools (`synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, `list_models`, `benchmark_engine`, `get_cluster_status`) directly to LLM agent workstations like Claude Desktop or Cursor.
 
 ```bash
-voxforg mcp
+voxforge mcp
 ```
 
 #### Claude Desktop Integration (`claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -179,13 +179,13 @@ voxforg mcp
 
 | Variable | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `VOXFORG_API_KEY` | String | `None` | Enforces Bearer token authentication on `/v1/*` API endpoints |
-| `VOXFORG_ROUTER_URL` | String | `None` | Upstream OpenAI-compatible router endpoint (`/v1/audio/speech`) |
-| `VOXFORG_ROUTER_API_KEY` | String | `None` | Bearer token for upstream model router (automatically masked in logs) |
-| `VOXFORG_ROUTER_MODEL` | String | `tts-1` | Model identifier sent in router payloads |
-| `VOXFORG_ASR_URL` | String | `None` | Upstream OpenAI-compatible transcription endpoint (Faster-Whisper / WhisperX) |
-| `VOXFORG_QWEN3_URL` | String | `None` | Upstream zero-shot voice cloning service endpoint |
-| `VOXFORG_FFMPEG_PATH` | String | `ffmpeg` | Custom binary path for FFmpeg audio demuxing and video muxing |
+| `VOXFORGE_API_KEY` | String | `None` | Enforces Bearer token authentication on `/v1/*` API endpoints |
+| `VOXFORGE_ROUTER_URL` | String | `None` | Upstream OpenAI-compatible router endpoint (`/v1/audio/speech`) |
+| `VOXFORGE_ROUTER_API_KEY` | String | `None` | Bearer token for upstream model router (automatically masked in logs) |
+| `VOXFORGE_ROUTER_MODEL` | String | `tts-1` | Model identifier sent in router payloads |
+| `VOXFORGE_ASR_URL` | String | `None` | Upstream OpenAI-compatible transcription endpoint (Faster-Whisper / WhisperX) |
+| `VOXFORGE_QWEN3_URL` | String | `None` | Upstream zero-shot voice cloning service endpoint |
+| `VOXFORGE_FFMPEG_PATH` | String | `ffmpeg` | Custom binary path for FFmpeg audio demuxing and video muxing |
 | `RUST_LOG` | String | `info` | Logging verbosity (`error`, `warn`, `info`, `debug`, `trace`) |
 
 ---
@@ -207,7 +207,7 @@ The Workflows Dashboard serves as the command center for multi-project speech pi
   - **Export JSON**: Downloads the full pipeline graph (nodes, connection edges, parameters, and metadata) as an importable JSON file.
 - **Create & Import Workflows**:
   - **"New Workflow" Button**: Creates a clean slate pipeline with default inputs and master audio sinks ready for composition.
-  - **"Import JSON" Button**: Opens the native file dialog or drag-and-drop zone to import any VoxForg or n8n-exported audio pipeline schema.
+  - **"Import JSON" Button**: Opens the native file dialog or drag-and-drop zone to import any VoxForge or n8n-exported audio pipeline schema.
 - **Breadcrumb Navigation**: Header displays breadcrumb link (`Workflows / <Workflow Name>`), enabling one-click return to the central dashboard at any time without losing edits.
 
 ---
@@ -289,7 +289,7 @@ Clicking **"Clone New Voice"** launches the studio voice cloning interface:
    - **Sample Rate Transcoding**: Resamples to linear 16-bit 24,000 Hz mono PCM WAV for neural conditioning.
 3. **512-Dimensional Acoustic Embedding**: Conditioning extractors calculate speaker identity vectors capturing pitch contours, formant distribution, and vocal timbre.
 4. **Persistent Profile Storage**:
-   - Cloned voices are synchronized immediately with browser local storage (`voxforg_custom_voices`) and the backend SQLite/Postgres database.
+   - Cloned voices are synchronized immediately with browser local storage (`voxforge_custom_voices`) and the backend SQLite/Postgres database.
    - Cloned profiles appear instantly in the Voice Lab directory and in DAG Canvas `VoiceAssigner` dropdown menus.
 
 ---
@@ -311,7 +311,7 @@ Clicking **"Clone New Voice"** launches the studio voice cloning interface:
 
 ## 4. OpenAI Drop-In API Integration
 
-VoxForg replaces OpenAI TTS in existing applications without changing application logic.
+VoxForge replaces OpenAI TTS in existing applications without changing application logic.
 
 ### 4.1 Python OpenAI SDK
 ```python
@@ -319,13 +319,13 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8080/v1",
-    api_key="your-key-here"  # Matches VOXFORG_API_KEY if enabled
+    api_key="your-key-here"  # Matches VOXFORGE_API_KEY if enabled
 )
 
 response = client.audio.speech.create(
     model="edge-tts",
     voice="en-US-AriaNeural",
-    input="VoxForg provides zero-latency neural speech generation."
+    input="VoxForge provides zero-latency neural speech generation."
 )
 
 response.stream_to_file("output.wav")
@@ -345,7 +345,7 @@ async function main() {
   const response = await openai.audio.speech.create({
     model: "openai-router",
     voice: "alloy",
-    input: "Hello from VoxForg enterprise audio platform!",
+    input: "Hello from VoxForge enterprise audio platform!",
   });
 
   const buffer = Buffer.from(await response.arrayBuffer());
@@ -359,21 +359,21 @@ main();
 
 ## 5. Prometheus Telemetry & Monitoring
 
-VoxForg includes a native Prometheus metrics exporter at `GET /metrics`.
+VoxForge includes a native Prometheus metrics exporter at `GET /metrics`.
 
 Key metrics exported:
-- `voxforg_requests_total{endpoint, status}`
-- `voxforg_synthesis_total`
-- `voxforg_synthesis_duration_seconds_total`
-- `voxforg_audio_samples_total`
-- `voxforg_cache_hits_total` & `voxforg_cache_misses_total`
-- `voxforg_active_requests`
+- `voxforge_requests_total{endpoint, status}`
+- `voxforge_synthesis_total`
+- `voxforge_synthesis_duration_seconds_total`
+- `voxforge_audio_samples_total`
+- `voxforge_cache_hits_total` & `voxforge_cache_misses_total`
+- `voxforge_active_requests`
 
 ---
 
 ## 6. Model Context Protocol (MCP) Integration
 
-VoxForg includes a built-in Model Context Protocol (MCP) server adhering to the JSON-RPC 2.0 specification over standard I/O (`stdio`). This enables autonomous LLM coding agents and desktop assistants (Claude Desktop, Cursor, Antigravity, Windsurf) to synthesize speech, clone voices, transcribe audio, and run full DAG pipelines natively.
+VoxForge includes a built-in Model Context Protocol (MCP) server adhering to the JSON-RPC 2.0 specification over standard I/O (`stdio`). This enables autonomous LLM coding agents and desktop assistants (Claude Desktop, Cursor, Antigravity, Windsurf) to synthesize speech, clone voices, transcribe audio, and run full DAG pipelines natively.
 
 ### 6.1 Available MCP Tools
 
@@ -395,8 +395,8 @@ Add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -408,8 +408,8 @@ Add to your project's `.cursor/mcp.json` or global configuration:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -421,8 +421,8 @@ Add to `mcp_config.json`:
 ```json
 {
   "mcpServers": {
-    "voxforg": {
-      "command": "voxforg",
+    "voxforge": {
+      "command": "voxforge",
       "args": ["mcp"]
     }
   }
@@ -433,17 +433,17 @@ Add to `mcp_config.json`:
 
 ## 7. n8n Workflow Automation Integration
 
-VoxForg connects seamlessly with [n8n](https://n8n.io) to automate speech generation, customer service audio replies, automated podcast publishing, and voice cloning directly inside your automation flows.
+VoxForge connects seamlessly with [n8n](https://n8n.io) to automate speech generation, customer service audio replies, automated podcast publishing, and voice cloning directly inside your automation flows.
 
 ### 7.1 Method 1: Drop-In OpenAI Audio Node
 
-Because VoxForg implements the standard OpenAI Audio Speech API (`/v1/audio/speech`), you can use n8n's native **OpenAI Node**:
+Because VoxForge implements the standard OpenAI Audio Speech API (`/v1/audio/speech`), you can use n8n's native **OpenAI Node**:
 
 1. Add an **OpenAI** node to your n8n workflow.
 2. Select Resource: **Audio**, Operation: **Generate Speech**.
 3. In Credential settings, click **Create New Credential**:
    - **Base URL**: `http://localhost:8080/v1` (or your Docker host IP)
-   - **API Key**: Any string (or matches `VOXFORG_API_KEY` if set)
+   - **API Key**: Any string (or matches `VOXFORGE_API_KEY` if set)
 4. Configure parameters:
    - **Model**: `edge-tts` (or `kokoro-82m`, `piper`, `qwen3-tts`)
    - **Voice**: `en-US-AriaNeural` (or any cloned voice ID)
@@ -480,7 +480,7 @@ To send spoken notifications to Telegram, Discord, or Slack:
 
 Execute complex multi-speaker podcasts or audiobooks triggered by webhooks:
 
-1. In VoxForg Workflows Dashboard or DAG Canvas, click **Export JSON** to obtain your pipeline definition.
+1. In VoxForge Workflows Dashboard or DAG Canvas, click **Export JSON** to obtain your pipeline definition.
 2. In n8n, add an **HTTP Request** node:
    - Method: `POST`
    - URL: `http://localhost:8080/v1/pipeline/execute`
@@ -516,7 +516,7 @@ You can copy and paste this complete workflow snippet directly into the n8n canv
 
 ```json
 {
-  "name": "VoxForg Neural Audio Automation",
+  "name": "VoxForge Neural Audio Automation",
   "nodes": [
     {
       "parameters": {
@@ -537,7 +537,7 @@ You can copy and paste this complete workflow snippet directly into the n8n canv
         "url": "http://localhost:8080/v1/audio/speech",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"edge-tts\",\n  \"voice\": \"{{ $json.body.voice || 'en-US-AriaNeural' }}\",\n  \"input\": \"{{ $json.body.text || 'Welcome to VoxForg automated speech processing.' }}\",\n  \"response_format\": \"wav\",\n  \"speed\": 1.0\n}",
+        "jsonBody": "={\n  \"model\": \"edge-tts\",\n  \"voice\": \"{{ $json.body.voice || 'en-US-AriaNeural' }}\",\n  \"input\": \"{{ $json.body.text || 'Welcome to VoxForge automated speech processing.' }}\",\n  \"response_format\": \"wav\",\n  \"speed\": 1.0\n}",
         "options": {
           "response": {
             "response": {
@@ -548,7 +548,7 @@ You can copy and paste this complete workflow snippet directly into the n8n canv
         }
       },
       "id": "1d8b9a10-0001-4000-8000-000000000002",
-      "name": "VoxForg Speech Generator",
+      "name": "VoxForge Speech Generator",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [460, 300]
@@ -559,7 +559,7 @@ You can copy and paste this complete workflow snippet directly into the n8n canv
       "main": [
         [
           {
-            "node": "VoxForg Speech Generator",
+            "node": "VoxForge Speech Generator",
             "type": "main",
             "index": 0
           }

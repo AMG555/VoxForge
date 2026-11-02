@@ -7,7 +7,7 @@ Accepted
 2026-09-05
 
 ## Context
-VoxForg requires high-throughput, low-latency audio manipulation, streaming chunk delivery, and multi-engine process orchestration. Key technical constraints:
+VoxForge requires high-throughput, low-latency audio manipulation, streaming chunk delivery, and multi-engine process orchestration. Key technical constraints:
 - Real-time factor (RTF) must remain below 0.1 for interactive speech synthesis.
 - Zero-garbage-collection pauses during live audio streaming to prevent acoustic pops and buffer underruns.
 - Direct hardware probing (x86 SIMD, ARM NEON, CUDA C bindings, ONNX Runtime native bindings).

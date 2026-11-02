@@ -1,28 +1,28 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/voxforg-core",
-    "crates/voxforg-hardware",
-    "crates/voxforg-audio",
-    "crates/voxforg-engine",
-    "crates/voxforg-router",
-    "crates/voxforg-pronunciation",
-    "crates/voxforg-pipeline",
-    "crates/voxforg-benchmark",
-    "crates/voxforg-worker",
-    "crates/voxforg-asr",
-    "crates/voxforg-catalog",
-    "crates/voxforg-mcp",
-    "crates/voxforg-api",
-    "crates/voxforg-cli",
+    "crates/voxforge-core",
+    "crates/voxforge-hardware",
+    "crates/voxforge-audio",
+    "crates/voxforge-engine",
+    "crates/voxforge-router",
+    "crates/voxforge-pronunciation",
+    "crates/voxforge-pipeline",
+    "crates/voxforge-benchmark",
+    "crates/voxforge-worker",
+    "crates/voxforge-asr",
+    "crates/voxforge-catalog",
+    "crates/voxforge-mcp",
+    "crates/voxforge-api",
+    "crates/voxforge-cli",
 ]
 
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-authors = ["VoxForg Core Contributors"]
+authors = ["VoxForge Core Contributors"]
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/voxforg/voxforg"
+repository = "https://github.com/voxforge/voxforge"
 readme = "README.md"
 
 [workspace.dependencies]
@@ -53,19 +53,19 @@ hex = "0.4"
 symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
 
 # Internal workspace crates
-voxforg-core          = { path = "crates/voxforg-core" }
-voxforg-hardware      = { path = "crates/voxforg-hardware" }
-voxforg-audio         = { path = "crates/voxforg-audio" }
-voxforg-engine        = { path = "crates/voxforg-engine" }
-voxforg-router        = { path = "crates/voxforg-router" }
-voxforg-pronunciation = { path = "crates/voxforg-pronunciation" }
-voxforg-pipeline      = { path = "crates/voxforg-pipeline" }
-voxforg-benchmark     = { path = "crates/voxforg-benchmark" }
-voxforg-worker        = { path = "crates/voxforg-worker" }
-voxforg-asr           = { path = "crates/voxforg-asr" }
-voxforg-catalog       = { path = "crates/voxforg-catalog" }
-voxforg-mcp           = { path = "crates/voxforg-mcp" }
-voxforg-api           = { path = "crates/voxforg-api" }
+voxforge-core          = { path = "crates/voxforge-core" }
+voxforge-hardware      = { path = "crates/voxforge-hardware" }
+voxforge-audio         = { path = "crates/voxforge-audio" }
+voxforge-engine        = { path = "crates/voxforge-engine" }
+voxforge-router        = { path = "crates/voxforge-router" }
+voxforge-pronunciation = { path = "crates/voxforge-pronunciation" }
+voxforge-pipeline      = { path = "crates/voxforge-pipeline" }
+voxforge-benchmark     = { path = "crates/voxforge-benchmark" }
+voxforge-worker        = { path = "crates/voxforge-worker" }
+voxforge-asr           = { path = "crates/voxforge-asr" }
+voxforge-catalog       = { path = "crates/voxforge-catalog" }
+voxforge-mcp           = { path = "crates/voxforge-mcp" }
+voxforge-api           = { path = "crates/voxforge-api" }
 
 [profile.dev]
 debug = 0
