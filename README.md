@@ -4,7 +4,7 @@
 
 **Enterprise-Grade, Self-Hostable, Multi-Engine Text-to-Speech Platform & Visual Pipeline Builder**
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.2.0-brightgreen.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Feature_Complete_v0.2.0_Beta-blue.svg)](docs/architecture.md)
 [![Release](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/AMG555/VoxForge/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
@@ -21,8 +21,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: Production Ready (v0.2.0)**  
-> Full feature set complete and operational: multi-engine neural TTS (Kokoro, Piper, Qwen3, Edge-TTS), zero-shot voice cloning, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates fully tested and verified.
+> **Project Status: Feature-Complete (v0.2.0 Public Beta)**  
+> All core features built, tested, and operational: multi-engine neural TTS (Kokoro, Piper, Qwen3, Edge-TTS), zero-shot voice cloning, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests; currently in open public beta for community hardware & driver soak testing prior to v1.0 LTS.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  
