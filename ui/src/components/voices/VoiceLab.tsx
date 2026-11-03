@@ -585,14 +585,29 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       if (recordedAudioUrl) {
         URL.revokeObjectURL(recordedAudioUrl);
       }
+      if (stsAudioUrl) {
+        URL.revokeObjectURL(stsAudioUrl);
+      }
+      if (stsConvertedUrl) {
+        URL.revokeObjectURL(stsConvertedUrl);
+      }
       if (timerRef.current) {
         clearInterval(timerRef.current);
+      }
+      if (stsTimerRef.current) {
+        clearInterval(stsTimerRef.current);
+      }
+      if (stsMediaRecorderRef.current && stsMediaRecorderRef.current.state !== 'inactive') {
+        try {
+          stsMediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+          stsMediaRecorderRef.current.stop();
+        } catch {}
       }
       if (speechRecognitionRef.current) {
         try { speechRecognitionRef.current.stop(); } catch {}
       }
     };
-  }, [audioUrl, recordedAudioUrl]);
+  }, [audioUrl, recordedAudioUrl, stsAudioUrl, stsConvertedUrl]);
 
   // Clean neural voices list: eliminate mock sine voices and sort working neural voices to top
   const filteredVoices = localVoices

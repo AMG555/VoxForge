@@ -135,6 +135,21 @@ git clone https://github.com/AMG555/VoxForge.git
 cd VoxForge
 ```
 
+#### Quick 1-Step Launch (Embedded UI Pre-Compiled)
+To immediately start the visual workstation without additional compilation:
+```bash
+# Option A: Standard Cargo
+cargo run --bin voxforge
+
+# Option B: 1-Click Launchers
+./run.bat          # Windows
+./run.sh           # Linux / macOS
+
+# Option C: NPM
+npm start
+```
+*Opens `http://localhost:8080` in your browser automatically.*
+
 #### Step 2: (Optional) Recompile Webstation UI
 The repository includes pre-built production assets in `crates/voxforge-api/ui_dist/`. If you modified the React application in `ui/`:
 ```bash
