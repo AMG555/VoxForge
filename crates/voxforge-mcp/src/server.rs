@@ -1249,4 +1249,92 @@ mod tests {
         assert_eq!(resp["id"], 12);
         assert_eq!(resp["result"]["isError"], false);
     }
+
+    #[tokio::test]
+    async fn test_mcp_voice_clone_and_cloned_synthesis_e2e() {
+        let server = McpServer::with_defaults();
+
+        // 1. Generate fake reference audio WAV (140Hz tone, 1 sec)
+        let sample_rate = 24000u32;
+        let pcm: Vec<i16> = (0..24000)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                let s = (2.0 * std::f32::consts::PI * 140.0 * t).sin() * 12000.0;
+                s.round() as i16
+            })
+            .collect();
+        let wav_bytes =
+            voxforge_audio::WavEncoder::encode_pcm16_to_wav(&pcm, sample_rate, 1).unwrap();
+        let audio_b64 = hex::encode(&wav_bytes);
+
+        // 2. Call clone_voice via MCP tools/call
+        let clone_call = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+                "name": "clone_voice",
+                "arguments": {
+                    "name": "MCP Cloned Agent",
+                    "engine_id": "mock-tts",
+                    "reference_audio_base64": audio_b64,
+                    "language": "en-US",
+                    "description": "Zero-shot cloned voice via MCP"
+                }
+            }
+        });
+
+        let resp_str = server.handle_message(&clone_call.to_string()).await.unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
+        assert_eq!(resp["id"], 20);
+        assert_eq!(resp["result"]["isError"], false);
+
+        // Parse result content
+        let content_text = resp["result"]["content"][0]["text"].as_str().unwrap();
+        let clone_result: serde_json::Value = serde_json::from_str(content_text).unwrap();
+        assert_eq!(clone_result["status"], "created");
+        let profile_id = clone_result["profile_id"].as_str().unwrap();
+
+        // 3. Verify cloned voice is listed in resources/read "voxforge://voices"
+        let read_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "resources/read",
+            "params": { "uri": "voxforge://voices" }
+        });
+        let resp_str = server.handle_message(&read_req.to_string()).await.unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
+        let voices_text = resp["result"]["contents"][0]["text"].as_str().unwrap();
+        let voices: Vec<serde_json::Value> = serde_json::from_str(voices_text).unwrap();
+        assert!(voices
+            .iter()
+            .any(|v| v["id"] == profile_id && v["is_cloned"] == true));
+
+        // 4. Synthesize speech using the cloned voice via MCP tools/call
+        let synth_call = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 22,
+            "method": "tools/call",
+            "params": {
+                "name": "synthesize_speech",
+                "arguments": {
+                    "text": "Hello world from cloned neural voice agent.",
+                    "voice": profile_id,
+                    "speed": 1.0
+                }
+            }
+        });
+        let resp_str = server.handle_message(&synth_call.to_string()).await.unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
+        assert_eq!(resp["id"], 22);
+        assert_eq!(resp["result"]["isError"], false);
+
+        let synth_text = resp["result"]["content"][0]["text"].as_str().unwrap();
+        let synth_result: serde_json::Value = serde_json::from_str(synth_text).unwrap();
+        assert_eq!(synth_result["status"], "success");
+        assert!(synth_result["duration_seconds"].as_f64().unwrap() > 0.0);
+        let audio_hex = synth_result["audio_wav_hex"].as_str().unwrap();
+        let audio_bytes = hex::decode(audio_hex).unwrap();
+        assert!(audio_bytes.starts_with(b"RIFF"));
+    }
 }

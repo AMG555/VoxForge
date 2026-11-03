@@ -4,7 +4,8 @@
 
 **Enterprise-Grade, Self-Hostable, Multi-Engine Text-to-Speech Platform & Visual Pipeline Builder**
 
-[![Status](https://img.shields.io/badge/Status-In_Active_Development-yellow.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.2.0-brightgreen.svg)](docs/architecture.md)
+[![Release](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/AMG555/VoxForge/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
@@ -20,8 +21,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: In Active Development (Pre-v1.0)**  
-> Core engine architecture, hardware autodetect, DAG pipeline runner, and OpenAI-compatible API are functional. Engine backends, offline neural weights, and desktop packaging are actively progressing.
+> **Project Status: Production Ready (v0.2.0)**  
+> Full feature set complete and operational: multi-engine neural TTS (Kokoro, Piper, Qwen3, Edge-TTS), zero-shot voice cloning, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates fully tested and verified.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  
@@ -207,7 +208,39 @@ For complete technical specifications, sequence diagrams, and lifecycle document
 
 ## Quick Start
 
-### 1. Instant Run via NPX (No Installation)
+### 🤖 1-Prompt Setup for Any AI Agent (Claude Code, Cursor, Windsurf, Antigravity)
+
+Running an AI coding assistant? Copy-paste this single prompt to have your agent clone, build, launch, and verify VoxForge automatically:
+
+```text
+Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the speech synthesis server and visual workstation (run `cargo run --bin voxforge` or use `./run.bat` on Windows / `./run.sh` on macOS/Linux; fallback to `npx voxforge` or `docker compose up -d` if no Rust compiler is installed), and verify that http://localhost:8080/health returns status ok.
+```
+
+---
+
+### 1. Clone & Run in 2 Steps (Developers)
+
+Clone the repository and launch the full workstation immediately:
+
+```bash
+git clone https://github.com/AMG555/VoxForge.git
+cd VoxForge
+
+# Option A: Standard Cargo (Linux, macOS, Windows)
+cargo run --bin voxforge
+
+# Option B: 1-Click Script
+./run.bat          # Windows
+./run.sh           # Linux / macOS
+
+# Option C: NPM / Node
+npm start
+```
+*Zero manual setup required. The production React 19 visual workstation is embedded directly inside the compiled binary. Automatically spins up the server and opens `http://localhost:8080` in your default browser.*
+
+---
+
+### 2. Instant Run via NPX (Zero Install)
 
 Launch the full visual workstation and local server with one command:
 
@@ -218,7 +251,7 @@ npx voxforge
 
 ---
 
-### 2. One-Line Terminal Installers
+### 3. One-Line Terminal Installers
 
 Install the standalone binary into your system PATH:
 
@@ -239,7 +272,7 @@ voxforge serve --open
 
 ---
 
-### 3. AI Agent Integration via Model Context Protocol (MCP)
+### 4. AI Agent Integration via Model Context Protocol (MCP)
 
 Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForge:
 
@@ -257,36 +290,21 @@ Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code direct
 
 ---
 
-### 3. Single Docker Container (All-in-One)
+### 5. Docker Containers (All-in-One & Neural Stack)
 
 Launch the unified container (backend + embedded visual UI):
 
 ```bash
 docker run -d -p 8080:8080 -v voxforge-data:/app/data ghcr.io/amg555/voxforge
 ```
-Open `http://localhost:8080` in your browser.
-
----
-
-### 4. Run via Docker Compose (Multi-Service Stack)
-
-The fastest way to launch VoxForge with database persistence or dedicated neural microservices:
-
+Or start multi-service stack with persistent database and neural microservices:
 ```bash
-# Clone the repository
-git clone https://github.com/AMG555/VoxForge.git
-cd VoxForge
-
-# Start standard services (Daemon + Database)
-docker compose up -d
-
-# Or launch complete turnkey neural stack (Faster-Whisper ASR + Kokoro Neural TTS + Daemon)
 docker compose -f docker-compose.neural.yml up -d
 ```
 
 ---
 
-### 5. Run Single Binary (CLI)
+### 6. Run Single Binary (CLI)
 
 Download the release binary for your platform or build from source:
 
@@ -307,7 +325,7 @@ cargo build --release --bin voxforge
 ./target/release/voxforge serve --port 8080 --data-dir ./data
 ```
 
-### 6. OpenAI Drop-In Replacement
+### 7. OpenAI Drop-In Replacement
 
 VoxForge provides a drop-in replacement for the OpenAI Audio Speech API (`/v1/audio/speech`).
 
@@ -348,7 +366,7 @@ response.stream_to_file("speech.wav")
 
 ---
 
-### 7. n8n Workflow Automation Integration
+### 8. n8n Workflow Automation Integration
 
 Connect VoxForge to [n8n](https://n8n.io) to automate speech pipelines, customer voice replies, and multi-speaker podcast generation:
 

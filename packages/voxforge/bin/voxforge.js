@@ -110,16 +110,18 @@ async function main() {
   const cacheDir = path.join(os.homedir(), '.voxforge', 'bin');
   const binaryPath = path.join(cacheDir, `voxforge${ext}`);
 
-  // 1. Check if running inside or near repository with local build
-  const localRepoBuild = path.resolve(__dirname, '../../target/release', `voxforge${ext}`);
-  const cwdBuild = path.resolve(process.cwd(), 'target/release', `voxforge${ext}`);
-  if (fs.existsSync(localRepoBuild)) {
-    runBinary(localRepoBuild);
-    return;
-  }
-  if (fs.existsSync(cwdBuild)) {
-    runBinary(cwdBuild);
-    return;
+  // 1. Check if running inside or near repository with local build (release or debug)
+  const localCandidates = [
+    path.resolve(__dirname, '../../../target/release', `voxforge${ext}`),
+    path.resolve(__dirname, '../../../target/debug', `voxforge${ext}`),
+    path.resolve(process.cwd(), 'target/release', `voxforge${ext}`),
+    path.resolve(process.cwd(), 'target/debug', `voxforge${ext}`),
+  ];
+  for (const candidate of localCandidates) {
+    if (fs.existsSync(candidate)) {
+      runBinary(candidate);
+      return;
+    }
   }
 
   if (!fs.existsSync(binaryPath)) {
