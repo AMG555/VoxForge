@@ -88,3 +88,4 @@ if ($PurgeData) {
 }
 
 Write-Host "`nVoxForge has been cleanly uninstalled from your system." -ForegroundColor Green
+
