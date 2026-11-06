@@ -60,6 +60,36 @@ voxforge serve --open
 
 ---
 
+### 1.3 Clean Uninstallation
+
+To cleanly remove VoxForge, desktop/start-menu shortcuts, and PATH configuration:
+
+#### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/uninstall.ps1 | iex
+```
+*To also delete downloaded neural weights and cloned voice profiles, run with `-PurgeData`:*
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -PurgeData
+```
+
+#### Linux & macOS (POSIX Shell)
+```bash
+curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/uninstall.sh | sh
+```
+*To also purge data:*
+```bash
+./scripts/uninstall.sh --purge-data
+```
+
+#### Cloned Repository (1-Click)
+```bash
+./uninstall.bat       # Windows (or double-click)
+./uninstall.sh        # Linux / macOS
+```
+
+---
+
 ### 1.3 Single Docker Container (All-in-One)
 
 Launch the self-contained workstation (daemon + embedded visual UI) in a single lightweight container:

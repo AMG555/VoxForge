@@ -30,129 +30,66 @@
 
 ---
 
-## Direct Downloads (Desktop & Standalone)
+## ⚡ Quick Start — Run in 1 Step
 
-For creators, studio producers, and desktop users: download the pre-compiled standalone app directly. Zero build tools, Docker, or terminal setup required.
+### 🤖 1-Prompt Setup for Any AI Agent (Cursor, Claude Code, Windsurf, Antigravity)
 
-| Platform | Download | Package Format | File Size | Details |
-| :--- | :--- | :--- | :--- | :--- |
-| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard (`.exe`) | ~14 MB | Professional installer with path selection, desktop shortcut, uninstaller |
-| **Windows 10 / 11 (Portable)** | [**Download Standalone .exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Portable Executable | ~13 MB | Single zero-install binary with embedded studio UI |
-| **Windows 10 / 11 (Zip Bundle)** | [**Download .zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | ~5 MB | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
-| **macOS (Apple Silicon & Intel)** | [**Download Universal**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Standalone Binary | ~14 MB | Universal binary with embedded studio UI |
-| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | ~12 MB | Zero-dependency glibc standalone executable |
+Running an AI coding assistant? Copy-paste this single prompt to have your agent clone, build, launch, and verify VoxForge automatically:
 
-### How to Run & Install on Windows:
-
-1. **Direct Run**: Download [**`voxforge-windows-x86_64.exe`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) and double-click it. It spins up the neural engine server and opens your web browser to `http://localhost:8080`.
-2. **Portable Bundle**: Download [**`VoxForge-Windows-x64.zip`**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip), extract anywhere, and double-click `VoxForge-Start.bat`.
-3. **Install Desktop & Start Menu Icon**: Run `install-desktop.bat` (or run in PowerShell: `irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex`). Adds `VoxForge` icon directly to your Windows Desktop and Start Menu.
-
-> [!NOTE]
-> **Windows SmartScreen warning?** You may see *"voxforge-windows-x86_64.exe isn't commonly downloaded"* in your browser or *"Windows protected your PC"* on launch. This is normal for any new open-source executable that hasn't yet built download reputation — **VoxForge contains no malware**. The full source code is auditable in this repository.
->
-> **To bypass in Edge:** In the Downloads panel click **See more** → **Keep anyway**.
->
-> **To bypass in Chrome:** Click the download arrow → **Keep** → **Keep anyway**.
->
-> **To bypass the SmartScreen launch dialog:** Click **More info** → **Run anyway**.
->
-> **Prefer no warnings at all?** Use the **PowerShell one-liner installer** — it runs entirely in-terminal and bypasses SmartScreen:
-> ```powershell
-> irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
-> ```
-
-### How to Run & Install on macOS (Apple Silicon & Intel):
-
-1. **One-Line Installer (Recommended)**:
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
-   ```
-   Automatically downloads the Universal binary, configures your PATH, and clears Gatekeeper quarantine.
-
-2. **Direct Download**:
-   Download [**`voxforge-macos-universal`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal), open your Terminal, and run:
-   ```bash
-   chmod +x voxforge-macos-universal
-   # If macOS Gatekeeper displays "developer cannot be verified":
-   xattr -d com.apple.quarantine voxforge-macos-universal
-   ./voxforge-macos-universal
-   ```
-
-3. **NPX Instant Runner**:
-   ```bash
-   npx voxforge
-   ```
-
-### How to Run & Install on Linux (Ubuntu, Debian, Fedora, Arch):
-
-1. **One-Line Installer (Recommended)**:
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
-   ```
-   Installs `voxforge` to `~/.local/bin/` and creates a desktop application entry (`voxforge.desktop`).
-
-2. **Tarball Bundle**:
-   Download [**`voxforge-linux-x86_64.tar.gz`**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz), extract, and execute:
-   ```bash
-   tar -xzf voxforge-linux-x86_64.tar.gz
-   ./voxforge-linux-x86_64
-   ```
-
-3. **NPX Instant Runner**:
-   ```bash
-   npx voxforge
-   ```
+```text
+Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the speech synthesis server and visual workstation (run `cargo run --bin voxforge` or use `./run.bat` on Windows / `./run.sh` on macOS/Linux; fallback to `npx voxforge` or `docker compose up -d` if no Rust compiler is installed), and verify that http://localhost:8080/health returns status ok.
+```
 
 ---
 
-## Quick Start
+### 🚀 Instant Run for Humans
 
-**VoxForge** is a unified, hardware-adaptive speech synthesis server and visual workflow builder: a modular node-based engine that allows developers and creators to design sophisticated audio pipelines—from chunking multi-page documents to assigning emotional prosody and dynamic voice-swapping across different TTS engines—all behind an OpenAI-compatible API.
+| Method | Command | What It Does |
+| :--- | :--- | :--- |
+| **Instant (Zero Install)** | `npx voxforge` | Auto-detects OS, downloads pre-built binary, launches server & opens browser |
+| **Clone & Run (Cargo)** | `git clone https://github.com/AMG555/VoxForge.git`<br>`cd VoxForge && cargo run --bin voxforge` | Builds Rust daemon + embedded React 19 UI, opens `http://localhost:8080` |
+| **Windows 1-Click** | Double-click `run.bat` | Auto-detects MSVC compiler, builds & opens workstation |
+| **Linux / macOS 1-Click** | `./run.sh` | Shell launcher for workstation daemon |
+| **Docker Container** | `docker run -d -p 8080:8080 -v voxforge-data:/app/data ghcr.io/amg555/voxforge` | Standalone container with backend & embedded UI |
 
-VoxForge eliminates vendor lock-in by abstracting 10+ local and cloud speech engines behind a unified Rust core with zero-latency streaming.
+---
 
-### Key Capabilities
+## 📦 System Install & 🗑️ Clean Uninstall
 
-- **Unified Multi-Engine Orchestration**: Support for ultra-fast local engines (Piper, KittenTTS, Kokoro-82M), heavy neural synthesizers (Qwen3-TTS, ChatTTS, StyleTTS2), and zero-cost cloud relays (Edge-TTS) without code changes.
-- **Workflows Dashboard (n8n-Style Project Hub)**: Central dashboard to manage multiple speech pipelines. Search and filter across tags (`Podcast`, `Tactical`, `Dubbing`, `Radio`), duplicate templates, import/export full pipeline JSON schemas, and switch projects via clean breadcrumbs.
-- **Visual Pipeline Canvas & DAG Ergonomics**: 2D infinite node-based DAG canvas with smooth 2D pan, pointer-anchored focal zoom (`0.25x` to `2.5x`), marquee multi-selection, 16px magnetic grid snapping, multi-node JSON clipboard copying (`Ctrl+C`), and searchable quick-add node palette (`Tab` or `/`). Features dynamic connection wire beacons, hover cut, Kahn's topological execution ordering, per-node bypass toggles, and real-time millisecond latency telemetry.
-- **Automated Speech Recognition (ASR)**: Native Whisper inference engine with sliding-window VAD energy segmentation, generating OpenAI-compatible transcriptions, word timestamps, and SRT/VTT subtitle files (`POST /v1/audio/transcriptions`).
-- **Zero-Shot Voice Cloning & Studio Pre-Processing**: Studio-grade acoustic pipeline featuring 80Hz Butterworth high-pass filtering, adaptive noise gating, true peak normalization to -0.5 dBFS, and 24kHz linear PCM transcoding to extract 512-D neural speaker identity embeddings (`POST /v1/voices/clone`). Persistent across browser local storage and backend database.
-- **Full Automation Connectivity (n8n & Webhooks)**: Connects natively to n8n workflows via drop-in OpenAI Audio nodes (`http://localhost:8080/v1`), direct HTTP Request binary audio nodes, webhook-triggered DAG pipeline execution (`POST /v1/pipeline/execute`), and programmatic voice cloning.
-- **Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 stdio server (`voxforge mcp`) exposing 8 tools (`synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, `list_models`, `benchmark_engine`, `get_cluster_status`) directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
-- **Production Video Dubbing & Audiobook DAG Workflows**: Turnkey DAG templates chaining ASR, Speaker Diarization, Voice Mapping, Time-Stretch tempo alignment, and Audio Muxing for video tracks and multi-chapter audiobook publishing.
-- **Model Catalog & Weights Manager**: Built-in weights manager validating host RAM and GPU VRAM constraints before installing curated open weights (Kokoro, Piper, Whisper, Qwen3, Silero) with cryptographic SHA-256 verification (`/v1/catalog/models`).
-- **Hardware-Aware Adaptive Dispatch**: Automated hardware probe detecting CPU vector extensions (AVX2, AVX-512, NEON) and GPU accelerators (NVIDIA CUDA, Apple MPS, DirectML) to dynamically allocate optimal engine models.
-- **Tri-Tier Storage Architecture**:
-  - **Embedded / Desktop**: Zero-dependency SQLite with WAL mode.
-  - **Self-Hosted Docker**: High-concurrency PostgreSQL with connection pooling.
-  - **Cloud Multi-Tenant**: Supabase integration with Row-Level Security (RLS).
-- **Automated QA & Voice A/B Benchmarking**:
-  - Side-by-side acoustic quality evaluation across engines, voices, and prosody parameters.
-  - Measures real-time factor (RTF), TTFB latency, RMS loudness (dBFS), peak amplitude, and digital clipping samples.
-  - Accessible via interactive UI (`A/B & QA Lab`), REST API (`POST /v1/qa/ab-test`), and CLI (`voxforge ab-test`).
-- **Enterprise Security Baseline**:
-  - Strict server-side proxying; frontend never handles downstream API credentials.
-  - Granular API key permissions (`tts:read`, `tts:write`, `pipeline:admin`).
-  - Strict CORS validation, rate-limiting (token bucket), and RFC 7807 problem details.
-- **Voice Design Studio & Semantic Archetypes**: Synthesize custom 512-D neural acoustic speaker embeddings directly from natural language prompts (e.g. "Warm, soothing storyteller voice with slight chest resonance and calm cadence") and 5-axis Director AI controls via 40+ semantic anchor archetypes (`POST /v1/voices/design`).
-- **Portable Persona Bundles (`.voxpersona`)**: Self-contained voice sharing archive format packaging speaker identity metadata, 512-D neural embeddings, reference WAV audio samples, prosody baseline, and visual avatar (`GET /v1/voices/:id/export`, `POST /v1/voices/import`).
-- **Smart Fit Dubbing Planner & WSOLA Time-Stretch**: Intelligent dubbing synchronization engine featuring pause gap absorption (120ms natural floor), underrun floor protection (0.85x duration), and geometric 50/50 audio rate and video slow-motion split. Uses pitch-preserving WSOLA (Waveform Similarity Overlap-Add) audio time-stretching with zero pitch artifacting.
-- **5-Axis Director AI Taxonomy & Prosody Mirroring**: Fine-grained acoustic direction across 5 standardized axes (`energy`, `emotion`, `pace`, `intimacy`, `formality`) mapped to speaker-relative z-scores (F0 pitch mean/std, RMS loudness, syllable cadence, voicing ratio).
-- **Acoustic Echo Cancellation (AEC)**: Real-time Normalized Least Mean Squares (NLMS) adaptive filtering with Geigel Double-Talk Detection for live push-to-talk dictation without loudspeaker feedback.
-- **Timed Karaoke Subtitle Exporter (`.ass`)**: Generates Advanced SubStation Alpha karaoke subtitle files with word-level centisecond timing tags (`{\k<cs>}`) for video players and video editing timelines.
-- **Double-Blind A/B QA Audition Lab**: Randomized blind audition trials with 5-star Mean Opinion Score (MOS) grading and unblinded reveal dashboard for unbiased human evaluation alongside objective RTF and loudness metrics.
-- **Pronunciation Lexicon & SSML-Lite Engine**: Whole-word boundary-aware regex dictionary and lightweight SSML parser (`<break>`, `<prosody>`, `<emphasis>`, `<phoneme>`) for custom pronunciation overrides across all speech engines (`GET /v1/pronunciation/dictionary`, `POST /v1/pronunciation/apply`).
-- **Audio Provenance Watermarking & Tamper Verification**: Invisible spread-spectrum acoustic watermark embedding 16-bit application signature (`0x5658` = "VX") and tamper detection surviving compression and resampling (`POST /v1/audio/watermark`, `POST /v1/audio/verify-watermark`, `NodeType::Watermark`).
-- **Longform Audiobook Resumption & Content-Addressable Checkpointing**: Content-addressable SHA-256 chunk caching and atomic chapter state manifests (`resume.json`) allowing interrupted multi-chapter longform renders to resume without re-synthesizing completed chapters (`GET /v1/jobs/checkpoints`, `POST /v1/jobs/:id/resume`).
-- **Multi-Endpoint Mirror Racing**: Concurrent latency probing of primary HuggingFace Hub, HF-Mirror, and Cloudflare R2 CDN mirrors to ensure rapid model weight downloads worldwide without stalling.
-- **Voice-to-Voice Conversion & Timbre Morphing**: Pitch contour and harmonic formant morphing node preserving actor cadence and intonation (`NodeType::VoiceConversion`).
-- **Twilio Telephony & Real-Time Voicebot Bridge**: Bidirectional WebSocket gateway connecting Twilio Media Streams (8kHz mu-law) to real-time speech and transcription pipelines (`GET /v1/telephony/twilio/stream`).
-- **Cross-Platform Delivery**:
-  - Standalone single binary (`voxforge-cli`) with embedded workstation UI.
-  - Official multi-arch Docker containers (`linux/amd64`, `linux/arm64`).
-  - Native desktop application built on Tauri v2 (Windows `.msi`, macOS `.dmg`, Linux `.AppImage`).
+Install standalone binary into system PATH or cleanly remove it with 1 command:
+
+| Platform | 1-Line Terminal Install | 1-Line Clean Uninstall |
+| :--- | :--- | :--- |
+| **Windows (PowerShell)** | `irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 \| iex` | `irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/uninstall.ps1 \| iex` |
+| **Linux & macOS** | `curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh \| sh` | `curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/uninstall.sh \| sh` |
+| **Cloned Repo** | Run `./run.bat` (Win) or `./run.sh` (Unix) | Run `./uninstall.bat` (Win) or `./uninstall.sh` (Unix) |
+
+> [!TIP]
+> **Need to delete models and voice profiles too?** Pass `-PurgeData` (Windows PowerShell: `.\scripts\uninstall.ps1 -PurgeData`) or `--purge-data` (Linux/macOS: `./scripts/uninstall.sh --purge-data`).
+
+---
+
+## ✨ Key Capabilities
+
+- **🎙️ Unified Multi-Engine Speech Synthesis**: Abstract 10+ local and cloud speech engines (Piper ONNX, Kokoro-82M, KittenTTS, Qwen3-TTS, ChatTTS, StyleTTS2, and Edge-TTS) behind a single OpenAI-compatible API (`/v1/audio/speech`).
+- **🧬 Zero-Shot Voice Cloning & Voice Lab**: Extract 512-D neural speaker identity embeddings from 3-second reference audio (`POST /v1/voices/clone`). Includes 80Hz Butterworth filtering, adaptive noise gating, peak normalization (-0.5 dBFS), 5-axis Director AI controls, and `.voxpersona` bundle sharing.
+- **🎛️ Visual DAG Pipeline Studio**: Infinite node canvas with focal zoom (`0.25x` to `2.5x`), Kahn's topological execution, magnetic snapping, multi-node clipboard copying (`Ctrl+C`), video dubbing time-stretching (WSOLA), and audiobook resumption checkpointing (`resume.json`).
+- **🤖 Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 stdio server (`voxforge mcp`) providing 14 speech tools and 4 resource streams directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
+- **🛡️ Enterprise Hardware & Audio DSP**: Automated hardware profiler detecting AVX2/AVX-512, NVIDIA CUDA, and Apple MPS; real-time Acoustic Echo Cancellation (NLMS); and spread-spectrum acoustic watermarking (`0x5658`).
+
+---
+
+## Direct Downloads (Desktop & Standalone)
+
+For creators and desktop users who prefer pre-compiled release binaries:
+
+| Platform | Download | Package Format | Details |
+| :--- | :--- | :--- | :--- |
+| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard (`.exe`) | Professional installer with desktop shortcut & uninstaller |
+| **Windows 10 / 11 (Portable)** | [**Download Standalone .exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Portable Executable | Single zero-install binary with embedded studio UI |
+| **Windows 10 / 11 (Zip Bundle)** | [**Download .zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
+| **macOS (Universal)** | [**Download Universal**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Standalone Binary | Universal binary with embedded studio UI (Apple Silicon & Intel) |
+| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | Zero-dependency standalone executable |
 
 ---
 
@@ -206,73 +143,9 @@ For complete technical specifications, sequence diagrams, and lifecycle document
 
 ---
 
-## Quick Start
+## 🛠️ Integrations & Developer Tools
 
-### 🤖 1-Prompt Setup for Any AI Agent (Claude Code, Cursor, Windsurf, Antigravity)
-
-Running an AI coding assistant? Copy-paste this single prompt to have your agent clone, build, launch, and verify VoxForge automatically:
-
-```text
-Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the speech synthesis server and visual workstation (run `cargo run --bin voxforge` or use `./run.bat` on Windows / `./run.sh` on macOS/Linux; fallback to `npx voxforge` or `docker compose up -d` if no Rust compiler is installed), and verify that http://localhost:8080/health returns status ok.
-```
-
----
-
-### 1. Clone & Run in 2 Steps (Developers)
-
-Clone the repository and launch the full workstation immediately:
-
-```bash
-git clone https://github.com/AMG555/VoxForge.git
-cd VoxForge
-
-# Option A: Standard Cargo (Linux, macOS, Windows)
-cargo run --bin voxforge
-
-# Option B: 1-Click Script
-./run.bat          # Windows
-./run.sh           # Linux / macOS
-
-# Option C: NPM / Node
-npm start
-```
-*Zero manual setup required. The production React 19 visual workstation is embedded directly inside the compiled binary. Automatically spins up the server and opens `http://localhost:8080` in your default browser.*
-
----
-
-### 2. Instant Run via NPX (Zero Install)
-
-Launch the full visual workstation and local server with one command:
-
-```bash
-npx voxforge
-```
-*Auto-detects platform, fetches matching binary with embedded UI, starts server, and opens your browser to `http://localhost:8080`.*
-
----
-
-### 3. One-Line Terminal Installers
-
-Install the standalone binary into your system PATH:
-
-**Linux & macOS:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.sh | sh
-```
-
-**Windows PowerShell:**
-```powershell
-irm https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/install.ps1 | iex
-```
-
-Start the visual workstation:
-```bash
-voxforge serve --open
-```
-
----
-
-### 4. AI Agent Integration via Model Context Protocol (MCP)
+### 1. AI Agent Integration via Model Context Protocol (MCP)
 
 Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForge:
 
@@ -290,7 +163,7 @@ Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code direct
 
 ---
 
-### 5. Docker Containers (All-in-One & Neural Stack)
+### 2. Docker Containers (All-in-One & Neural Stack)
 
 Launch the unified container (backend + embedded visual UI):
 
@@ -304,7 +177,7 @@ docker compose -f docker-compose.neural.yml up -d
 
 ---
 
-### 6. Run Single Binary (CLI)
+### 3. Run Single Binary (CLI)
 
 Download the release binary for your platform or build from source:
 
@@ -325,7 +198,7 @@ cargo build --release --bin voxforge
 ./target/release/voxforge serve --port 8080 --data-dir ./data
 ```
 
-### 7. OpenAI Drop-In Replacement
+### 4. OpenAI Drop-In Replacement
 
 VoxForge provides a drop-in replacement for the OpenAI Audio Speech API (`/v1/audio/speech`).
 
@@ -366,7 +239,7 @@ response.stream_to_file("speech.wav")
 
 ---
 
-### 8. n8n Workflow Automation Integration
+### 5. n8n Workflow Automation Integration
 
 Connect VoxForge to [n8n](https://n8n.io) to automate speech pipelines, customer voice replies, and multi-speaker podcast generation:
 
@@ -374,25 +247,6 @@ Connect VoxForge to [n8n](https://n8n.io) to automate speech pipelines, customer
 - **HTTP Request Node**: Invoke `POST http://localhost:8080/v1/audio/speech` with response format set to `File (Binary)` to dispatch audio to Telegram, WhatsApp, Slack, or Discord bots.
 - **Webhook DAG Execution**: Trigger full multi-speaker DAG pipelines with `POST http://localhost:8080/v1/pipeline/execute` passing exported pipeline JSON.
 - **Automated Voice Cloning**: Conditionally clone caller voices via `POST http://localhost:8080/v1/voices/clone`.
-
----
-
-### 8. Model Context Protocol (MCP) Server
-
-VoxForge runs a native JSON-RPC 2.0 stdio server (`voxforge mcp`) allowing LLM coding assistants (Claude Desktop, Cursor, Antigravity, Windsurf) to execute speech tools autonomously:
-
-```json
-{
-  "mcpServers": {
-    "voxforge": {
-      "command": "voxforge",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-Exposes 8 core tools: `synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, `list_models`, `benchmark_engine`, and `get_cluster_status`.
 
 ---
 
