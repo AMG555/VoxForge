@@ -43,10 +43,9 @@ fi
 # 4. Clean PATH entries in shell rc files
 for RC in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bashrc"; do
     if [ -f "$RC" ]; then
-        if grep -q "voxforge" "$RC" 2>/dev/null || grep -q "$INSTALL_DIR" "$RC" 2>/dev/null; then
-            # Clean voxforge specific PATH export line if present
-            sed -i.bak "/export PATH=.*$INSTALL_DIR/d" "$RC" 2>/dev/null || true
-            rm -f "${RC}.bak" 2>/dev/null || true
+        if grep -q "$INSTALL_DIR" "$RC" 2>/dev/null; then
+            # Clean voxforge specific PATH export line if present (portable across macOS BSD and Linux GNU)
+            grep -v "$INSTALL_DIR" "$RC" > "${RC}.tmp" 2>/dev/null && mv -f "${RC}.tmp" "$RC" 2>/dev/null || rm -f "${RC}.tmp" 2>/dev/null
             printf "\033[1;32mCleaned PATH configuration in %s\033[0m\n" "$RC"
         fi
     fi
@@ -73,3 +72,4 @@ else
 fi
 
 printf "\n\033[1;32m=== VoxForge successfully uninstalled ===\033[0m\n\n"
+
