@@ -22,6 +22,8 @@ VoxForge is an open-source, modular, hardware-adaptive speech synthesis server, 
 | **Hardware Probe** | `cargo run --bin voxforge -- hardware` | Displays CPU SIMD & GPU compute tiers |
 | **Audio Synthesis** | `cargo run --bin voxforge -- synth "Hello" --voice en-US-AriaNeural --out test.wav` | Direct CLI synthesis |
 | **A/B Quality Test** | `cargo run --bin voxforge -- ab-test --iterations 3` | Measures RTF, SNR, loudness |
+| **Uninstall (Windows)** | `.\uninstall.bat` | Removes shortcuts, cleans PATH, removes binary |
+| **Uninstall (Unix)** | `./uninstall.sh` | Removes binary, desktop launcher, and cleans PATH |
 
 ## Development & Test Commands
 
