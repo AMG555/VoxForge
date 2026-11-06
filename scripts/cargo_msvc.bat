@@ -45,4 +45,5 @@ if exist "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxil
 
 :run_cargo
 set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
+if not defined CARGO_INCREMENTAL set CARGO_INCREMENTAL=0
 cargo %*
