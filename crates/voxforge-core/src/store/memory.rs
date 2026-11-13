@@ -69,17 +69,8 @@ impl DataStore for MemoryStore {
         let filtered = lock
             .values()
             .filter(|v| {
-                if let Some(lang) = language {
-                    if !v.language.starts_with(lang) {
-                        return false;
-                    }
-                }
-                if let Some(eng) = engine {
-                    if v.engine_id != eng {
-                        return false;
-                    }
-                }
-                true
+                language.is_none_or(|lang| v.language.starts_with(lang))
+                    && engine.is_none_or(|eng| v.engine_id == eng)
             })
             .cloned()
             .collect();
