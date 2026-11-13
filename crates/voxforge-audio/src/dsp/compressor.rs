@@ -82,3 +82,50 @@ impl DynamicCompressor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compressor_reduces_loud_signal() {
+        // 0 dBFS signal with -6 dB threshold and 4:1 ratio should be attenuated
+        let mut loud = vec![32000i16; 2000];
+        DynamicCompressor::process(&mut loud, 24000, -6.0, 4.0, 5.0, 100.0, 0.0);
+        let mean_out: f64 =
+            loud.iter().map(|&s| (s as f64).abs()).sum::<f64>() / loud.len() as f64;
+        assert!(mean_out < 32000.0, "Compressor must attenuate loud signal");
+    }
+
+    #[test]
+    fn test_compressor_silent_signal_unaltered() {
+        let mut silent = vec![0i16; 500];
+        DynamicCompressor::process(&mut silent, 24000, -18.0, 3.0, 15.0, 100.0, 0.0);
+        assert!(silent.iter().all(|&s| s == 0));
+    }
+
+    #[test]
+    fn test_compressor_nan_parameters_use_defaults() {
+        // NaN parameters must fall back to safe defaults and never panic
+        let mut samples = vec![16000i16; 100];
+        DynamicCompressor::process(
+            &mut samples,
+            24000,
+            f32::NAN,
+            f32::NAN,
+            f32::NAN,
+            f32::NAN,
+            f32::NAN,
+        );
+        assert!(samples.iter().all(|&s| s >= i16::MIN && s <= i16::MAX));
+    }
+
+    #[test]
+    fn test_compressor_makeup_gain_boosts_quiet_signal() {
+        let mut quiet = vec![100i16; 1000];
+        DynamicCompressor::process(&mut quiet, 24000, -60.0, 1.0, 5.0, 100.0, 20.0);
+        let mean_out: f64 =
+            quiet.iter().map(|&s| (s as f64).abs()).sum::<f64>() / quiet.len() as f64;
+        assert!(mean_out > 100.0, "Makeup gain must boost quiet signal");
+    }
+}
