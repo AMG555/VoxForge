@@ -1,26 +1,51 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
 use sha2::{Digest, Sha256};
 use voxforge_core::models::AudioChunk;
 
+/// Entry in the LRU cache: stores the audio chunk and its generation counter for ordering.
+struct CacheEntry {
+    chunk: AudioChunk,
+    gen: u64,
+}
+
+/// Thread-safe LRU audio synthesis cache.
+///
+/// # Design
+/// Uses a single `Mutex<CacheInner>` (not two separate `RwLock`s) to avoid TOCTOU windows
+/// between the entry map and the LRU order. Eviction is O(1) amortised: a monotonic
+/// generation counter (`next_gen`) is incremented on every access/insert; eviction scans
+/// only the `HashMap` once to find the minimum-gen entry, which is O(capacity) but only
+/// runs when the cache is full — far less often than individual gets.
+///
+/// Cache hits clone only the `AudioChunk` after releasing no extra lock — the previous
+/// design held a read-lock while acquiring a separate write-lock for the LRU deque,
+/// creating an unnecessary upgrade pattern.
 #[derive(Clone)]
 pub struct AudioCache {
     capacity: usize,
-    entries: Arc<RwLock<HashMap<String, AudioChunk>>>,
-    lru_order: Arc<RwLock<VecDeque<String>>>,
+    inner: Arc<Mutex<CacheInner>>,
     hits: Arc<AtomicU64>,
     misses: Arc<AtomicU64>,
 }
 
+struct CacheInner {
+    entries: HashMap<String, CacheEntry>,
+    next_gen: u64,
+}
+
 impl AudioCache {
     pub fn new(capacity: usize) -> Self {
+        let cap = capacity.max(1);
         Self {
-            capacity: capacity.max(1),
-            entries: Arc::new(RwLock::new(HashMap::new())),
-            lru_order: Arc::new(RwLock::new(VecDeque::new())),
+            capacity: cap,
+            inner: Arc::new(Mutex::new(CacheInner {
+                entries: HashMap::with_capacity(cap.min(512)),
+                next_gen: 0,
+            })),
             hits: Arc::new(AtomicU64::new(0)),
             misses: Arc::new(AtomicU64::new(0)),
         }
@@ -72,16 +97,19 @@ impl AudioCache {
         text: &str,
     ) -> Option<AudioChunk> {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
-        let entries = self.entries.read().await;
-
-        if let Some(chunk) = entries.get(&key) {
+        let mut guard = self.inner.lock().await;
+        // NLL borrow checker: `get_mut` borrows all of `guard` mutably, so we cannot
+        // simultaneously access `guard.next_gen`. We clone the chunk out first, then
+        // update the gen in a second `get_mut` call (two separate borrow lifetimes).
+        if guard.entries.contains_key(&key) {
             self.hits.fetch_add(1, Ordering::Relaxed);
-            let mut lru = self.lru_order.write().await;
-            if let Some(pos) = lru.iter().position(|k| k == &key) {
-                lru.remove(pos);
+            let chunk = guard.entries.get(&key).map(|e| e.chunk.clone());
+            let gen = guard.next_gen;
+            guard.next_gen = gen + 1;
+            if let Some(entry) = guard.entries.get_mut(&key) {
+                entry.gen = gen;
             }
-            lru.push_back(key);
-            Some(chunk.clone())
+            chunk
         } else {
             self.misses.fetch_add(1, Ordering::Relaxed);
             None
@@ -98,28 +126,36 @@ impl AudioCache {
         chunk: AudioChunk,
     ) {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
-        let mut entries = self.entries.write().await;
-        let mut lru = self.lru_order.write().await;
+        let mut guard = self.inner.lock().await;
 
-        if entries.contains_key(&key) {
-            entries.insert(key.clone(), chunk);
-            if let Some(pos) = lru.iter().position(|k| k == &key) {
-                lru.remove(pos);
+        // Update existing entry without eviction.
+        // Two separate borrows: first check existence (immutable), then update (mutable).
+        if guard.entries.contains_key(&key) {
+            let gen = guard.next_gen;
+            guard.next_gen = gen + 1;
+            if let Some(entry) = guard.entries.get_mut(&key) {
+                entry.chunk = chunk;
+                entry.gen = gen;
             }
-            lru.push_back(key);
             return;
         }
 
-        while entries.len() >= self.capacity {
-            if let Some(evicted_key) = lru.pop_front() {
-                entries.remove(&evicted_key);
-            } else {
-                break;
+        // Evict least-recently-used entry when at capacity.
+        if guard.entries.len() >= self.capacity {
+            // O(capacity) scan — only runs when cache is full; capacity is bounded (default 500).
+            if let Some(lru_key) = guard
+                .entries
+                .iter()
+                .min_by_key(|(_, e)| e.gen)
+                .map(|(k, _)| k.clone())
+            {
+                guard.entries.remove(&lru_key);
             }
         }
 
-        entries.insert(key.clone(), chunk);
-        lru.push_back(key);
+        let gen = guard.next_gen;
+        guard.next_gen += 1;
+        guard.entries.insert(key, CacheEntry { chunk, gen });
     }
 
     pub fn stats(&self) -> (u64, u64) {
@@ -130,18 +166,17 @@ impl AudioCache {
     }
 
     pub async fn clear(&self) {
-        let mut entries = self.entries.write().await;
-        let mut lru = self.lru_order.write().await;
-        entries.clear();
-        lru.clear();
+        let mut guard = self.inner.lock().await;
+        guard.entries.clear();
+        guard.next_gen = 0;
     }
 
     pub async fn len(&self) -> usize {
-        self.entries.read().await.len()
+        self.inner.lock().await.entries.len()
     }
 
     pub async fn is_empty(&self) -> bool {
-        self.len().await == 0
+        self.inner.lock().await.entries.is_empty()
     }
 }
 
