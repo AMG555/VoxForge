@@ -4,10 +4,15 @@
 //! while maintaining pitch and formant frequencies.
 
 /// WSOLA pitch-preserving time stretcher.
+///
+/// Pre-computes the Hann analysis window on construction so the per-call
+/// hot path (`stretch_by_ratio`) makes zero allocations for the window vector.
 pub struct WsolaTimeStretch {
     frame_size: usize,
     overlap: usize,
     search_window: usize,
+    /// Pre-computed Hann window coefficients — allocated once in `new()`.
+    hann_window: Vec<f32>,
 }
 
 impl WsolaTimeStretch {
@@ -24,10 +29,20 @@ impl WsolaTimeStretch {
         let overlap = frame_size / 2;
         let search_window = overlap / 2;
 
+        // Pre-compute Hann window once for the lifetime of this struct.
+        let hann_window: Vec<f32> = (0..frame_size)
+            .map(|i| {
+                (0.5 * (1.0
+                    - (2.0 * std::f64::consts::PI * i as f64 / (frame_size - 1) as f64).cos()))
+                    as f32
+            })
+            .collect();
+
         Self {
             frame_size,
             overlap,
             search_window,
+            hann_window,
         }
     }
 
@@ -81,16 +96,10 @@ impl WsolaTimeStretch {
         };
 
         let mut output = Vec::with_capacity(estimated_out_len + self.frame_size);
-        let mut window = Vec::with_capacity(self.frame_size);
-        for i in 0..self.frame_size {
-            // Hann window for smooth overlap-add
-            let w = 0.5
-                * (1.0
-                    - (2.0 * std::f64::consts::PI * i as f64 / (self.frame_size - 1) as f64).cos());
-            window.push(w as f32);
-        }
+        // Use the pre-computed Hann window (no allocation on hot path).
+        let window = &self.hann_window;
 
-        // Initialize output with the first frame
+        // Initialize output accumulators for overlap-add synthesis.
         let mut out_accum = vec![0.0f32; estimated_out_len + self.frame_size * 2];
         let mut weight_accum = vec![0.0f32; estimated_out_len + self.frame_size * 2];
 
