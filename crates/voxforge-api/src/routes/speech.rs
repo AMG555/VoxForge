@@ -215,7 +215,7 @@ fn encode_chunk_to_response(
                 .collect();
             (bytes, "audio/pcm")
         }
-        _ => {
+        AudioContainerFormat::Wav => {
             let wav_bytes = WavEncoder::encode_pcm16_to_wav(
                 &audio_chunk.pcm_data,
                 audio_chunk.sample_rate,
@@ -232,6 +232,24 @@ fn encode_chunk_to_response(
                 (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
             })?;
             (wav_bytes, "audio/wav")
+        }
+        // MP3, Opus, FLAC, AAC encoding is not yet implemented locally.
+        // Return 406 with a clear contract error rather than silently sending
+        // WAV bytes under the wrong MIME type (which breaks every decoder).
+        other => {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/format-not-supported".to_string(),
+                title: "Output Format Not Supported".to_string(),
+                status: StatusCode::NOT_ACCEPTABLE.as_u16(),
+                detail: format!(
+                    "Response format '{:?}' is not yet supported for local synthesis. \
+                     Use 'wav' or 'pcm'. To get MP3/Opus output pass the request through \
+                     an upstream router that supports transcoding (VOXFORGE_ROUTER_URL).",
+                    other
+                ),
+                instance: "/v1/audio/speech".to_string(),
+            };
+            return Err((StatusCode::NOT_ACCEPTABLE, Json(err)));
         }
     };
 
@@ -446,15 +464,16 @@ pub async fn synthesize_speech(
                             .synthesize_cached(engine.clone(), &synth_req)
                             .await
                             .map_err(|e| {
+                                let (status_code, detail) = e.classify_synthesis_error();
                                 let err = ProblemDetails {
                                     problem_type: "https://voxforge.org/errors/synthesis-failure"
                                         .to_string(),
                                     title: "Synthesis Error".to_string(),
-                                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                    detail: e.to_string(),
+                                    status: status_code,
+                                    detail,
                                     instance: "/v1/audio/speech".to_string(),
                                 };
-                                (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+                                (StatusCode::from_u16(status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR), Json(err))
                             })?;
                         sample_rate = chunk.sample_rate;
                         channels = chunk.channels;
@@ -485,14 +504,15 @@ pub async fn synthesize_speech(
                 .synthesize_cached(engine.clone(), &synth_req)
                 .await
                 .map_err(|e| {
+                    let (status_code, detail) = e.classify_synthesis_error();
                     let err = ProblemDetails {
                         problem_type: "https://voxforge.org/errors/synthesis-failure".to_string(),
                         title: "Synthesis Error".to_string(),
-                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                        detail: e.to_string(),
+                        status: status_code,
+                        detail,
                         instance: "/v1/audio/speech".to_string(),
                     };
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+                    (StatusCode::from_u16(status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR), Json(err))
                 })?;
             sample_rate = chunk.sample_rate;
             channels = chunk.channels;

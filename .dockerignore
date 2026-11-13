@@ -1,0 +1,12 @@
+target/
+ui/node_modules/
+ui/dist/
+.git/
+.github/
+*.md
+!README.md
+scripts/
+dist/
+.env
+.env.*
+*.log
