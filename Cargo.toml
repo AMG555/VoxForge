@@ -44,7 +44,7 @@ sysinfo = "0.30"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 axum = { version = "0.7", features = ["ws", "macros"] }
 tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs", "compression-gzip"] }
 http-body-util = "0.1"
 subtle = "2.5"
 tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
@@ -77,9 +77,9 @@ debug = 0
 # Adds ~30s to compile time; reduces binary size ~15% and improves throughput ~5-10%.
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = "fat"
 codegen-units = 1
-strip = "symbols"
+strip = true
 panic = "abort"
 overflow-checks = false
 
@@ -91,6 +91,6 @@ inherits = "release"
 opt-level = "s"       # size-optimised codegen
 lto = "fat"           # full LTO: maximises dead-code elimination
 codegen-units = 1
-strip = "symbols"
+strip = true
 panic = "abort"
 overflow-checks = false

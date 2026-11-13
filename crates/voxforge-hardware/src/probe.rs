@@ -1,12 +1,15 @@
 use crate::profile::{GpuAccelerator, HardwareProfile, HardwareTier, SimdSupport};
-use sysinfo::System;
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
 pub struct HardwareProbe;
 
 impl HardwareProbe {
     pub fn probe() -> HardwareProfile {
-        let mut sys = System::new_all();
-        sys.refresh_all();
+        let sys = System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::everything())
+                .with_memory(MemoryRefreshKind::everything()),
+        );
 
         let os = System::name().unwrap_or_else(|| std::env::consts::OS.to_string());
         let arch = std::env::consts::ARCH.to_string();

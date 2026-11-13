@@ -360,19 +360,18 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
     table[b'-' as usize] = 62;
     table[b'_' as usize] = 63;
 
-    let filtered: Vec<u8> = clean
-        .bytes()
-        .filter(|&b| !b.is_ascii_whitespace())
-        .collect();
-    if filtered.is_empty() {
+    if clean.is_empty() {
         return Err("Empty audio payload".to_string());
     }
 
-    let mut out = Vec::with_capacity(filtered.len() * 3 / 4);
+    let mut out = Vec::with_capacity(clean.len() * 3 / 4);
     let mut buf = 0u32;
     let mut bits = 0;
 
-    for &b in &filtered {
+    for b in clean.bytes() {
+        if b.is_ascii_whitespace() {
+            continue;
+        }
         if b == b'=' {
             break;
         }

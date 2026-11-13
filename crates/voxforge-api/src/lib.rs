@@ -13,6 +13,7 @@ use axum::http::HeaderValue;
 use axum::{
     extract::DefaultBodyLimit, middleware::from_fn, middleware::from_fn_with_state, Router,
 };
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
@@ -60,6 +61,7 @@ pub fn create_app(state: AppState) -> Router {
         ))
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(cors)
+        .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .fallback(routes::embedded_ui::static_handler)
         .with_state(state)
