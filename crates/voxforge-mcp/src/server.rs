@@ -497,6 +497,15 @@ impl McpServer {
                         .get("reference_transcript")
                         .and_then(|t| t.as_str())
                         .map(|s| s.to_string()),
+                    additional_reference_audio_base64: args
+                        .get("additional_reference_audio_base64")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                     language: lang.to_string(),
                     description: desc.map(|d| d.to_string()),
                     gender: None,
@@ -515,6 +524,58 @@ impl McpServer {
                         }))
                     }
                     Err(e) => ToolCallResult::error(format!("Voice cloning failed: {e}")),
+                }
+            }
+
+            "refine_voice" => {
+                let profile_id = args.get("profile_id").and_then(|p| p.as_str()).unwrap_or("");
+                let audio_b64 = args.get("audio_base64").and_then(|a| a.as_str()).unwrap_or("");
+
+                if profile_id.trim().is_empty() {
+                    return ToolCallResult::error("Parameter 'profile_id' is required");
+                }
+                if audio_b64.trim().is_empty() {
+                    return ToolCallResult::error("Parameter 'audio_base64' is required");
+                }
+
+                let profile = match self.voice_profiles.get(profile_id).await {
+                    Some(p) => p,
+                    None => {
+                        return ToolCallResult::error(format!(
+                            "Voice profile '{profile_id}' not found"
+                        ))
+                    }
+                };
+
+                let engine = match self.engine_registry.get(&profile.engine_id).await {
+                    Some(e) => e,
+                    None => {
+                        return ToolCallResult::error(format!(
+                            "Engine '{}' not registered",
+                            profile.engine_id
+                        ))
+                    }
+                };
+
+                let decoded_hex = match safe_decode_audio_bytes(audio_b64) {
+                    Ok(bytes) => hex::encode(bytes),
+                    Err(e) => return ToolCallResult::error(e),
+                };
+
+                match engine.refine_voice_embedding(&profile, &decoded_hex).await {
+                    Ok(refined) => {
+                        self.voice_profiles.insert(refined.clone()).await;
+                        ToolCallResult::json(&serde_json::json!({
+                            "status": "refined",
+                            "profile_id": refined.id,
+                            "name": refined.name,
+                            "version": refined.version,
+                            "sample_count": refined.sample_count,
+                            "similarity_score": refined.similarity_score,
+                            "embedding_dim": refined.embedding.as_ref().map(|e| e.len()).unwrap_or(0)
+                        }))
+                    }
+                    Err(e) => ToolCallResult::error(format!("Voice refinement failed: {e}")),
                 }
             }
 

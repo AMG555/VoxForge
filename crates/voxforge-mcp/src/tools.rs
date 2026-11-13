@@ -77,6 +77,28 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
             }),
         },
         McpTool {
+            name: "refine_voice".to_string(),
+            description: "Refine an existing cloned voice profile by incorporating a new reference audio sample. Updates the speaker embedding centroid using weighted averaging and increments the profile version.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "string",
+                        "description": "ID of the existing voice profile to refine"
+                    },
+                    "audio_base64": {
+                        "type": "string",
+                        "description": "Base64 or hex-encoded additional reference audio clip (WAV or PCM)"
+                    },
+                    "transcript": {
+                        "type": "string",
+                        "description": "Optional transcript of the additional sample to improve accuracy"
+                    }
+                },
+                "required": ["profile_id", "audio_base64"]
+            }),
+        },
+        McpTool {
             name: "transcribe_audio".to_string(),
             description: "Transcribe audio speech into text or timed subtitles using neural Whisper ASR engines. Accepts file path or base64 data.".to_string(),
             input_schema: serde_json::json!({
