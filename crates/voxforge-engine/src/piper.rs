@@ -188,9 +188,7 @@ impl PiperTtsEngine {
 
         // Convert raw 16-bit little-endian bytes to Vec<i16>
         let pcm_data: Vec<i16> = raw_bytes
-            .as_chunks::<2>()
-            .0
-            .iter()
+            .chunks_exact(2)
             .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
             .collect();
 

@@ -648,17 +648,13 @@ impl TtsEngine for Qwen3TtsEngine {
                     .map(|(samples, _, _)| samples)
                     .unwrap_or_else(|_| {
                         bytes
-                            .as_chunks::<2>()
-                            .0
-                            .iter()
+                            .chunks_exact(2)
                             .map(|c| i16::from_le_bytes([c[0], c[1]]))
                             .collect()
                     })
             } else {
                 bytes
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
+                    .chunks_exact(2)
                     .map(|c| i16::from_le_bytes([c[0], c[1]]))
                     .collect()
             };
@@ -682,17 +678,13 @@ impl TtsEngine for Qwen3TtsEngine {
                     .map(|(samples, _, _)| samples)
                     .unwrap_or_else(|_| {
                         bytes
-                            .as_chunks::<2>()
-                            .0
-                            .iter()
+                            .chunks_exact(2)
                             .map(|c| i16::from_le_bytes([c[0], c[1]]))
                             .collect()
                     })
             } else {
                 bytes
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
+                    .chunks_exact(2)
                     .map(|c| i16::from_le_bytes([c[0], c[1]]))
                     .collect()
             };
@@ -717,9 +709,7 @@ impl TtsEngine for Qwen3TtsEngine {
                     .unwrap_or_default()
             } else {
                 extra_bytes
-                    .as_chunks::<2>()
-                    .0
-                    .iter()
+                    .chunks_exact(2)
                     .map(|c| i16::from_le_bytes([c[0], c[1]]))
                     .collect()
             };
@@ -906,9 +896,7 @@ impl TtsEngine for Qwen3TtsEngine {
                 .unwrap_or_default()
         } else {
             bytes
-                .as_chunks::<2>()
-                .0
-                .iter()
+                .chunks_exact(2)
                 .map(|c| i16::from_le_bytes([c[0], c[1]]))
                 .collect()
         };
@@ -983,7 +971,6 @@ impl TtsEngine for Qwen3TtsEngine {
         Ok(updated)
     }
 
-    #[allow(clippy::chunks_exact_to_as_chunks)]
     async fn synthesize_cloned(&self, request: &ClonedSynthesisRequest) -> Result<AudioChunk> {
         // 1. Dynamic sidecar resolution: check configured URL or standard ports (9000, 8880, 5000)
         let sidecar_url = self.endpoint_url.clone().or_else(|| {
