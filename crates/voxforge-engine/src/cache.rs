@@ -98,18 +98,14 @@ impl AudioCache {
     ) -> Option<AudioChunk> {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
         let mut guard = self.inner.lock().await;
-        // NLL borrow checker: `get_mut` borrows all of `guard` mutably, so we cannot
-        // simultaneously access `guard.next_gen`. We clone the chunk out first, then
-        // update the gen in a second `get_mut` call (two separate borrow lifetimes).
-        if guard.entries.contains_key(&key) {
+        let CacheInner { entries, next_gen } = &mut *guard;
+
+        if let Some(entry) = entries.get_mut(&key) {
             self.hits.fetch_add(1, Ordering::Relaxed);
-            let chunk = guard.entries.get(&key).map(|e| e.chunk.clone());
-            let gen = guard.next_gen;
-            guard.next_gen = gen + 1;
-            if let Some(entry) = guard.entries.get_mut(&key) {
-                entry.gen = gen;
-            }
-            chunk
+            let gen = *next_gen;
+            *next_gen = gen + 1;
+            entry.gen = gen;
+            Some(entry.chunk.clone())
         } else {
             self.misses.fetch_add(1, Ordering::Relaxed);
             None
@@ -127,16 +123,14 @@ impl AudioCache {
     ) {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
         let mut guard = self.inner.lock().await;
+        let CacheInner { entries, next_gen } = &mut *guard;
 
-        // Update existing entry without eviction.
-        // Two separate borrows: first check existence (immutable), then update (mutable).
-        if guard.entries.contains_key(&key) {
-            let gen = guard.next_gen;
-            guard.next_gen = gen + 1;
-            if let Some(entry) = guard.entries.get_mut(&key) {
-                entry.chunk = chunk;
-                entry.gen = gen;
-            }
+        // Update existing entry in a single lookup without eviction.
+        if let Some(entry) = entries.get_mut(&key) {
+            let gen = *next_gen;
+            *next_gen = gen + 1;
+            entry.chunk = chunk;
+            entry.gen = gen;
             return;
         }
 

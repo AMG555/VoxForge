@@ -42,18 +42,17 @@ fn decode_base64(input: &str) -> Option<Vec<u8>> {
     table[b'-' as usize] = 62;
     table[b'_' as usize] = 63;
 
-    let filtered: Vec<u8> = input
-        .bytes()
-        .filter(|&b| !b.is_ascii_whitespace())
-        .collect();
-    if filtered.is_empty() {
+    if input.is_empty() {
         return None;
     }
-    let mut out = Vec::with_capacity(filtered.len() * 3 / 4);
+    let mut out = Vec::with_capacity(input.len() * 3 / 4);
     let mut buf = 0u32;
     let mut bits = 0;
 
-    for &b in &filtered {
+    for b in input.bytes() {
+        if b.is_ascii_whitespace() {
+            continue;
+        }
         if b == b'=' {
             break;
         }
@@ -83,6 +82,7 @@ pub struct Qwen3TtsEngine {
     endpoint_url: Option<String>,
     client: reqwest::Client,
     cloned_profiles: Arc<RwLock<HashMap<String, VoiceProfile>>>,
+    sidecar_cache: std::sync::RwLock<Option<(std::time::Instant, Option<String>)>>,
 }
 
 impl Default for Qwen3TtsEngine {
@@ -93,13 +93,24 @@ impl Default for Qwen3TtsEngine {
 
 impl Qwen3TtsEngine {
     pub fn new(sample_rate: u32) -> Self {
-        let endpoint_url = std::env::var("VOXFORGE_QWEN3_URL").ok().or_else(|| {
-            if auto_detect_local_port(9000) {
-                Some("http://127.0.0.1:9000".to_string())
-            } else {
-                None
-            }
-        });
+        let endpoint_url = std::env::var("VOXFORGE_QWEN3_URL")
+            .ok()
+            .or_else(|| std::env::var("VOXFORGE_SIDECAR_URL").ok())
+            .or_else(|| {
+                if auto_detect_local_port(9000) {
+                    Some("http://127.0.0.1:9000".to_string())
+                } else if auto_detect_local_port(8880) {
+                    Some("http://127.0.0.1:8880".to_string())
+                } else if auto_detect_local_port(9880) {
+                    Some("http://127.0.0.1:9880".to_string())
+                } else if auto_detect_local_port(8000) {
+                    Some("http://127.0.0.1:8000".to_string())
+                } else if auto_detect_local_port(5000) {
+                    Some("http://127.0.0.1:5000".to_string())
+                } else {
+                    None
+                }
+            });
 
         let mut profiles_map = HashMap::new();
         if let Ok(dir_str) = std::env::var("VOXFORGE_PROFILES_DIR") {
@@ -118,6 +129,11 @@ impl Qwen3TtsEngine {
             }
         }
 
+        let sidecar_cache = std::sync::RwLock::new(Some((
+            std::time::Instant::now(),
+            endpoint_url.clone(),
+        )));
+
         Self {
             sample_rate,
             clone_count: AtomicUsize::new(0),
@@ -127,12 +143,62 @@ impl Qwen3TtsEngine {
                 .build()
                 .unwrap_or_default(),
             cloned_profiles: Arc::new(RwLock::new(profiles_map)),
+            sidecar_cache,
         }
     }
 
     pub fn with_endpoint(mut self, url: impl Into<String>) -> Self {
-        self.endpoint_url = Some(url.into());
+        let u = url.into();
+        self.endpoint_url = Some(u.clone());
+        if let Ok(mut guard) = self.sidecar_cache.write() {
+            *guard = Some((std::time::Instant::now(), Some(u)));
+        }
         self
+    }
+
+    pub fn resolve_sidecar_url(&self) -> Option<String> {
+        if let Some(ref url) = self.endpoint_url {
+            return Some(url.clone());
+        }
+        if let Ok(url) = std::env::var("VOXFORGE_SIDECAR_URL") {
+            if !url.trim().is_empty() {
+                return Some(url.trim().to_string());
+            }
+        }
+        if let Ok(url) = std::env::var("VOXFORGE_QWEN3_URL") {
+            if !url.trim().is_empty() {
+                return Some(url.trim().to_string());
+            }
+        }
+
+        let now = std::time::Instant::now();
+        if let Ok(guard) = self.sidecar_cache.read() {
+            if let Some((checked_at, ref cached_url)) = *guard {
+                if now.duration_since(checked_at) < std::time::Duration::from_secs(10) {
+                    return cached_url.clone();
+                }
+            }
+        }
+
+        let detected = if auto_detect_local_port(9000) {
+            Some("http://127.0.0.1:9000".to_string())
+        } else if auto_detect_local_port(8880) {
+            Some("http://127.0.0.1:8880".to_string())
+        } else if auto_detect_local_port(9880) {
+            Some("http://127.0.0.1:9880".to_string())
+        } else if auto_detect_local_port(8000) {
+            Some("http://127.0.0.1:8000".to_string())
+        } else if auto_detect_local_port(5000) {
+            Some("http://127.0.0.1:5000".to_string())
+        } else {
+            None
+        };
+
+        if let Ok(mut guard) = self.sidecar_cache.write() {
+            *guard = Some((now, detected.clone()));
+        }
+
+        detected
     }
 
     /// Extract a 512-dimensional speaker embedding vector from reference audio samples.
@@ -219,7 +285,7 @@ impl Qwen3TtsEngine {
 
         // Slots 128..320: 16-band perceptual spectral filterbank (Long-Term Average Spectrum)
         let num_bands = 16;
-        let mut band_powers = vec![0.0f32; num_bands];
+        let mut band_powers = [0.0f32; 16];
         let total_energy: f64 = conditioned
             .iter()
             .map(|&s| (s as f64).powi(2))
@@ -583,7 +649,7 @@ impl TtsEngine for Qwen3TtsEngine {
                 voxforge_audio::NaturalBreath::generate(chunk.sample_rate, 120.0, -36.0, 1750.0);
             voxforge_audio::SoftEnvelope::process(&mut breath, chunk.sample_rate, 8.0, 8.0);
             let pause_samples = (chunk.sample_rate as f32 * 0.025).round() as usize;
-            breath.extend(vec![0i16; pause_samples]);
+            breath.resize(breath.len() + pause_samples, 0);
             breath.extend(chunk.pcm_data);
             chunk.pcm_data = breath;
         }
@@ -972,18 +1038,8 @@ impl TtsEngine for Qwen3TtsEngine {
     }
 
     async fn synthesize_cloned(&self, request: &ClonedSynthesisRequest) -> Result<AudioChunk> {
-        // 1. Dynamic sidecar resolution: check configured URL or standard ports (9000, 8880, 5000)
-        let sidecar_url = self.endpoint_url.clone().or_else(|| {
-            if auto_detect_local_port(9000) {
-                Some("http://127.0.0.1:9000".to_string())
-            } else if auto_detect_local_port(8880) {
-                Some("http://127.0.0.1:8880".to_string())
-            } else if auto_detect_local_port(5000) {
-                Some("http://127.0.0.1:5000".to_string())
-            } else {
-                None
-            }
-        });
+        // 1. Dynamic sidecar resolution: check configured URL, env, or cached auto-detected ports
+        let sidecar_url = self.resolve_sidecar_url();
 
         if let Some(ref url) = sidecar_url {
             let payload = serde_json::json!({
@@ -1355,7 +1411,7 @@ impl TtsEngine for Qwen3TtsEngine {
             );
             voxforge_audio::SoftEnvelope::process(&mut breath, chunk.sample_rate, 8.0, 8.0);
             let pause_samples = (chunk.sample_rate as f32 * 0.030).round() as usize;
-            breath.extend(vec![0i16; pause_samples]);
+            breath.resize(breath.len() + pause_samples, 0);
             breath.extend(chunk.pcm_data);
             chunk.pcm_data = breath;
         }
@@ -1568,7 +1624,7 @@ fn auto_detect_local_port(port: u16) -> bool {
     use std::net::{SocketAddr, TcpStream};
     use std::time::Duration;
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok()
+    TcpStream::connect_timeout(&addr, Duration::from_millis(15)).is_ok()
 }
 
 #[cfg(test)]

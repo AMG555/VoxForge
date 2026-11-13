@@ -64,7 +64,6 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ audioElement, 
     const dataArray = new Uint8Array(bufferLength);
 
     const render = () => {
-      animFrameId.current = requestAnimationFrame(render);
       const width = canvas.width;
       const height = canvas.height;
 
@@ -79,6 +78,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ audioElement, 
       ctx2d.stroke();
 
       if (analyserNode && isPlaying) {
+        animFrameId.current = requestAnimationFrame(render);
         if (mode === 'bars') {
           analyserNode.getByteFrequencyData(dataArray);
           const barWidth = (width / bufferLength) * 2.2;

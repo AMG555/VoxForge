@@ -32,7 +32,7 @@ futures.workspace = true
 hex.workspace = true
 hound.workspace = true
 regex.workspace = true
-rust-embed = { version = "8.5", features = ["interpolate-folder-path"] }
+rust-embed = { version = "8.5", features = ["interpolate-folder-path", "compression"] }
 mime_guess = "2.0"
 
 [dev-dependencies]
