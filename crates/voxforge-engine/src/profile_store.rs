@@ -101,8 +101,12 @@ impl VoiceProfileStore {
             reference_transcript: None,
             embedding: Some(vec![0.05f32; 512]),
             clone_capabilities: Some(vec!["zero-shot".to_string()]),
+            similarity_score: None,
+            sample_count: 0,
+            version: 1,
             metadata: HashMap::new(),
             created_at: Utc::now(),
+            refined_at: None,
         };
 
         let p2 = VoiceProfile {
@@ -117,8 +121,12 @@ impl VoiceProfileStore {
             reference_transcript: None,
             embedding: Some(vec![-0.05f32; 512]),
             clone_capabilities: Some(vec!["zero-shot".to_string()]),
+            similarity_score: None,
+            sample_count: 0,
+            version: 1,
             metadata: HashMap::new(),
             created_at: Utc::now(),
+            refined_at: None,
         };
 
         map.insert(p1.id.clone(), p1);
@@ -278,8 +286,12 @@ mod tests {
             reference_transcript: None,
             embedding: Some(vec![0.1; 512]),
             clone_capabilities: Some(vec!["zero-shot".to_string()]),
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
             metadata: HashMap::new(),
             created_at: Utc::now(),
+            refined_at: None,
         };
 
         store.insert(custom.clone()).await;

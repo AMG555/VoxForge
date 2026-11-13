@@ -33,6 +33,19 @@ impl AudioCache {
         pitch: f32,
         text: &str,
     ) -> String {
+        Self::compute_key_with_profile(engine_id, voice_id, speed, pitch, text, None)
+    }
+
+    /// Computes a cache key that optionally binds to a cloned voice profile version.
+    /// Passing `profile_version` prevents stale hits after `refine_voice_embedding` bumps the version.
+    pub fn compute_key_with_profile(
+        engine_id: &str,
+        voice_id: &str,
+        speed: f32,
+        pitch: f32,
+        text: &str,
+        profile_version: Option<u32>,
+    ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(engine_id.as_bytes());
         hasher.update(b":");
@@ -43,6 +56,10 @@ impl AudioCache {
         hasher.update(pitch.to_bits().to_be_bytes());
         hasher.update(b":");
         hasher.update(text.as_bytes());
+        if let Some(ver) = profile_version {
+            hasher.update(b":v");
+            hasher.update(ver.to_be_bytes());
+        }
         hex::encode(hasher.finalize())
     }
 
