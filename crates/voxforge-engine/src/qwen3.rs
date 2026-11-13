@@ -1882,7 +1882,7 @@ mod tests {
         // similarity_score is set when more than 1 sample is provided
         assert!(profile.similarity_score.is_some());
         let sim = profile.similarity_score.unwrap();
-        assert!(sim >= 0.0 && sim <= 1.0, "Similarity must be in [0,1]");
+        assert!((0.0..=1.0).contains(&sim), "Similarity must be in [0,1]");
 
         let emb = profile.embedding.as_ref().unwrap();
         assert_eq!(emb.len(), 512);
@@ -1933,7 +1933,7 @@ mod tests {
         assert!(profile_v2.refined_at.is_some());
         assert!(profile_v2.similarity_score.is_some());
         let sim = profile_v2.similarity_score.unwrap();
-        assert!(sim >= 0.0 && sim <= 1.0);
+        assert!((0.0..=1.0).contains(&sim));
 
         // Embedding must still be unit-normalized
         let emb = profile_v2.embedding.as_ref().unwrap();

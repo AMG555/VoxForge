@@ -389,7 +389,7 @@ mod tests {
         let data = b"Hello, VoxForge dubbing!";
         let encoded = base64_encode(data);
         // Verify it is valid base64 by checking length and characters.
-        assert!(encoded.len() > 0);
+        assert!(!encoded.is_empty());
         assert!(encoded.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
     }
 
