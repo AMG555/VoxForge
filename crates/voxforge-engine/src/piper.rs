@@ -115,7 +115,9 @@ impl PiperTtsEngine {
             .json(&body)
             .send()
             .await
-            .map_err(|e| VoxForgeError::Engine(format!("Piper HTTP sidecar request failed: {e}")))?;
+            .map_err(|e| {
+                VoxForgeError::Engine(format!("Piper HTTP sidecar request failed: {e}"))
+            })?;
 
         if !res.status().is_success() {
             let status = res.status();

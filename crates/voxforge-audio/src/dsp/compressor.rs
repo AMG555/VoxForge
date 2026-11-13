@@ -92,8 +92,7 @@ mod tests {
         // 0 dBFS signal with -6 dB threshold and 4:1 ratio should be attenuated
         let mut loud = vec![32000i16; 2000];
         DynamicCompressor::process(&mut loud, 24000, -6.0, 4.0, 5.0, 100.0, 0.0);
-        let mean_out: f64 =
-            loud.iter().map(|&s| (s as f64).abs()).sum::<f64>() / loud.len() as f64;
+        let mean_out: f64 = loud.iter().map(|&s| (s as f64).abs()).sum::<f64>() / loud.len() as f64;
         assert!(mean_out < 32000.0, "Compressor must attenuate loud signal");
     }
 

@@ -46,7 +46,13 @@ pub struct ResumeJobResponse {
 fn sanitize_job_id(id: &str) -> String {
     let safe: String = id
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .take(64) // cap length
         .collect();
     if safe.is_empty() || safe == "." || safe == ".." {

@@ -120,10 +120,7 @@ pub async fn dub_script(
                     problem_type: "https://voxforge.org/errors/line-too-long".to_string(),
                     title: "Script Line Too Long".to_string(),
                     status: 400,
-                    detail: format!(
-                        "Script line {} exceeds 10,000 character limit",
-                        i
-                    ),
+                    detail: format!("Script line {} exceeds 10,000 character limit", i),
                     instance: "/v1/audio/dub".to_string(),
                 }),
             ));
@@ -189,8 +186,7 @@ pub async fn dub_script(
                     .await?
             }
         } else {
-            synthesize_via_registry(&state, &line.speaker, &line.text, speed, pitch, format)
-                .await?
+            synthesize_via_registry(&state, &line.speaker, &line.text, speed, pitch, format).await?
         };
 
         let start_sample = if let Some(secs) = line.start_seconds {
@@ -240,9 +236,10 @@ pub async fn dub_script(
 
     // Encode to WAV / PCM and base64.
     let audio_bytes = match format {
-        AudioContainerFormat::Pcm => {
-            mixed.iter().flat_map(|s| s.to_le_bytes()).collect::<Vec<u8>>()
-        }
+        AudioContainerFormat::Pcm => mixed
+            .iter()
+            .flat_map(|s| s.to_le_bytes())
+            .collect::<Vec<u8>>(),
         _ => WavEncoder::encode_pcm16_to_wav(&mixed, sample_rate, 1).map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -353,14 +350,21 @@ async fn synthesize_via_registry(
 
 /// Minimal base64 encoder (no external dep — mirrors the decoder in cloning.rs).
 fn base64_encode(data: &[u8]) -> String {
-    const CHARSET: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     let mut i = 0;
     while i < data.len() {
         let b0 = data[i] as u32;
-        let b1 = if i + 1 < data.len() { data[i + 1] as u32 } else { 0 };
-        let b2 = if i + 2 < data.len() { data[i + 2] as u32 } else { 0 };
+        let b1 = if i + 1 < data.len() {
+            data[i + 1] as u32
+        } else {
+            0
+        };
+        let b2 = if i + 2 < data.len() {
+            data[i + 2] as u32
+        } else {
+            0
+        };
         let triple = (b0 << 16) | (b1 << 8) | b2;
         out.push(CHARSET[((triple >> 18) & 0x3F) as usize] as char);
         out.push(CHARSET[((triple >> 12) & 0x3F) as usize] as char);
@@ -389,7 +393,9 @@ mod tests {
         let encoded = base64_encode(data);
         // Verify it is valid base64 by checking length and characters.
         assert!(!encoded.is_empty());
-        assert!(encoded.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
+        assert!(encoded
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
     }
 
     #[test]

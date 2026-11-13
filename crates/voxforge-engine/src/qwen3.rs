@@ -129,10 +129,8 @@ impl Qwen3TtsEngine {
             }
         }
 
-        let sidecar_cache = std::sync::RwLock::new(Some((
-            std::time::Instant::now(),
-            endpoint_url.clone(),
-        )));
+        let sidecar_cache =
+            std::sync::RwLock::new(Some((std::time::Instant::now(), endpoint_url.clone())));
 
         Self {
             sample_rate,
@@ -640,7 +638,13 @@ impl TtsEngine for Qwen3TtsEngine {
             0.28,
         );
         voxforge_audio::HarmonicWarmth::process(&mut chunk.pcm_data, 0.25, 0.28);
-        voxforge_audio::DeEsser::process(&mut chunk.pcm_data, chunk.sample_rate, 6500.0, -22.0, 4.5);
+        voxforge_audio::DeEsser::process(
+            &mut chunk.pcm_data,
+            chunk.sample_rate,
+            6500.0,
+            -22.0,
+            4.5,
+        );
         voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
         voxforge_audio::SoftEnvelope::process(&mut chunk.pcm_data, chunk.sample_rate, 6.0, 24.0);
 
@@ -881,15 +885,9 @@ impl TtsEngine for Qwen3TtsEngine {
         metadata.extend(request.metadata.clone());
 
         // Record aggregation quality in metadata for observability
-        metadata.insert(
-            "sample_count".to_string(),
-            format!("{}", sample_count),
-        );
+        metadata.insert("sample_count".to_string(), format!("{}", sample_count));
         if let Some(sim) = similarity_score {
-            metadata.insert(
-                "intra_sample_similarity".to_string(),
-                format!("{:.4}", sim),
-            );
+            metadata.insert("intra_sample_similarity".to_string(), format!("{:.4}", sim));
         }
 
         let mut clone_capabilities = vec![
@@ -1000,8 +998,7 @@ impl TtsEngine for Qwen3TtsEngine {
         }
 
         // Cross-version similarity: how much did the embedding shift?
-        let refinement_similarity =
-            Self::compute_cosine_similarity(existing_embedding, &refined);
+        let refinement_similarity = Self::compute_cosine_similarity(existing_embedding, &refined);
 
         let mut updated = profile.clone();
         updated.embedding = Some(refined);
@@ -1009,14 +1006,17 @@ impl TtsEngine for Qwen3TtsEngine {
         updated.sample_count = profile.sample_count.saturating_add(1);
         updated.refined_at = Some(Utc::now());
         updated.similarity_score = Some(refinement_similarity.clamp(0.0, 1.0));
-        updated
-            .metadata
-            .insert("refinement_similarity".to_string(), format!("{:.4}", refinement_similarity));
+        updated.metadata.insert(
+            "refinement_similarity".to_string(),
+            format!("{:.4}", refinement_similarity),
+        );
         updated.metadata.insert(
             "sample_count".to_string(),
             format!("{}", updated.sample_count),
         );
-        updated.metadata.insert("version".to_string(), format!("{}", updated.version));
+        updated
+            .metadata
+            .insert("version".to_string(), format!("{}", updated.version));
 
         // Persist updated profile to disk
         let profiles_dir = std::env::var("VOXFORGE_PROFILES_DIR")
@@ -1382,7 +1382,13 @@ impl TtsEngine for Qwen3TtsEngine {
         );
 
         // 10. Soft de-essing to tame harsh sibilance
-        voxforge_audio::DeEsser::process(&mut chunk.pcm_data, chunk.sample_rate, 6500.0, -22.0, 5.0);
+        voxforge_audio::DeEsser::process(
+            &mut chunk.pcm_data,
+            chunk.sample_rate,
+            6500.0,
+            -22.0,
+            5.0,
+        );
 
         // 11. Studio peak normalization & brickwall limiting
         let max_amp = chunk.pcm_data.iter().map(|&s| s.abs()).max().unwrap_or(0) as f32;
@@ -1917,10 +1923,16 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        let profile = engine.clone_voice(&req).await.expect("Multi-sample clone must succeed");
+        let profile = engine
+            .clone_voice(&req)
+            .await
+            .expect("Multi-sample clone must succeed");
         assert_eq!(profile.sample_count, 2);
         assert_eq!(profile.version, 1);
-        assert!(profile.clone_capabilities.as_deref().unwrap_or_default()
+        assert!(profile
+            .clone_capabilities
+            .as_deref()
+            .unwrap_or_default()
             .contains(&"multi-sample-aggregated".to_string()));
         // similarity_score is set when more than 1 sample is provided
         assert!(profile.similarity_score.is_some());
@@ -1931,7 +1943,10 @@ mod tests {
         assert_eq!(emb.len(), 512);
         // Centroid must be unit-normalized
         let l2: f32 = emb.iter().map(|&x| x * x).sum::<f32>().sqrt();
-        assert!((l2 - 1.0).abs() < 1e-3, "Centroid embedding must be unit-normalized");
+        assert!(
+            (l2 - 1.0).abs() < 1e-3,
+            "Centroid embedding must be unit-normalized"
+        );
     }
 
     #[tokio::test]
@@ -1960,7 +1975,10 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        let profile_v1 = engine.clone_voice(&req).await.expect("Initial clone must succeed");
+        let profile_v1 = engine
+            .clone_voice(&req)
+            .await
+            .expect("Initial clone must succeed");
         assert_eq!(profile_v1.version, 1);
         assert_eq!(profile_v1.sample_count, 1);
         assert!(profile_v1.refined_at.is_none());
@@ -1981,12 +1999,13 @@ mod tests {
         // Embedding must still be unit-normalized
         let emb = profile_v2.embedding.as_ref().unwrap();
         let l2: f32 = emb.iter().map(|&x| x * x).sum::<f32>().sqrt();
-        assert!((l2 - 1.0).abs() < 1e-3, "Refined embedding must be unit-normalized");
+        assert!(
+            (l2 - 1.0).abs() < 1e-3,
+            "Refined embedding must be unit-normalized"
+        );
 
         // Verify refinement rejects empty audio
-        let err = engine
-            .refine_voice_embedding(&profile_v2, "")
-            .await;
+        let err = engine.refine_voice_embedding(&profile_v2, "").await;
         assert!(err.is_err());
     }
 }

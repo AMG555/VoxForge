@@ -87,19 +87,21 @@ impl AlgorithmicReverb {
     /// calls run on the hot path with zero heap traffic.
     pub fn new(sample_rate: u32) -> Self {
         let rate_scale = (sample_rate as f32) / 44100.0;
-        let combs = Self::COMB_TUNINGS.map(|t| {
-            CombFilter::new(((t as f32) * rate_scale).round() as usize)
-        });
-        let allpasses = Self::ALLPASS_TUNINGS.map(|t| {
-            AllpassFilter::new(((t as f32) * rate_scale).round() as usize, 0.5)
-        });
+        let combs =
+            Self::COMB_TUNINGS.map(|t| CombFilter::new(((t as f32) * rate_scale).round() as usize));
+        let allpasses = Self::ALLPASS_TUNINGS
+            .map(|t| AllpassFilter::new(((t as f32) * rate_scale).round() as usize, 0.5));
         Self { combs, allpasses }
     }
 
     /// Reset all delay-line state to zero (reuse with a new audio clip).
     pub fn reset(&mut self) {
-        for c in &mut self.combs { c.reset(); }
-        for a in &mut self.allpasses { a.reset(); }
+        for c in &mut self.combs {
+            c.reset();
+        }
+        for a in &mut self.allpasses {
+            a.reset();
+        }
     }
 
     /// Apply reverberation to `samples` in-place using this instance's delay lines.
@@ -108,7 +110,14 @@ impl AlgorithmicReverb {
     /// - `damping`:   High-frequency absorption (0.0 to 1.0).
     /// - `wet_mix`:   Wet reverb level (0.0 to 1.0).
     /// - `dry_mix`:   Dry direct level (0.0 to 1.0).
-    pub fn process(&mut self, samples: &mut [i16], room_size: f32, damping: f32, wet_mix: f32, dry_mix: f32) {
+    pub fn process(
+        &mut self,
+        samples: &mut [i16],
+        room_size: f32,
+        damping: f32,
+        wet_mix: f32,
+        dry_mix: f32,
+    ) {
         if samples.is_empty()
             || !room_size.is_finite()
             || !damping.is_finite()

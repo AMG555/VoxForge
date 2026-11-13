@@ -938,7 +938,8 @@ mod tests {
 
     #[test]
     fn test_cli_parse_serve_defaults() {
-        let cli = Cli::try_parse_from(["voxforge", "serve"]).expect("Failed to parse serve command");
+        let cli =
+            Cli::try_parse_from(["voxforge", "serve"]).expect("Failed to parse serve command");
         match cli.command {
             Some(Commands::Serve(args)) => {
                 assert_eq!(args.port, 8080);

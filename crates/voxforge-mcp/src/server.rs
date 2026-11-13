@@ -528,8 +528,14 @@ impl McpServer {
             }
 
             "refine_voice" => {
-                let profile_id = args.get("profile_id").and_then(|p| p.as_str()).unwrap_or("");
-                let audio_b64 = args.get("audio_base64").and_then(|a| a.as_str()).unwrap_or("");
+                let profile_id = args
+                    .get("profile_id")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("");
+                let audio_b64 = args
+                    .get("audio_base64")
+                    .and_then(|a| a.as_str())
+                    .unwrap_or("");
 
                 if profile_id.trim().is_empty() {
                     return ToolCallResult::error("Parameter 'profile_id' is required");
@@ -1345,7 +1351,10 @@ mod tests {
             }
         });
 
-        let resp_str = server.handle_message(&clone_call.to_string()).await.unwrap();
+        let resp_str = server
+            .handle_message(&clone_call.to_string())
+            .await
+            .unwrap();
         let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
         assert_eq!(resp["id"], 20);
         assert_eq!(resp["result"]["isError"], false);
@@ -1385,7 +1394,10 @@ mod tests {
                 }
             }
         });
-        let resp_str = server.handle_message(&synth_call.to_string()).await.unwrap();
+        let resp_str = server
+            .handle_message(&synth_call.to_string())
+            .await
+            .unwrap();
         let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
         assert_eq!(resp["id"], 22);
         assert_eq!(resp["result"]["isError"], false);

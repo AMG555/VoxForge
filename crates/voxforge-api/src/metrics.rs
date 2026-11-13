@@ -64,7 +64,9 @@ impl MetricsCollector {
         }
         out.push('\n');
 
-        out.push_str("# HELP voxforge_synthesis_total Total number of completed speech syntheses\n");
+        out.push_str(
+            "# HELP voxforge_synthesis_total Total number of completed speech syntheses\n",
+        );
         out.push_str("# TYPE voxforge_synthesis_total counter\n");
         out.push_str(&format!(
             "voxforge_synthesis_total {}\n\n",
