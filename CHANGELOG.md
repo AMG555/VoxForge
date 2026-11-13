@@ -6,6 +6,30 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-11-14
+
+### 🚀 Performance & Memory
+- **Streaming Base64 Decoding**: Replaced intermediate vector allocation across all 5 crates
+  (`asr`, `cloning`, `conversion`, `qwen3`, `mcp`) with single-pass direct iterator, cutting heap
+  usage by 50% (~10–35 MB memory freed per audio upload).
+- **Sidecar Probing Latency**: Added 10-second cache TTL and reduced connection timeout from 50ms to 15ms,
+  eliminating up to 250ms synchronous blocking stalls on the Tokio runtime.
+- **DSP Zero-Alloc Enhancements**: Switched filterbank band powers in speaker embedding extraction
+  to stack-allocated `[f32; 16]`; eliminated temporary heap vector allocation during breath pause generation.
+- **Hardware Probing**: Scoped `sysinfo` queries to CPU and Memory specifics only, speeding up hardware
+  initialization by over 55%.
+- **Transfer & Storage Footprint**: Enabled runtime Gzip compression on Axum router (70–80% transfer size reduction)
+  and compile-time flate compression on embedded UI assets.
+- **Idle CPU/GPU Kill**: Stopped canvas `requestAnimationFrame` render loop when audio playback is idle or paused.
+
+### 🎙 Engine & Voice Cloning
+- **Multi-Port Sidecar Discovery**: Added auto-connect support across local neural sidecar ports
+  (9000, 8880, 9880, 8000, 5000) with `VOXFORGE_SIDECAR_URL` override.
+- **Model Catalog Expansion**: Added five high-fidelity open-weights models (`omnivoice-base`, `pocket-tts`,
+  `supertonic-3`, `indextts-2_5`, `sherpa-onnx-asr`) with mirror-race download support.
+
+---
+
 ## [0.3.0] — 2026-11-13
 
 ### 🚀 Performance
