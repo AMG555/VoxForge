@@ -32,9 +32,22 @@ pub struct VoiceProfile {
     /// Supported cloning capabilities for this profile (e.g. "cross-lingual", "emotion-transfer").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clone_capabilities: Option<Vec<String>>,
+    /// Cosine similarity score (0.0–1.0) of this embedding against its own reference audio.
+    /// Populated after multi-sample aggregation; higher scores indicate better cloning fidelity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub similarity_score: Option<f32>,
+    /// Number of reference audio samples averaged into this embedding.
+    #[serde(default)]
+    pub sample_count: u32,
+    /// Monotonically increasing version counter, incremented on each embedding refinement.
+    #[serde(default)]
+    pub version: u32,
     #[serde(default)]
     pub metadata: HashMap<String, String>,
     pub created_at: DateTime<Utc>,
+    /// Timestamp of the most recent embedding refinement (None if never refined after creation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refined_at: Option<DateTime<Utc>>,
 }
 
 fn default_language() -> String {
@@ -53,6 +66,11 @@ pub struct CloneVoiceRequest {
     /// Optional exact transcript of the reference audio for conditioning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_transcript: Option<String>,
+    /// Additional reference audio samples (base64-encoded). When provided, their
+    /// acoustic embeddings are averaged with the primary reference to produce a
+    /// more stable, noise-robust speaker identity vector.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_reference_audio_base64: Vec<String>,
     #[serde(default = "default_language")]
     pub language: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
