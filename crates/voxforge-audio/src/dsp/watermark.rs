@@ -48,20 +48,24 @@ impl AudioWatermark {
         self
     }
 
-    /// Generate pseudo-random carrier sequence for a given bit index
-    fn generate_chip_carrier(&self, bit_index: usize, length: usize) -> Vec<f32> {
+    /// Generate pseudo-random carrier sequence for a given bit index.
+    ///
+    /// Uses a **fixed-size stack array** (`[f32; 128]`) matching `chip_rate` to
+    /// eliminate per-chip heap allocation. For 30s audio at 24kHz this removes
+    /// ~5600 `Vec` allocations (one per 128-sample chip) from the hot path.
+    /// Only the first `length` elements are used (handles end-of-buffer partial chips).
+    fn generate_chip_carrier(&self, bit_index: usize, length: usize) -> [f32; 128] {
         let mut seed = self
             .carrier_seed
             .wrapping_add((bit_index as u64).wrapping_mul(0x517cc1b727220a95));
-        let mut carrier = Vec::with_capacity(length);
-        for _ in 0..length {
+        let mut carrier = [0.0f32; 128];
+        for slot in carrier.iter_mut().take(length) {
             // Xorshift64 PRNG
             seed ^= seed << 13;
             seed ^= seed >> 7;
             seed ^= seed << 17;
             // Bipolar {-1.0, 1.0}
-            let bit = (seed & 1) == 1;
-            carrier.push(if bit { 1.0 } else { -1.0 });
+            *slot = if (seed & 1) == 1 { 1.0 } else { -1.0 };
         }
         carrier
     }
@@ -71,9 +75,8 @@ impl AudioWatermark {
     /// Loops the 16-bit message across the entire audio length for high redundancy
     pub fn embed(&self, samples: &mut [f32], payload: u16) -> usize {
         let bit_count = 16;
-        let bits: Vec<bool> = (0..bit_count)
-            .map(|i| ((payload >> (15 - i)) & 1) == 1)
-            .collect();
+        let bits: [bool; 16] =
+            std::array::from_fn(|i| ((payload >> (15 - i)) & 1) == 1);
         let total_samples = samples.len();
         let bits_total = total_samples / self.chip_rate;
 
@@ -84,9 +87,10 @@ impl AudioWatermark {
         for (b_idx, chunk) in samples.chunks_mut(self.chip_rate).enumerate() {
             let bit_val = bits[b_idx % bit_count];
             let sign = if bit_val { 1.0 } else { -1.0 };
-            let carrier = self.generate_chip_carrier(b_idx % bit_count, chunk.len());
+            let clen = chunk.len();
+            let carrier = self.generate_chip_carrier(b_idx % bit_count, clen);
 
-            for (sample, &c) in chunk.iter_mut().zip(carrier.iter()) {
+            for (sample, &c) in chunk.iter_mut().zip(carrier[..clen].iter()) {
                 // Additive spread-spectrum watermark
                 *sample += sign * c * self.embedding_strength;
                 // Soft clip to [-1.0, 1.0] to prevent overflow
@@ -115,15 +119,16 @@ impl AudioWatermark {
             };
         }
 
-        let mut bit_correlations = vec![0.0f32; bit_count];
-        let mut bit_counts = vec![0usize; bit_count];
+        let mut bit_correlations = [0.0f32; 16];
+        let mut bit_counts = [0usize; 16];
 
         for (b_idx, chunk) in samples.chunks(self.chip_rate).enumerate() {
             let slot = b_idx % bit_count;
-            let carrier = self.generate_chip_carrier(slot, chunk.len());
+            let clen = chunk.len();
+            let carrier = self.generate_chip_carrier(slot, clen);
 
             let mut corr = 0.0f32;
-            for (&s, &c) in chunk.iter().zip(carrier.iter()) {
+            for (&s, &c) in chunk.iter().zip(carrier[..clen].iter()) {
                 corr += s * c;
             }
             if !chunk.is_empty() {
