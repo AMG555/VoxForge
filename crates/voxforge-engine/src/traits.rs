@@ -111,4 +111,19 @@ pub trait TtsEngine: Send + Sync {
             self.id()
         )))
     }
+
+    /// Refine an existing cloned voice profile by folding in a new reference audio sample.
+    /// The updated embedding is the weighted average of the current embedding and the new
+    /// sample's embedding, incrementing the profile's version and sample_count.
+    /// Returns the updated VoiceProfile with `version` and `refined_at` populated.
+    async fn refine_voice_embedding(
+        &self,
+        _profile: &VoiceProfile,
+        _new_reference_audio_base64: &str,
+    ) -> Result<VoiceProfile> {
+        Err(VoxForgeError::Engine(format!(
+            "Engine '{}' does not support embedding refinement",
+            self.id()
+        )))
+    }
 }
