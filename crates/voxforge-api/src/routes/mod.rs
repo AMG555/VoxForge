@@ -141,7 +141,7 @@ pub fn build_api_router() -> Router<AppState> {
         )
         // Verbal Filler & Hallucination Refinement Engine
         .route("/v1/audio/refine", post(refine::refine_text))
-        // Multi-speaker script dubbing (VoiceStudio parity)
+        // Multi-speaker script dubbing
         .route("/v1/audio/dub", post(dub::dub_script))
         // Speech-to-Speech (Neural Voice Conversion)
         .route(

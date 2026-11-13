@@ -84,7 +84,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Acoustic Echo Cancellation (NLMS with double-talk detection)
 - 5-axis Director AI taxonomy (energy, emotion, pace, intimacy, formality)
 - Prosody mirroring with formant estimation, HNR, shimmer, jitter
-- VoiceStudio feature parity: 27/27 areas matched or exceeded
+- Comprehensive studio parity: 27/27 audio workflow areas matched or exceeded
 
 ### Fixed
 - Atomic write (temp+rename) in `VoiceProfileStore`

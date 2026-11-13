@@ -4,8 +4,7 @@
 //! and synthesizes each line with the assigned voice, returning a single
 //! mixed WAV file whose total duration covers all cues.
 //!
-//! This addresses the core feature gap vs. VoiceStudio, which ships video/audio
-//! dubbing as a first-class API operation.
+//! Ships multi-speaker video/audio dialogue dubbing as a first-class API operation.
 
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
