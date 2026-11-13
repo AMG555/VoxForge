@@ -836,6 +836,7 @@ async fn run_clone(args: CloneArgs) -> Result<()> {
         reference_audio_base64: Some(hex_encoded),
         reference_audio_path: Some(args.audio.to_string_lossy().to_string()),
         reference_transcript: args.transcript,
+        additional_reference_audio_base64: vec![],
         language: args.language,
         description: Some(format!("Cloned voice profile for {}", args.name)),
         gender: Some(gender),
