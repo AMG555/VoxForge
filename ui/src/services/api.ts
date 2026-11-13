@@ -7,6 +7,7 @@ import {
   PipelineDefinition,
   RefineVoicePayload,
   Voice,
+  VoiceProfile,
 } from '../types';
 
 const BASE_URL = '';
@@ -177,7 +178,7 @@ export const api = {
     return res.json();
   },
 
-  async cloneVoice(payload: CloneVoicePayload): Promise<any> {
+  async cloneVoice(payload: CloneVoicePayload): Promise<VoiceProfile> {
     const res = await fetch(`${BASE_URL}/v1/voices/clone`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
@@ -190,7 +191,7 @@ export const api = {
     return res.json();
   },
 
-  async refineVoice(profileId: string, payload: RefineVoicePayload): Promise<Voice> {
+  async refineVoice(profileId: string, payload: RefineVoicePayload): Promise<VoiceProfile> {
     const res = await fetch(`${BASE_URL}/v1/voices/profiles/${encodeURIComponent(profileId)}/refine`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
@@ -409,6 +410,34 @@ export const api = {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to resume job checkpoint');
+    return res.json();
+  },
+
+  async dubScript(payload: {
+    script: Array<{
+      speaker: string;
+      text: string;
+      start_seconds?: number;
+      speed?: number;
+      pitch?: number;
+    }>;
+    gap_ms?: number;
+    response_format?: 'wav' | 'pcm';
+  }): Promise<{
+    audio_base64: string;
+    total_duration_seconds: number;
+    lines: Array<{ speaker: string; start_seconds: number; duration_seconds: number }>;
+    sample_rate: number;
+  }> {
+    const res = await fetch(`${BASE_URL}/v1/audio/dub`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Script dubbing failed' }));
+      throw new Error(err.detail || 'Script dubbing failed');
+    }
     return res.json();
   },
 

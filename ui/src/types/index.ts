@@ -150,6 +150,27 @@ export interface EngineHealthInfo {
   action_target?: string;
 }
 
+/** Full voice profile returned by clone / refine / profile CRUD endpoints. */
+export interface VoiceProfile {
+  id: string;
+  name: string;
+  engine_id: string;
+  description?: string;
+  language: string;
+  gender?: 'male' | 'female' | 'neutral';
+  reference_audio_path?: string;
+  reference_audio_base64?: string;
+  reference_transcript?: string;
+  embedding?: number[];
+  clone_capabilities?: string[];
+  similarity_score?: number;
+  sample_count: number;
+  version: number;
+  metadata: Record<string, string>;
+  created_at: string;
+  refined_at?: string;
+}
+
 export interface CloneVoicePayload {
   name: string;
   engine_id?: string;

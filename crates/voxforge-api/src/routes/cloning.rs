@@ -425,6 +425,19 @@ pub async fn assess_reference_audio(
         ));
     }
 
+    if body.audio_base64.len() > 35 * 1024 * 1024 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Audio Payload Too Large".to_string(),
+                status: 400,
+                detail: "Reference audio payload exceeds maximum permitted size (35MB)".to_string(),
+                instance: "/v1/voices/assess".to_string(),
+            }),
+        ));
+    }
+
     let (samples, sample_rate, channels) =
         decode_b64_to_pcm(&body.audio_base64).map_err(|detail| {
             (

@@ -1358,4 +1358,185 @@ mod tests {
             "http://localhost:3000"
         );
     }
+
+    /// Integration test: full clone → verify → refine → delete lifecycle via HTTP.
+    #[tokio::test]
+    async fn test_clone_verify_refine_delete_lifecycle() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // Synthesize a consistent test PCM tone (140Hz, 0.4s at 24kHz).
+        let pcm: Vec<i16> = (0..9600)
+            .map(|i| {
+                let t = i as f32 / 24000.0;
+                ((2.0 * std::f32::consts::PI * 140.0 * t).sin() * 12000.0) as i16
+            })
+            .collect();
+        let wav = voxforge_audio::WavEncoder::encode_pcm16_to_wav(&pcm, 24000, 1).unwrap();
+        let audio_b64 = hex::encode(&wav);
+
+        // Step 1 — Clone voice.
+        let clone_body = serde_json::json!({
+            "name": "Lifecycle Test Voice",
+            "engine_id": "mock-tts",
+            "reference_audio_base64": audio_b64,
+            "language": "en-US",
+            "gender": "neutral"
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/clone")
+            .header("content-type", "application/json")
+            .body(Body::from(clone_body.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let clone_resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let profile_id = clone_resp["id"].as_str().unwrap().to_string();
+        assert_eq!(clone_resp["name"], "Lifecycle Test Voice");
+        assert_eq!(clone_resp["version"], 1);
+
+        // Step 2 — Retrieve profile.
+        let req = Request::builder()
+            .uri(format!("/v1/voices/profiles/{profile_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let profile_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(profile_json["id"], profile_id.as_str());
+
+        // Step 3 — Verify voice (identical audio → high confidence match).
+        let verify_body = serde_json::json!({
+            "reference_audio_base64": audio_b64,
+            "test_audio_base64": audio_b64
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/verify")
+            .header("content-type", "application/json")
+            .body(Body::from(verify_body.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let verify_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(verify_json["is_match"].as_bool().unwrap());
+        assert!(verify_json["similarity_score"].as_f64().unwrap() > 0.9);
+
+        // Step 4 — Refine voice profile with an additional sample.
+        let refine_pcm: Vec<i16> = (0..9600)
+            .map(|i| {
+                let t = i as f32 / 24000.0;
+                ((2.0 * std::f32::consts::PI * 145.0 * t).sin() * 11000.0) as i16
+            })
+            .collect();
+        let refine_wav =
+            voxforge_audio::WavEncoder::encode_pcm16_to_wav(&refine_pcm, 24000, 1).unwrap();
+        let refine_b64 = hex::encode(&refine_wav);
+
+        let refine_body = serde_json::json!({
+            "audio_base64": refine_b64,
+            "transcript": "An additional reference sample for neural embedding refinement."
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/voices/profiles/{profile_id}/refine"))
+            .header("content-type", "application/json")
+            .body(Body::from(refine_body.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let refined_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        // Version must increment after refinement.
+        assert!(refined_json["version"].as_u64().unwrap() >= 2);
+        assert!(refined_json["refined_at"].is_string());
+
+        // Step 5 — Delete profile.
+        let req = Request::builder()
+            .method("DELETE")
+            .uri(format!("/v1/voices/profiles/{profile_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        // Step 6 — Confirm profile is gone (404).
+        let req = Request::builder()
+            .uri(format!("/v1/voices/profiles/{profile_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// Integration test: POST /v1/audio/dub — multi-speaker script dubbing endpoint.
+    #[tokio::test]
+    async fn test_dub_script_endpoint() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        let dub_body = serde_json::json!({
+            "script": [
+                { "speaker": "mock-en-female", "text": "Welcome to the studio.", "speed": 1.0 },
+                { "speaker": "mock-en-male", "text": "Glad to be here.", "speed": 1.1 }
+            ],
+            "gap_ms": 200,
+            "response_format": "wav"
+        });
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/dub")
+            .header("content-type", "application/json")
+            .body(Body::from(dub_body.to_string()))
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(json["total_duration_seconds"].as_f64().unwrap() > 0.0);
+        assert_eq!(json["lines"].as_array().unwrap().len(), 2);
+        assert_eq!(json["sample_rate"], 24000);
+        let b64 = json["audio_base64"].as_str().unwrap();
+        assert!(!b64.is_empty());
+
+        // Empty script must return 400.
+        let bad_body = serde_json::json!({ "script": [] });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/dub")
+            .header("content-type", "application/json")
+            .body(Body::from(bad_body.to_string()))
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// Integration test: POST /v1/voices/assess payload size guard.
+    #[tokio::test]
+    async fn test_assess_reference_audio_size_guard() {
+        let state = setup_test_state(None).await;
+        let app = create_app(state);
+
+        // 35MB + 1 byte of base64 data should be rejected.
+        let huge = "A".repeat(35 * 1024 * 1024 + 1);
+        let body = serde_json::json!({ "audio_base64": huge });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/assess")
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        // This will be rejected by Axum's DefaultBodyLimit (32MB) before reaching the handler,
+        // so we accept either 413 (payload too large) or 400 (bad request from validation).
+        let res = app.oneshot(req).await.unwrap();
+        assert!(
+            res.status() == StatusCode::PAYLOAD_TOO_LARGE
+                || res.status() == StatusCode::BAD_REQUEST
+        );
+    }
 }
