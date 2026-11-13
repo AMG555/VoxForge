@@ -1,3 +1,8 @@
+// `chunks_exact_to_as_chunks` was added in Rust 1.99 clippy; older stable versions don't know
+// this lint. `unknown_lints` silences the "unknown lint" warning on older compilers so the lint
+// allow doesn't itself become a `-D warnings` failure.
+#![allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
+
 //! Model Context Protocol (MCP) server implementation for VoxForge.
 //!
 //! Exposes VoxForge speech synthesis, voice cloning, audio transcription, model

@@ -186,7 +186,6 @@ impl KokoroTtsEngine {
     }
 
     /// Decode WAV or RAW PCM payload into 16-bit PCM samples.
-    #[allow(clippy::chunks_exact_to_as_chunks)]
     fn parse_audio_response(&self, bytes: &[u8]) -> Result<Vec<i16>> {
         if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
             // Standard WAV format: find 'data' subchunk
