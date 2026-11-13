@@ -100,17 +100,15 @@ impl PronunciationLexicon {
         let mut active_rules: Vec<&PronunciationRule> = rules_guard
             .iter()
             .filter(|r| {
-                if !r.enabled {
-                    return false;
-                }
-                match (&r.language, lang) {
-                    (Some(rule_lang), Some(target_lang)) => {
-                        rule_lang.eq_ignore_ascii_case("all")
-                            || target_lang.starts_with(rule_lang.as_str())
+                r.enabled
+                    && match (&r.language, lang) {
+                        (Some(rule_lang), Some(target_lang)) => {
+                            rule_lang.eq_ignore_ascii_case("all")
+                                || target_lang.starts_with(rule_lang.as_str())
+                        }
+                        (Some(rule_lang), None) => rule_lang.eq_ignore_ascii_case("all"),
+                        (None, _) => true,
                     }
-                    (Some(rule_lang), None) => rule_lang.eq_ignore_ascii_case("all"),
-                    (None, _) => true,
-                }
             })
             .collect();
 

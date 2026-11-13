@@ -159,15 +159,8 @@ impl ModelCatalogStore {
         let map = self.items.read().await;
         map.values()
             .filter(|item| {
-                if let Some(t) = model_type {
-                    if item.model_type != t {
-                        return false;
-                    }
-                }
-                if installed_only && item.status != ModelStatus::Installed {
-                    return false;
-                }
-                true
+                model_type.is_none_or(|t| item.model_type == t)
+                    && (!installed_only || item.status == ModelStatus::Installed)
             })
             .cloned()
             .collect()
