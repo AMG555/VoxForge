@@ -159,12 +159,19 @@ pub struct ApplyPronunciationResponse {
     pub replacements_count: usize,
 }
 
+/// Maximum text size accepted by the apply-pronunciation endpoint.
+pub const MAX_APPLY_TEXT_CHARS: usize = 50_000;
+
 /// `POST /v1/pronunciation/apply` — apply runtime pronunciation dictionary replacements to text
 pub async fn apply_pronunciation(
     State(state): State<AppState>,
     Json(body): Json<ApplyPronunciationRequest>,
 ) -> Json<ApplyPronunciationResponse> {
-    let original = body.text;
+    let original = if body.text.len() > MAX_APPLY_TEXT_CHARS {
+        body.text[..MAX_APPLY_TEXT_CHARS].to_string()
+    } else {
+        body.text
+    };
     let entries = state.pronunciation.dictionary().list();
 
     let mut processed = original.clone();
