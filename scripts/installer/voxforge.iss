@@ -1,9 +1,9 @@
 ; VoxForge Inno Setup Installer Script
-; Produces: VoxForge-Setup-v0.2.0-windows-x64.exe
+; Produces: VoxForge-Setup-v0.3.0-windows-x64.exe
 ; Requires Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VoxForge"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "VoxForge Contributors"
 #define MyAppURL "https://github.com/AMG555/VoxForge"
 #define MyAppExeName "voxforge.exe"
@@ -23,7 +23,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\..\LICENSE-APACHE
 OutputDir=..\..\dist
-OutputBaseFilename=VoxForge-Setup-v{#MyAppVersion}-windows-x64
+OutputBaseFilename=VoxForge-Setup-v0.3.0-windows-x64
 SetupIconFile=..\..\assets\voxforge.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -48,7 +48,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1
 
 [Files]
-Source: "..\..\target\release\voxforge.exe"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
+; Binary is copied to dist/ by the packaging step before Inno Setup runs
+Source: "..\..\dist\voxforge.exe"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
 Source: "..\..\assets\voxforge.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
