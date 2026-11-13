@@ -2,7 +2,7 @@
 # Single container serves REST API, WebSocket streams, and embedded React UI.
 
 # 1. UI Build Stage
-FROM node:20-bullseye-slim AS ui-builder
+FROM node:24-bullseye-slim AS ui-builder
 WORKDIR /app/ui
 COPY ui/package*.json ./
 RUN npm ci --prefer-offline --no-audit
@@ -10,7 +10,7 @@ COPY ui/ ./
 RUN npm run build
 
 # 2. Rust Compile Stage
-FROM rust:1.80-bullseye AS rust-builder
+FROM rust:stable-bullseye AS rust-builder
 WORKDIR /usr/src/voxforge
 COPY Cargo.toml ./
 COPY crates ./crates
