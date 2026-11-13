@@ -41,12 +41,25 @@ pub struct RefineTextResponse {
     pub hallucination_loops_removed: usize,
 }
 
+/// Maximum text size accepted by the refine endpoint (same as speech endpoint: 50 KB).
+pub const MAX_REFINE_TEXT_CHARS: usize = 50_000;
+
 /// Refine dictated or transcribed text by stripping verbal fillers ("um", "uh"),
 /// filtering repetitive hallucination loops, and formatting punctuation.
 pub async fn refine_text(
     State(_state): State<AppState>,
     Json(payload): Json<RefineTextRequest>,
 ) -> Result<Json<RefineTextResponse>, (StatusCode, String)> {
+    if payload.text.len() > MAX_REFINE_TEXT_CHARS {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!(
+                "Input text exceeds the {} character limit",
+                MAX_REFINE_TEXT_CHARS
+            ),
+        ));
+    }
+
     let mut refined = payload.text.clone();
     let mut fillers_count = 0;
     let mut loop_count = 0;

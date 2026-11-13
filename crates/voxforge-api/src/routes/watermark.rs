@@ -30,11 +30,30 @@ pub struct VerifyWatermarkRequest {
     pub audio_base64: String,
 }
 
+/// Maximum base64-encoded audio payload size accepted by watermark endpoints (~24 MB decoded).
+pub const MAX_WATERMARK_PAYLOAD_CHARS: usize = 32 * 1024 * 1024;
+
 /// `POST /v1/audio/watermark` — embed invisible spread-spectrum watermark
 pub async fn embed_watermark_handler(
     State(_state): State<AppState>,
     Json(body): Json<EmbedWatermarkRequest>,
 ) -> Result<Json<EmbedWatermarkResponse>, (StatusCode, Json<ProblemDetails>)> {
+    if body.audio_base64.len() > MAX_WATERMARK_PAYLOAD_CHARS {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Audio Payload Too Large".to_string(),
+                status: StatusCode::PAYLOAD_TOO_LARGE.as_u16(),
+                detail: format!(
+                    "The 'audio_base64' payload exceeds the 32 MB limit (was {} bytes)",
+                    body.audio_base64.len()
+                ),
+                instance: "/v1/audio/watermark".to_string(),
+            }),
+        ));
+    }
+
     let wav_bytes = match hex_or_base64_decode(&body.audio_base64) {
         Ok(b) => b,
         Err(e) => {
@@ -106,6 +125,22 @@ pub async fn verify_watermark_handler(
     State(_state): State<AppState>,
     Json(body): Json<VerifyWatermarkRequest>,
 ) -> Result<Json<WatermarkDetectionResult>, (StatusCode, Json<ProblemDetails>)> {
+    if body.audio_base64.len() > MAX_WATERMARK_PAYLOAD_CHARS {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Audio Payload Too Large".to_string(),
+                status: StatusCode::PAYLOAD_TOO_LARGE.as_u16(),
+                detail: format!(
+                    "The 'audio_base64' payload exceeds the 32 MB limit (was {} bytes)",
+                    body.audio_base64.len()
+                ),
+                instance: "/v1/audio/verify-watermark".to_string(),
+            }),
+        ));
+    }
+
     let wav_bytes = match hex_or_base64_decode(&body.audio_base64) {
         Ok(b) => b,
         Err(e) => {
