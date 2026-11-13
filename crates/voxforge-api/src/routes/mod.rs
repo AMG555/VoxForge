@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod cloning;
 pub mod conversion;
 pub mod docs;
+pub mod dub;
 pub mod embedded_ui;
 pub mod health;
 pub mod jobs;
@@ -140,6 +141,8 @@ pub fn build_api_router() -> Router<AppState> {
         )
         // Verbal Filler & Hallucination Refinement Engine
         .route("/v1/audio/refine", post(refine::refine_text))
+        // Multi-speaker script dubbing (VoiceStudio parity)
+        .route("/v1/audio/dub", post(dub::dub_script))
         // Speech-to-Speech (Neural Voice Conversion)
         .route(
             "/v1/audio/speech-to-speech",

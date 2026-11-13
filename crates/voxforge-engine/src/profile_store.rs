@@ -134,6 +134,9 @@ impl VoiceProfileStore {
     }
 
     /// Insert or update a voice profile in memory and persist atomically to disk if directory is configured.
+    ///
+    /// Disk write uses write-to-temp + rename for crash safety: a partial write can never
+    /// leave a corrupt `.json` file in place because `rename` is atomic on all major OS/FS.
     pub async fn insert(&self, profile: VoiceProfile) {
         let id = profile.id.clone();
         {
@@ -146,7 +149,13 @@ impl VoiceProfileStore {
                 let _ = std::fs::create_dir_all(dir);
                 let file_path = dir.join(format!("{}.json", safe_id));
                 if let Ok(json_str) = serde_json::to_string_pretty(&profile) {
-                    let _ = std::fs::write(&file_path, json_str);
+                    // Atomic write: write to a temp file next to the target, then rename.
+                    // On POSIX this is guaranteed atomic; on Windows it is effectively atomic
+                    // because the rename replaces the destination file atomically in NTFS.
+                    let tmp_path = dir.join(format!(".{}.json.tmp", safe_id));
+                    if std::fs::write(&tmp_path, &json_str).is_ok() {
+                        let _ = std::fs::rename(&tmp_path, &file_path);
+                    }
                 }
             }
         }
