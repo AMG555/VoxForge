@@ -845,14 +845,35 @@ impl PipelineExecutor {
                         .get("background_audio_path")
                         .and_then(|p| p.as_str())
                     {
-                        if let Ok(bytes) = std::fs::read(bg_path) {
-                            if bytes.starts_with(b"RIFF") {
-                                if let Ok((pcm, _sr, _ch)) =
-                                    voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                                {
-                                    ctx.background_audio_pcm = pcm;
+                        // Block path traversal: reject any path containing ".." components,
+                        // null bytes, UNC prefixes, or non-.wav extensions.
+                        let is_safe = !bg_path.contains('\0')
+                            && !bg_path.starts_with(r"\\")
+                            && !bg_path.starts_with("//")
+                            && std::path::Path::new(bg_path)
+                                .components()
+                                .all(|c| c != std::path::Component::ParentDir)
+                            && std::path::Path::new(bg_path)
+                                .extension()
+                                .and_then(|e| e.to_str())
+                                .map(|e| matches!(e.to_lowercase().as_str(), "wav" | "wave"))
+                                .unwrap_or(false);
+
+                        if is_safe {
+                            if let Ok(bytes) = std::fs::read(bg_path) {
+                                if bytes.starts_with(b"RIFF") {
+                                    if let Ok((pcm, _sr, _ch)) =
+                                        voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
+                                    {
+                                        ctx.background_audio_pcm = pcm;
+                                    }
                                 }
                             }
+                        } else {
+                            tracing::warn!(
+                                path = %bg_path,
+                                "AudioMux: background_audio_path rejected (path traversal or non-wav)"
+                            );
                         }
                     }
                 }
