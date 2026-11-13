@@ -162,8 +162,12 @@ impl TtsEngine for MockTtsEngine {
             reference_transcript: request.reference_transcript.clone(),
             embedding: Some(vec![0.5f32; 512]),
             clone_capabilities: Some(vec!["synthetic".to_string()]),
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
             metadata: request.metadata.clone(),
             created_at: chrono::Utc::now(),
+            refined_at: None,
         })
     }
 

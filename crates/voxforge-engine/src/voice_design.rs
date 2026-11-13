@@ -292,6 +292,187 @@ impl ArchetypeBank {
                 Gender::Female,
                 120,
             ),
+            // ── Extended archetypes (seeds 121–140) ──────────────────────────────
+            (
+                "tech_guide",
+                &[
+                    "technical", "tutorial", "guide", "explainer", "instructional",
+                    "elearning", "helpful",
+                ],
+                Gender::Neutral,
+                121,
+            ),
+            (
+                "confident_coach",
+                &[
+                    "motivational", "coach", "sport", "fitness", "confidence",
+                    "push", "inspiring",
+                ],
+                Gender::Male,
+                122,
+            ),
+            (
+                "soft_luxury",
+                &[
+                    "luxury", "premium", "velour", "aspirational", "lavish",
+                    "exclusive", "refined",
+                ],
+                Gender::Female,
+                123,
+            ),
+            (
+                "news_anchor_female",
+                &[
+                    "news", "anchor", "female_broadcast", "journalist_female",
+                    "reporter", "on_air",
+                ],
+                Gender::Female,
+                124,
+            ),
+            (
+                "laid_back_podcaster",
+                &[
+                    "casual", "laid_back", "conversational", "relaxed", "interview",
+                    "friendly_host",
+                ],
+                Gender::Male,
+                125,
+            ),
+            (
+                "documentary_narrator",
+                &[
+                    "documentary", "nature", "wildlife", "science", "serious_narrator",
+                    "gravitas",
+                ],
+                Gender::Male,
+                126,
+            ),
+            (
+                "empathetic_counselor",
+                &[
+                    "empathetic", "caring", "support", "therapist", "counselor",
+                    "compassionate", "warm_female",
+                ],
+                Gender::Female,
+                127,
+            ),
+            (
+                "sharp_debate",
+                &[
+                    "debate", "sharp", "crisp", "argument", "precise",
+                    "assertive", "persuasive",
+                ],
+                Gender::Neutral,
+                128,
+            ),
+            (
+                "sci_fi_assistant",
+                &[
+                    "futuristic", "sci_fi", "space", "electronic", "digital_voice",
+                    "cool", "neutral_ai",
+                ],
+                Gender::Neutral,
+                129,
+            ),
+            (
+                "warm_southern_male",
+                &[
+                    "southern", "drawl", "folksy", "country", "rustic",
+                    "homespun", "warm_rural",
+                ],
+                Gender::Male,
+                130,
+            ),
+            (
+                "intense_villain",
+                &[
+                    "villain", "menacing", "dark", "ominous", "foreboding",
+                    "sinister", "theatrical",
+                ],
+                Gender::Male,
+                131,
+            ),
+            (
+                "bubbly_influencer",
+                &[
+                    "influencer", "social", "selfie", "upbeat_girl", "vlog",
+                    "trendy", "gen_z",
+                ],
+                Gender::Female,
+                132,
+            ),
+            (
+                "calm_mindfulness",
+                &[
+                    "mindfulness", "breathing", "guided_meditation", "sleep",
+                    "gentle_whisper", "bedtime",
+                ],
+                Gender::Neutral,
+                133,
+            ),
+            (
+                "gruff_veteran",
+                &[
+                    "military", "veteran", "gruff", "battle_worn", "sergeant",
+                    "no_nonsense", "authoritative_male",
+                ],
+                Gender::Male,
+                134,
+            ),
+            (
+                "polished_legal",
+                &[
+                    "legal", "attorney", "formal_male", "precise", "court",
+                    "barrister", "measured",
+                ],
+                Gender::Male,
+                135,
+            ),
+            (
+                "asmr_whisper",
+                &[
+                    "asmr", "tingles", "soft_spoken", "whispered", "relaxation",
+                    "headphone", "slow",
+                ],
+                Gender::Female,
+                136,
+            ),
+            (
+                "gritty_comedian",
+                &[
+                    "comedian", "sardonic", "sarcastic", "comedy", "dry_humor",
+                    "standup", "witty",
+                ],
+                Gender::Male,
+                137,
+            ),
+            (
+                "regal_classical",
+                &[
+                    "regal", "classical", "opera", "theatrical_female",
+                    "stage", "aria", "declamatory",
+                ],
+                Gender::Female,
+                138,
+            ),
+            (
+                "hype_sports_commentator",
+                &[
+                    "sports", "commentator", "stadium", "goal", "exciting",
+                    "broadcast_sports", "fast_paced",
+                ],
+                Gender::Male,
+                139,
+            ),
+            (
+                "gentle_child_narrator",
+                &[
+                    "children", "bedtime_story", "kind", "nurturing",
+                    "simple", "bright", "storybook",
+                ],
+                Gender::Female,
+                140,
+            ),
         ];
 
         for (name, keywords, gender, seed) in definitions {
@@ -498,8 +679,12 @@ impl ArchetypeBank {
                 "cross-lingual".to_string(),
                 "director-prosody".to_string(),
             ]),
+            similarity_score: None,
+            sample_count: 0,
+            version: 1,
             metadata,
             created_at: Utc::now(),
+            refined_at: None,
         }
     }
 }
@@ -511,7 +696,7 @@ mod tests {
     #[test]
     fn test_archetype_bank_initialization() {
         let bank = ArchetypeBank::new();
-        assert_eq!(bank.archetypes.len(), 20);
+        assert_eq!(bank.archetypes.len(), 40);
 
         // Verify all anchor vectors are normalized to unit sphere
         for arc in &bank.archetypes {

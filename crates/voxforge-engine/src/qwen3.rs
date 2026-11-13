@@ -685,7 +685,79 @@ impl TtsEngine for Qwen3TtsEngine {
             (Vec::new(), None)
         };
 
-        let embedding = Self::extract_speaker_embedding(&pcm);
+        // Primary embedding from the first reference sample
+        let primary_embedding = Self::extract_speaker_embedding(&pcm);
+
+        // Multi-sample aggregation: compute per-sample embeddings and average them.
+        // Clips the additional sample list to 7 max to prevent excessive processing.
+        let mut all_embeddings: Vec<Vec<f32>> = vec![primary_embedding.clone()];
+        let extra_limit = request.additional_reference_audio_base64.len().min(7);
+        for extra_b64 in &request.additional_reference_audio_base64[..extra_limit] {
+            let extra_bytes = decode_audio_payload(extra_b64);
+            let extra_samples: Vec<i16> = if extra_bytes.starts_with(b"RIFF") {
+                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&extra_bytes)
+                    .map(|(s, _, _)| s)
+                    .unwrap_or_default()
+            } else {
+                extra_bytes
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                    .collect()
+            };
+            if extra_samples.len() >= 2400 {
+                all_embeddings.push(Self::extract_speaker_embedding(&extra_samples));
+            }
+        }
+
+        // Centroid aggregation: element-wise mean across all sample embeddings, then L2-normalize.
+        let embedding = if all_embeddings.len() == 1 {
+            primary_embedding.clone()
+        } else {
+            let n = all_embeddings.len() as f32;
+            let mut centroid = vec![0.0f32; 512];
+            for emb in &all_embeddings {
+                for (slot, &val) in centroid.iter_mut().zip(emb.iter()) {
+                    *slot += val;
+                }
+            }
+            for slot in &mut centroid {
+                *slot /= n;
+            }
+            // Re-normalize centroid to unit sphere
+            let l2: f32 = centroid.iter().map(|&x| x * x).sum::<f32>().sqrt();
+            if l2 > 1e-6 {
+                for slot in &mut centroid {
+                    *slot /= l2;
+                }
+            }
+            centroid
+        };
+
+        // Intra-sample cosine similarity: measures how consistent the reference samples are.
+        // A score near 1.0 means all samples sound like the same person (high-quality clone).
+        let similarity_score = if all_embeddings.len() > 1 {
+            let mut total_sim = 0.0f32;
+            let mut pair_count = 0u32;
+            for i in 0..all_embeddings.len() {
+                for j in (i + 1)..all_embeddings.len() {
+                    total_sim +=
+                        Self::compute_cosine_similarity(&all_embeddings[i], &all_embeddings[j]);
+                    pair_count += 1;
+                }
+            }
+            if pair_count > 0 {
+                Some((total_sim / pair_count as f32).clamp(0.0, 1.0))
+            } else {
+                None
+            }
+        } else {
+            // Single sample: self-similarity is trivially 1.0; omit to avoid misleading the user.
+            None
+        };
+
+        let sample_count = all_embeddings.len() as u32;
 
         self.clone_count.fetch_add(1, Ordering::SeqCst);
         let profile_id = format!("qwen3-cloned-{}", Uuid::new_v4());
@@ -735,6 +807,27 @@ impl TtsEngine for Qwen3TtsEngine {
         }
         metadata.extend(request.metadata.clone());
 
+        // Record aggregation quality in metadata for observability
+        metadata.insert(
+            "sample_count".to_string(),
+            format!("{}", sample_count),
+        );
+        if let Some(sim) = similarity_score {
+            metadata.insert(
+                "intra_sample_similarity".to_string(),
+                format!("{:.4}", sim),
+            );
+        }
+
+        let mut clone_capabilities = vec![
+            "zero-shot".to_string(),
+            "cross-lingual".to_string(),
+            "prosody-transfer".to_string(),
+        ];
+        if sample_count > 1 {
+            clone_capabilities.push("multi-sample-aggregated".to_string());
+        }
+
         let profile = VoiceProfile {
             id: profile_id.clone(),
             name: request.name.clone(),
@@ -746,13 +839,13 @@ impl TtsEngine for Qwen3TtsEngine {
             reference_audio_base64: request.reference_audio_base64.clone(),
             reference_transcript: request.reference_transcript.clone(),
             embedding: Some(embedding),
-            clone_capabilities: Some(vec![
-                "zero-shot".to_string(),
-                "cross-lingual".to_string(),
-                "prosody-transfer".to_string(),
-            ]),
+            clone_capabilities: Some(clone_capabilities),
+            similarity_score,
+            sample_count,
+            version: 1,
             metadata,
             created_at: Utc::now(),
+            refined_at: None,
         };
 
         self.cloned_profiles
@@ -771,6 +864,106 @@ impl TtsEngine for Qwen3TtsEngine {
         }
 
         Ok(profile)
+    }
+
+    async fn refine_voice_embedding(
+        &self,
+        profile: &VoiceProfile,
+        new_reference_audio_base64: &str,
+    ) -> Result<VoiceProfile> {
+        if new_reference_audio_base64.is_empty() {
+            return Err(VoxForgeError::Config(
+                "refine_voice_embedding requires non-empty new_reference_audio_base64".to_string(),
+            ));
+        }
+
+        let existing_embedding = profile.embedding.as_deref().ok_or_else(|| {
+            VoxForgeError::Config("Profile has no existing embedding to refine".to_string())
+        })?;
+
+        // Decode and extract embedding from the new sample
+        let bytes = decode_audio_payload(new_reference_audio_base64);
+        let new_samples: Vec<i16> = if bytes.starts_with(b"RIFF") {
+            voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
+                .map(|(s, _, _)| s)
+                .unwrap_or_default()
+        } else {
+            bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                .collect()
+        };
+
+        if new_samples.len() < 2400 {
+            return Err(VoxForgeError::Config(
+                "New reference audio is too short; minimum 100ms (2400 samples at 24kHz) required"
+                    .to_string(),
+            ));
+        }
+
+        let new_embedding = Self::extract_speaker_embedding(&new_samples);
+
+        // Weighted averaging: weight = sample_count / (sample_count + 1).
+        // This gives more weight to the existing (potentially aggregated) embedding,
+        // letting each new sample contribute a diminishing but meaningful update.
+        let existing_count = profile.sample_count.max(1) as f32;
+        let weight_old = existing_count / (existing_count + 1.0);
+        let weight_new = 1.0 / (existing_count + 1.0);
+
+        let mut refined = vec![0.0f32; 512];
+        for (slot, (&old, &new)) in refined
+            .iter_mut()
+            .zip(existing_embedding.iter().zip(new_embedding.iter()))
+        {
+            *slot = weight_old * old + weight_new * new;
+        }
+
+        // Re-normalize to unit sphere
+        let l2: f32 = refined.iter().map(|&x| x * x).sum::<f32>().sqrt();
+        if l2 > 1e-6 {
+            for slot in &mut refined {
+                *slot /= l2;
+            }
+        }
+
+        // Cross-version similarity: how much did the embedding shift?
+        let refinement_similarity =
+            Self::compute_cosine_similarity(existing_embedding, &refined);
+
+        let mut updated = profile.clone();
+        updated.embedding = Some(refined);
+        updated.version = profile.version.saturating_add(1);
+        updated.sample_count = profile.sample_count.saturating_add(1);
+        updated.refined_at = Some(Utc::now());
+        updated.similarity_score = Some(refinement_similarity.clamp(0.0, 1.0));
+        updated
+            .metadata
+            .insert("refinement_similarity".to_string(), format!("{:.4}", refinement_similarity));
+        updated.metadata.insert(
+            "sample_count".to_string(),
+            format!("{}", updated.sample_count),
+        );
+        updated.metadata.insert("version".to_string(), format!("{}", updated.version));
+
+        // Persist updated profile to disk
+        let profiles_dir = std::env::var("VOXFORGE_PROFILES_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::path::PathBuf::from("data/voice_profiles"));
+        let _ = std::fs::create_dir_all(&profiles_dir);
+        let file_path = profiles_dir.join(format!("{}.json", updated.id));
+        if let Ok(json_str) = serde_json::to_string_pretty(&updated) {
+            let _ = std::fs::write(file_path, json_str);
+        }
+
+        // Update in-memory store
+        self.cloned_profiles
+            .write()
+            .await
+            .insert(updated.id.clone(), updated.clone());
+
+        Ok(updated)
     }
 
     #[allow(clippy::chunks_exact_to_as_chunks)]
@@ -1163,6 +1356,62 @@ impl TtsEngine for Qwen3TtsEngine {
             chunk.pcm_data = breath;
         }
 
+        // 14. Paralinguistic event injection from text markup.
+        // Parses [laugh], [sigh], [gasp], [cough], [pause:Xms] tags in the input text
+        // and inserts synthesized acoustic events at the correct positions.
+        // This runs after all realism processing so event audio matches the cloned voice's sample rate.
+        if voxforge_audio::has_paralinguistic_tags(&request.text) {
+            let sr = chunk.sample_rate;
+            let segments = voxforge_audio::parse_paralinguistic_text(&request.text);
+
+            // Count the non-tag text segments to estimate proportional placement
+            let text_parts: Vec<&str> = segments
+                .iter()
+                .filter_map(|s| {
+                    if let voxforge_audio::ParalinguisticSegment::Text(t) = s {
+                        Some(t.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let total_text_chars: usize = text_parts.iter().map(|t| t.len()).sum::<usize>().max(1);
+
+            // Rebuild PCM with emotion events spliced in at proportional positions
+            let mut assembled: Vec<i16> = Vec::with_capacity(chunk.pcm_data.len() + sr as usize);
+            let mut text_chars_seen = 0usize;
+
+            for segment in &segments {
+                match segment {
+                    voxforge_audio::ParalinguisticSegment::Text(text) => {
+                        // Slice the proportional chunk of speech audio for this text segment
+                        let char_fraction = text.len() as f32 / total_text_chars as f32;
+                        let sample_count =
+                            (chunk.pcm_data.len() as f32 * char_fraction).round() as usize;
+                        let start = (chunk.pcm_data.len() as f32
+                            * (text_chars_seen as f32 / total_text_chars as f32))
+                            .round() as usize;
+                        let end = (start + sample_count).min(chunk.pcm_data.len());
+                        assembled.extend_from_slice(&chunk.pcm_data[start..end]);
+                        text_chars_seen += text.len();
+                    }
+                    voxforge_audio::ParalinguisticSegment::Emotion(tag) => {
+                        let mut event =
+                            voxforge_audio::ParalinguisticSynthesizer::synthesize_event(*tag, sr);
+                        // Apply soft envelope to the event so it blends cleanly
+                        voxforge_audio::SoftEnvelope::process(&mut event, sr, 4.0, 8.0);
+                        assembled.extend_from_slice(&event);
+                    }
+                }
+            }
+
+            // Only replace if assembly produced a plausible result
+            if assembled.len() >= chunk.pcm_data.len() / 2 {
+                voxforge_audio::BrickwallLimiter::process(&mut assembled, -0.5);
+                chunk.pcm_data = assembled;
+            }
+        }
+
         Ok(chunk)
     }
 }
@@ -1338,6 +1587,7 @@ mod tests {
             reference_audio_base64: Some(b64),
             reference_audio_path: None,
             reference_transcript: Some("Sample speaker reference sentence.".to_string()),
+            additional_reference_audio_base64: vec![],
             language: "en-US".to_string(),
             description: Some("Custom cloned speaker".to_string()),
             gender: Some(Gender::Female),
@@ -1559,6 +1809,7 @@ mod tests {
             reference_audio_base64: None,
             reference_audio_path: Some(wav_path.to_str().unwrap().to_string()),
             reference_transcript: Some("Testing path cloning.".to_string()),
+            additional_reference_audio_base64: vec![],
             language: "en-US".to_string(),
             description: Some("Speaker cloned from local WAV path".to_string()),
             gender: Some(Gender::Male),
@@ -1575,5 +1826,107 @@ mod tests {
         assert!(profile.metadata.contains_key("f0_mean_hz"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_clone_voice_multi_sample_aggregation() {
+        let engine = Qwen3TtsEngine::default();
+
+        // Build two distinct synthetic PCM blobs
+        let make_pcm_b64 = |seed: i16| -> String {
+            let pcm: Vec<i16> = (0..4800)
+                .map(|i| ((i % 100 + seed as usize) * 100 % 32000) as i16)
+                .collect();
+            let bytes: Vec<u8> = pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
+            hex::encode(bytes)
+        };
+
+        let primary = make_pcm_b64(1);
+        let extra = make_pcm_b64(50);
+
+        let req = CloneVoiceRequest {
+            name: "Multi-Sample Speaker".to_string(),
+            engine_id: "qwen3-tts".to_string(),
+            reference_audio_base64: Some(primary),
+            reference_audio_path: None,
+            reference_transcript: None,
+            additional_reference_audio_base64: vec![extra],
+            language: "en-US".to_string(),
+            description: None,
+            gender: None,
+            metadata: HashMap::new(),
+        };
+
+        let profile = engine.clone_voice(&req).await.expect("Multi-sample clone must succeed");
+        assert_eq!(profile.sample_count, 2);
+        assert_eq!(profile.version, 1);
+        assert!(profile.clone_capabilities.as_deref().unwrap_or_default()
+            .contains(&"multi-sample-aggregated".to_string()));
+        // similarity_score is set when more than 1 sample is provided
+        assert!(profile.similarity_score.is_some());
+        let sim = profile.similarity_score.unwrap();
+        assert!(sim >= 0.0 && sim <= 1.0, "Similarity must be in [0,1]");
+
+        let emb = profile.embedding.as_ref().unwrap();
+        assert_eq!(emb.len(), 512);
+        // Centroid must be unit-normalized
+        let l2: f32 = emb.iter().map(|&x| x * x).sum::<f32>().sqrt();
+        assert!((l2 - 1.0).abs() < 1e-3, "Centroid embedding must be unit-normalized");
+    }
+
+    #[tokio::test]
+    async fn test_refine_voice_embedding() {
+        let engine = Qwen3TtsEngine::default();
+
+        let make_pcm_b64 = |seed: i16| -> String {
+            let pcm: Vec<i16> = (0..4800)
+                .map(|i| ((i % 120 + seed as usize) * 90 % 32000) as i16)
+                .collect();
+            let bytes: Vec<u8> = pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
+            hex::encode(bytes)
+        };
+
+        // Create initial profile
+        let req = CloneVoiceRequest {
+            name: "Refineable Speaker".to_string(),
+            engine_id: "qwen3-tts".to_string(),
+            reference_audio_base64: Some(make_pcm_b64(10)),
+            reference_audio_path: None,
+            reference_transcript: None,
+            additional_reference_audio_base64: vec![],
+            language: "en-US".to_string(),
+            description: None,
+            gender: None,
+            metadata: HashMap::new(),
+        };
+
+        let profile_v1 = engine.clone_voice(&req).await.expect("Initial clone must succeed");
+        assert_eq!(profile_v1.version, 1);
+        assert_eq!(profile_v1.sample_count, 1);
+        assert!(profile_v1.refined_at.is_none());
+
+        // Refine with a second sample
+        let profile_v2 = engine
+            .refine_voice_embedding(&profile_v1, &make_pcm_b64(75))
+            .await
+            .expect("Refinement must succeed");
+
+        assert_eq!(profile_v2.version, 2);
+        assert_eq!(profile_v2.sample_count, 2);
+        assert!(profile_v2.refined_at.is_some());
+        assert!(profile_v2.similarity_score.is_some());
+        let sim = profile_v2.similarity_score.unwrap();
+        assert!(sim >= 0.0 && sim <= 1.0);
+
+        // Embedding must still be unit-normalized
+        let emb = profile_v2.embedding.as_ref().unwrap();
+        let l2: f32 = emb.iter().map(|&x| x * x).sum::<f32>().sqrt();
+        assert!((l2 - 1.0).abs() < 1e-3, "Refined embedding must be unit-normalized");
+
+        // Verify refinement rejects empty audio
+        let err = engine
+            .refine_voice_embedding(&profile_v2, "")
+            .await;
+        assert!(err.is_err());
     }
 }

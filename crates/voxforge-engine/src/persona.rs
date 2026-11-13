@@ -99,8 +99,12 @@ mod tests {
             reference_transcript: None,
             embedding: Some(vec![0.1; 512]),
             clone_capabilities: None,
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
             metadata: HashMap::new(),
             created_at: chrono::Utc::now(),
+            refined_at: None,
         };
 
         let bundle = PersonaBundle::from_profile(profile.clone());
@@ -132,8 +136,12 @@ mod tests {
             reference_transcript: None,
             embedding: Some(vec![0.2; 512]),
             clone_capabilities: None,
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
             metadata,
             created_at: chrono::Utc::now(),
+            refined_at: None,
         };
 
         let bundle = PersonaBundle::from_profile(profile);
