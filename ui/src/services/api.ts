@@ -5,6 +5,7 @@ import {
   CloneVoicePayload,
   HardwareInfo,
   PipelineDefinition,
+  RefineVoicePayload,
   Voice,
 } from '../types';
 
@@ -185,6 +186,19 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Voice cloning failed' }));
       throw new Error(err.detail || 'Voice cloning failed');
+    }
+    return res.json();
+  },
+
+  async refineVoice(profileId: string, payload: RefineVoicePayload): Promise<Voice> {
+    const res = await fetch(`${BASE_URL}/v1/voices/profiles/${encodeURIComponent(profileId)}/refine`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Voice refinement failed' }));
+      throw new Error(err.detail || 'Voice refinement failed');
     }
     return res.json();
   },

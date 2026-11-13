@@ -61,6 +61,11 @@ export interface Voice {
   sample_rate_hz: number;
   tags: string[];
   description?: string;
+  // Voice cloning quality and versioning fields
+  similarity_score?: number;
+  version?: number;
+  sample_count?: number;
+  refined_at?: string;
 }
 
 export interface HardwareInfo {
@@ -150,9 +155,15 @@ export interface CloneVoicePayload {
   engine_id?: string;
   reference_audio_base64?: string;
   reference_transcript?: string;
+  additional_reference_audio_base64?: string[];
   language?: string;
   gender?: 'male' | 'female' | 'neutral';
   description?: string;
+}
+
+export interface RefineVoicePayload {
+  audio_base64: string;
+  transcript?: string;
 }
 
 export interface DirectorTaxonomy {
