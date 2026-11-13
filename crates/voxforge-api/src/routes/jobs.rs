@@ -38,10 +38,28 @@ pub struct ResumeJobResponse {
     pub is_finished: bool,
 }
 
+/// Sanitize a job_id to a safe filesystem segment.
+///
+/// Uses an allowlist (alphanumeric + `-` + `_`) instead of a denylist so that
+/// no variant of path traversal (`../`, `..%2F`, `....//`) can slip through.
+/// Returns `"unknown"` for empty or entirely non-safe IDs.
+fn sanitize_job_id(id: &str) -> String {
+    let safe: String = id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .take(64) // cap length
+        .collect();
+    if safe.is_empty() || safe == "." || safe == ".." {
+        "unknown".to_string()
+    } else {
+        safe
+    }
+}
+
 fn get_work_dir(job_id: &str) -> PathBuf {
     std::env::temp_dir()
         .join("voxforge_jobs")
-        .join(job_id.replace("..", "").replace("/", "").replace("\\", ""))
+        .join(sanitize_job_id(job_id))
 }
 
 /// `GET /v1/jobs/checkpoints` — list recent job checkpoints
@@ -139,10 +157,29 @@ mod tests {
 
     #[test]
     fn test_get_work_dir_sanitizes_path_traversal() {
+        // Classic traversal
         let dir = get_work_dir("../../../etc/passwd");
-        let dir_str = dir.to_str().unwrap();
-        assert!(!dir_str.contains(".."));
-        assert!(dir_str.ends_with("etcpasswd"));
+        let dir_str = dir.to_str().unwrap_or("");
+        assert!(!dir_str.contains(".."), "must not contain ..");
+        assert!(!dir_str.contains("/etc"), "must not reach /etc");
+        // All special chars become '_' or are dropped
+        assert!(dir_str.ends_with("______etc_passwd"));
+
+        // Dot-dot variant that the old .replace("..","") would not catch
+        let dir2 = get_work_dir(".../...");
+        let d2 = dir2.to_str().unwrap_or("");
+        assert!(!d2.contains(".."), "triple-dot variant must be neutralized");
+
+        // Null byte
+        let dir3 = get_work_dir("valid\x00evil");
+        let d3 = dir3.to_str().unwrap_or("");
+        assert!(!d3.contains('\x00'));
+
+        // Length cap
+        let long_id = "a".repeat(200);
+        let dir4 = get_work_dir(&long_id);
+        let last_seg = dir4.file_name().unwrap().to_str().unwrap();
+        assert!(last_seg.len() <= 64);
     }
 
     #[test]
