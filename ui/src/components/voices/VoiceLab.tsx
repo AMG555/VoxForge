@@ -563,6 +563,13 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [isCloning, setIsCloning] = useState<boolean>(false);
   const [audioQuality, setAudioQuality] = useState<AudioQualityAssessment | null>(null);
   const [isAutoTranscribing, setIsAutoTranscribing] = useState<boolean>(false);
+  // Multi-sample additional reference audio for enhanced embedding accuracy
+  const [additionalSamples, setAdditionalSamples] = useState<{ name: string; base64: string }[]>([]);
+  const additionalSampleInputRef = useRef<HTMLInputElement | null>(null);
+  // Refine voice state
+  const [isRefining, setIsRefining] = useState<boolean>(false);
+  const [refineStatus, setRefineStatus] = useState<string | null>(null);
+  const refineFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Microphone recording state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -1103,13 +1110,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         }
       }
 
-      let res: { id?: string } = {};
+      let res: { id?: string; similarity_score?: number; version?: number; sample_count?: number } = {};
       try {
         res = await api.cloneVoice({
           name: cloneName,
           engine_id: 'qwen3-tts',
           reference_audio_base64: cloneAudioBase64,
           reference_transcript: cloneTranscript || undefined,
+          additional_reference_audio_base64: additionalSamples.length > 0
+            ? additionalSamples.map((s) => s.base64)
+            : undefined,
           gender: cloneGender,
           language: resolvedLang,
         });
@@ -1125,7 +1135,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         gender: cloneGender,
         sample_rate_hz: 24000,
         tags: ['cloned', 'zero-shot', 'cross-lingual'],
-        description: `Zero-shot voice profile generated from reference sample (${resolvedLang})`,
+        description: `Zero-shot voice profile generated from ${additionalSamples.length > 0 ? `${1 + additionalSamples.length} reference samples` : 'reference sample'} (${resolvedLang})`,
+        similarity_score: res.similarity_score,
+        version: res.version,
+        sample_count: res.sample_count,
       };
       setLocalVoices((prev) => [newVoice, ...prev.filter((v) => v.id !== newVoice.id)]);
       onVoiceCreated?.(newVoice);
@@ -1137,11 +1150,42 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       setCloneAudioBase64('');
       setCloneFileName('');
       setCloneLanguage('AUTO');
+      setAdditionalSamples([]);
       resetRecording();
     } catch (err: any) {
       console.error('Cloning error:', err);
     } finally {
       setIsCloning(false);
+    }
+  };
+
+  const handleRefineVoice = async (file?: File) => {
+    if (!file || !selectedVoice || !isCustomVoice(selectedVoice)) return;
+    setIsRefining(true);
+    setRefineStatus(null);
+    try {
+      const result = await AudioProcessor.preprocessForCloning(file);
+      const refined = await api.refineVoice(selectedVoice.id, {
+        audio_base64: result.wavBase64,
+      });
+      const updatedVoice: Voice = {
+        ...selectedVoice,
+        similarity_score: (refined as any).similarity_score,
+        version: (refined as any).version,
+        sample_count: (refined as any).sample_count,
+        refined_at: (refined as any).refined_at,
+      };
+      setLocalVoices((prev) => prev.map((v) => (v.id === updatedVoice.id ? updatedVoice : v)));
+      onVoiceCreated?.(updatedVoice);
+      setRefineStatus(`Profile refined to v${(refined as any).version ?? 2} with ${(refined as any).sample_count ?? 2} samples.`);
+      setTimeout(() => setRefineStatus(null), 5000);
+    } catch (err: any) {
+      console.warn('Voice refinement offline or unsupported:', err);
+      setRefineStatus('Refinement not available (backend offline).');
+      setTimeout(() => setRefineStatus(null), 4000);
+    } finally {
+      setIsRefining(false);
+      if (refineFileInputRef.current) refineFileInputRef.current.value = '';
     }
   };
 
@@ -1378,6 +1422,33 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 <span>{voice.sample_rate_hz} Hz</span>
                 {getEngineBadge(voice.engine_id)}
               </div>
+              {/* Similarity score + version chips for cloned voices */}
+              {isCustomVoice(voice) && (voice.similarity_score !== undefined || voice.version !== undefined) && (
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {voice.similarity_score !== undefined && (
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded border flex items-center space-x-1 ${
+                        voice.similarity_score >= 0.85
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : voice.similarity_score >= 0.70
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}
+                      title={`Speaker identity similarity score: ${(voice.similarity_score * 100).toFixed(1)}%`}
+                    >
+                      <Activity className="w-2.5 h-2.5" />
+                      <span>{(voice.similarity_score * 100).toFixed(0)}% SIM</span>
+                    </span>
+                  )}
+                  {voice.version !== undefined && voice.version > 1 && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20"
+                      title={`Profile version ${voice.version} (${voice.sample_count ?? 1} samples)`}
+                    >
+                      v{voice.version} · {voice.sample_count ?? 1}s
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1426,6 +1497,50 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   <Download className="w-3.5 h-3.5 text-purple-400" />
                   <span>Export Persona</span>
                 </button>
+              )}
+
+              {/* Refine Voice button — only for cloned / custom voices */}
+              {selectedVoice && isCustomVoice(selectedVoice) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => refineFileInputRef.current?.click()}
+                    disabled={isRefining}
+                    className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors shadow ${
+                      isRefining
+                        ? 'border-sky-500/40 bg-sky-500/10 text-sky-400 opacity-75 cursor-wait'
+                        : 'border-[#242E3D] bg-[#121820] text-[#94A3B8] hover:text-white hover:border-sky-500/50 hover:bg-sky-500/10'
+                    }`}
+                    title="Add a new reference audio sample to refine the speaker embedding and improve voice accuracy"
+                  >
+                    {isRefining ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
+                    ) : (
+                      <FileUp className="w-3.5 h-3.5 text-sky-400" />
+                    )}
+                    <span>{isRefining ? 'Refining...' : 'Refine Voice'}</span>
+                    {selectedVoice.version !== undefined && selectedVoice.version > 1 && (
+                      <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        v{selectedVoice.version}
+                      </span>
+                    )}
+                  </button>
+                  <input
+                    ref={refineFileInputRef}
+                    type="file"
+                    accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleRefineVoice(file);
+                    }}
+                  />
+                  {refineStatus && (
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                      {refineStatus}
+                    </span>
+                  )}
+                </>
               )}
 
               <button
@@ -3497,15 +3612,100 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     Your cloned voice timbre can speak across <span className="text-amber-400 font-semibold">ALL supported languages</span> (Malayalam, Hindi, Tamil, Telugu, English, German, French, etc.) via neural cross-lingual synthesis.
                   </p>
                 </div>
+
+                {/* Multi-sample additional reference audio panel */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+                      Additional Reference Samples
+                      <span className="ml-2 text-[10px] font-normal text-[#64748B] lowercase tracking-normal">
+                        (optional — up to 7 extra clips for a stronger voice identity)
+                      </span>
+                    </label>
+                    {additionalSamples.length > 0 && (
+                      <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        {additionalSamples.length} / 7 added
+                      </span>
+                    )}
+                  </div>
+
+                  {additionalSamples.length > 0 && (
+                    <div className="space-y-1.5 mb-2">
+                      {additionalSamples.map((s, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between bg-[#0B0E14] border border-[#242E3D] rounded-lg px-3 py-2"
+                        >
+                          <span className="text-[11px] font-mono text-[#94A3B8] truncate flex-1 mr-2">{s.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalSamples((prev) => prev.filter((_, i) => i !== idx))}
+                            className="p-1 rounded text-[#64748B] hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                            aria-label={`Remove sample ${idx + 1}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {additionalSamples.length < 7 && (
+                    <button
+                      type="button"
+                      onClick={() => additionalSampleInputRef.current?.click()}
+                      className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-lg bg-[#0B0E14] border border-dashed border-[#3B485C] hover:border-amber-500/40 text-[#64748B] hover:text-amber-400 text-xs font-mono transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add another reference clip</span>
+                    </button>
+                  )}
+                  <input
+                    ref={additionalSampleInputRef}
+                    type="file"
+                    accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const result = await AudioProcessor.preprocessForCloning(file);
+                        setAdditionalSamples((prev) => [
+                          ...prev,
+                          { name: file.name, base64: result.wavBase64 },
+                        ]);
+                      } catch {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          const r = reader.result as string;
+                          const b64 = r.includes(',') ? r.split(',')[1] : r;
+                          setAdditionalSamples((prev) => [
+                            ...prev,
+                            { name: file.name, base64: b64 },
+                          ]);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Sticky Modal Footer */}
-              <div className="p-4 border-t border-[#242E3D] bg-[#0E131A] flex items-center justify-end space-x-3 shrink-0">
+              <div className="p-4 border-t border-[#242E3D] bg-[#0E131A] shrink-0">
+                {additionalSamples.length > 0 && (
+                  <p className="text-[10px] font-mono text-amber-400 mb-2 text-right">
+                    Using {1 + additionalSamples.length} reference samples — embedding centroid will be averaged for higher accuracy.
+                  </p>
+                )}
+                <div className="flex items-center justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => {
                     if (isRecording) stopRecording();
                     setShowCloneModal(false);
+                    setAdditionalSamples([]);
                   }}
                   className="px-4 py-2 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white text-xs font-semibold transition-colors"
                 >
@@ -3524,10 +3724,11 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   ) : (
                     <>
                       <Mic className="w-3.5 h-3.5" />
-                      <span>Clone Profile</span>
+                      <span>Clone Profile{additionalSamples.length > 0 ? ` (${1 + additionalSamples.length} samples)` : ''}</span>
                     </>
                   )}
                 </button>
+                </div>
               </div>
             </form>
           </div>
