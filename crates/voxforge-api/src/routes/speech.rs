@@ -473,7 +473,11 @@ pub async fn synthesize_speech(
                                     detail,
                                     instance: "/v1/audio/speech".to_string(),
                                 };
-                                (StatusCode::from_u16(status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR), Json(err))
+                                (
+                                    StatusCode::from_u16(status_code)
+                                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                                    Json(err),
+                                )
                             })?;
                         sample_rate = chunk.sample_rate;
                         channels = chunk.channels;
@@ -512,7 +516,11 @@ pub async fn synthesize_speech(
                         detail,
                         instance: "/v1/audio/speech".to_string(),
                     };
-                    (StatusCode::from_u16(status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR), Json(err))
+                    (
+                        StatusCode::from_u16(status_code)
+                            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                        Json(err),
+                    )
                 })?;
             sample_rate = chunk.sample_rate;
             channels = chunk.channels;

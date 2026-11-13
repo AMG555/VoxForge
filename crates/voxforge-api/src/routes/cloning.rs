@@ -247,7 +247,8 @@ pub async fn refine_voice_profile(
                 problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
                 title: "Audio Payload Too Large".to_string(),
                 status: 400,
-                detail: "Refinement audio payload exceeds maximum permitted size (35MB)".to_string(),
+                detail: "Refinement audio payload exceeds maximum permitted size (35MB)"
+                    .to_string(),
                 instance: format!("/v1/voices/profiles/{id}/refine"),
             }),
         ));
@@ -597,7 +598,9 @@ pub async fn verify_voice(
             let emb = profile.embedding.unwrap_or_else(|| {
                 if let Some(ref b64) = profile.reference_audio_base64 {
                     if let Ok((samples, _, _)) = decode_b64_to_pcm(b64) {
-                        return voxforge_engine::Qwen3TtsEngine::extract_speaker_embedding(&samples);
+                        return voxforge_engine::Qwen3TtsEngine::extract_speaker_embedding(
+                            &samples,
+                        );
                     }
                 } else if let Some(ref path) = profile.reference_audio_path {
                     if let Ok(bytes) = std::fs::read(path) {

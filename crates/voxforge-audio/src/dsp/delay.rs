@@ -42,11 +42,7 @@ impl EchoDelay {
     /// - `wet_mix`: Echo level mix (0.0–1.0).
     /// - `dry_mix`: Direct signal level mix (0.0–1.0).
     pub fn process(&mut self, samples: &mut [i16], wet_mix: f32, dry_mix: f32) {
-        if samples.is_empty()
-            || !wet_mix.is_finite()
-            || !dry_mix.is_finite()
-            || wet_mix <= 0.001
-        {
+        if samples.is_empty() || !wet_mix.is_finite() || !dry_mix.is_finite() || wet_mix <= 0.001 {
             return;
         }
 

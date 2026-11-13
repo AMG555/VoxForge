@@ -160,10 +160,9 @@ impl AudioMerger {
             for i in 0..actual_fade {
                 let t = i as f32 / actual_fade as f32;
                 let angle = t * half_pi;
-                let blended =
-                    (a_tail[i] as f32 * angle.cos() + b_head[i] as f32 * angle.sin())
-                        .round()
-                        .clamp(-32768.0, 32767.0) as i16;
+                let blended = (a_tail[i] as f32 * angle.cos() + b_head[i] as f32 * angle.sin())
+                    .round()
+                    .clamp(-32768.0, 32767.0) as i16;
                 out.push(blended);
             }
 

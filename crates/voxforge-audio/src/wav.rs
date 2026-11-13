@@ -49,8 +49,9 @@ impl WavEncoder {
             ));
         }
         let samples: std::result::Result<Vec<i16>, _> = reader.samples::<i16>().collect();
-        let pcm_samples = samples
-            .map_err(|e| VoxForgeError::AudioProcessing(format!("Failed to read samples: {}", e)))?;
+        let pcm_samples = samples.map_err(|e| {
+            VoxForgeError::AudioProcessing(format!("Failed to read samples: {}", e))
+        })?;
 
         Ok((pcm_samples, spec.sample_rate, spec.channels))
     }

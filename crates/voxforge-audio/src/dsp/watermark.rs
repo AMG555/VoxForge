@@ -75,8 +75,7 @@ impl AudioWatermark {
     /// Loops the 16-bit message across the entire audio length for high redundancy
     pub fn embed(&self, samples: &mut [f32], payload: u16) -> usize {
         let bit_count = 16;
-        let bits: [bool; 16] =
-            std::array::from_fn(|i| ((payload >> (15 - i)) & 1) == 1);
+        let bits: [bool; 16] = std::array::from_fn(|i| ((payload >> (15 - i)) & 1) == 1);
         let total_samples = samples.len();
         let bits_total = total_samples / self.chip_rate;
 

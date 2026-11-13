@@ -93,7 +93,9 @@ pub async fn install_catalog_model(
                 voxforge_core::error::VoxForgeError::HardwareUnsupported(_) => {
                     StatusCode::BAD_REQUEST
                 }
-                voxforge_core::error::VoxForgeError::Engine(ref msg) if msg.contains("not found") => {
+                voxforge_core::error::VoxForgeError::Engine(ref msg)
+                    if msg.contains("not found") =>
+                {
                     StatusCode::NOT_FOUND
                 }
                 _ => StatusCode::INTERNAL_SERVER_ERROR,
@@ -121,7 +123,9 @@ pub async fn uninstall_catalog_model(
         Ok(item) => Ok(Json(item)),
         Err(e) => {
             let status = match e {
-                voxforge_core::error::VoxForgeError::Engine(ref msg) if msg.contains("not found") => {
+                voxforge_core::error::VoxForgeError::Engine(ref msg)
+                    if msg.contains("not found") =>
+                {
                     StatusCode::NOT_FOUND
                 }
                 voxforge_core::error::VoxForgeError::Engine(ref msg)

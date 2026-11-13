@@ -56,11 +56,7 @@ impl VocalChorus {
     /// - `wet_mix`: Level of modulated voice blend (0.0–1.0).
     /// - `dry_mix`: Level of dry voice signal (0.0–1.0).
     pub fn process(&mut self, samples: &mut [i16], wet_mix: f32, dry_mix: f32) {
-        if samples.is_empty()
-            || !wet_mix.is_finite()
-            || !dry_mix.is_finite()
-            || wet_mix <= 0.001
-        {
+        if samples.is_empty() || !wet_mix.is_finite() || !dry_mix.is_finite() || wet_mix <= 0.001 {
             return;
         }
 
