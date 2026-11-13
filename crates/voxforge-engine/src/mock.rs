@@ -184,4 +184,18 @@ impl TtsEngine for MockTtsEngine {
         };
         self.synthesize(&synth_req).await
     }
+
+    /// Mock refinement: increments version and sample_count without real embedding math,
+    /// making the lifecycle integration test work without a full Qwen3 engine.
+    async fn refine_voice_embedding(
+        &self,
+        profile: &voxforge_core::models::VoiceProfile,
+        _new_reference_audio_base64: &str,
+    ) -> Result<voxforge_core::models::VoiceProfile> {
+        let mut updated = profile.clone();
+        updated.version = profile.version.saturating_add(1);
+        updated.sample_count = profile.sample_count.saturating_add(1);
+        updated.refined_at = Some(chrono::Utc::now());
+        Ok(updated)
+    }
 }
