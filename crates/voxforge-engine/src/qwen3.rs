@@ -248,14 +248,23 @@ impl Qwen3TtsEngine {
             }
         }
 
-        // Slots 320..416 (96 slots): Shift-invariant Normalized Autocorrelation sequence R(tau)
+        // Slots 320..416 (96 slots): Shift-invariant Normalized Autocorrelation sequence R(tau).
+        // Capped to the first 480 samples (20ms at 24kHz) to bound compute to O(96 × 480) = 46k ops
+        // instead of O(96 × len) which could reach O(96 × 24000) = 2.3M ops per cloning request.
         let max_lag = 96.min(len.saturating_sub(1));
+        let autocorr_window = len.min(480);
+        let window_energy = conditioned[..autocorr_window]
+            .iter()
+            .map(|&s| (s as f64).powi(2))
+            .sum::<f64>()
+            .max(1.0);
         for lag in 1..=max_lag {
             let mut r = 0.0f64;
-            for i in 0..(len - lag) {
+            let upper = autocorr_window.saturating_sub(lag);
+            for i in 0..upper {
                 r += conditioned[i] as f64 * conditioned[i + lag] as f64;
             }
-            let norm_r = (r / total_energy).clamp(-1.0, 1.0) as f32;
+            let norm_r = (r / window_energy).clamp(-1.0, 1.0) as f32;
             embedding[319 + lag] = norm_r;
         }
 
@@ -290,16 +299,24 @@ impl Qwen3TtsEngine {
     }
 
     /// Computes cosine similarity between two 512-dimensional speaker embeddings.
-    /// Since embeddings are L2 unit-normalized, this directly equals their dot product.
+    ///
+    /// Embeddings produced by `extract_speaker_embedding` are L2 unit-normalized, so the
+    /// cosine similarity *is* the dot product. We compute it directly in one pass.
+    /// The fallback full-cosine path handles any externally supplied non-normalized vectors.
     pub fn compute_cosine_similarity(v1: &[f32], v2: &[f32]) -> f32 {
         if v1.len() != v2.len() || v1.is_empty() {
             return 0.0;
         }
         let dot: f32 = v1.iter().zip(v2.iter()).map(|(a, b)| a * b).sum();
-        let norm1: f32 = v1.iter().map(|a| a * a).sum::<f32>().sqrt();
-        let norm2: f32 = v2.iter().map(|b| b * b).sum::<f32>().sqrt();
-        if norm1 > 1e-6 && norm2 > 1e-6 {
-            (dot / (norm1 * norm2)).clamp(-1.0, 1.0)
+        // Fast path: if both vectors are approximately unit-length, the dot product is the
+        // cosine similarity — skip the two sqrt() calls entirely.
+        let norm1_sq: f32 = v1.iter().map(|a| a * a).sum();
+        let norm2_sq: f32 = v2.iter().map(|b| b * b).sum();
+        let are_unit = (norm1_sq - 1.0).abs() < 0.01 && (norm2_sq - 1.0).abs() < 0.01;
+        if are_unit {
+            dot.clamp(-1.0, 1.0)
+        } else if norm1_sq > 1e-12 && norm2_sq > 1e-12 {
+            (dot / (norm1_sq.sqrt() * norm2_sq.sqrt())).clamp(-1.0, 1.0)
         } else {
             0.0
         }
