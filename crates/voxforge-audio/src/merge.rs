@@ -110,6 +110,9 @@ impl AudioMerger {
     }
 
     /// Concatenate an array of audio chunks using equal-power crossfading at every seam.
+    ///
+    /// Pre-allocates a single output buffer sized to the total audio minus fade overlaps,
+    /// avoiding repeated intermediate allocations that the previous fold approach caused.
     pub fn concatenate_with_equal_power_crossfade(
         chunks: &[&[i16]],
         sample_rate: u32,
@@ -122,12 +125,58 @@ impl AudioMerger {
             return chunks[0].to_vec();
         }
 
-        let mut accumulated = chunks[0].to_vec();
-        for &next_chunk in &chunks[1..] {
-            accumulated =
-                Self::equal_power_crossfade(&accumulated, next_chunk, sample_rate, crossfade_ms);
+        // Compute fade length to size the output buffer accurately.
+        let safe_crossfade_ms = crossfade_ms.clamp(1, 10_000);
+        let safe_sample_rate = sample_rate.min(192_000);
+        let fade_len = ((safe_sample_rate as f32) * (safe_crossfade_ms as f32 / 1000.0)) as usize;
+
+        let total_len: usize = chunks.iter().map(|c| c.len()).sum::<usize>()
+            - fade_len.saturating_mul(chunks.len().saturating_sub(1));
+
+        let mut out = Vec::with_capacity(total_len.max(1));
+        let half_pi = std::f32::consts::FRAC_PI_2;
+
+        // Write the first chunk's non-fade body, then blend each subsequent chunk.
+        if chunks[0].len() > fade_len {
+            out.extend_from_slice(&chunks[0][..chunks[0].len() - fade_len]);
         }
-        accumulated
+
+        for pair in chunks.windows(2) {
+            let seg_a = pair[0];
+            let seg_b = pair[1];
+
+            // Determine actual fade length for this pair (may be shorter than fade_len).
+            let actual_fade = fade_len.min(seg_a.len()).min(seg_b.len());
+
+            if actual_fade == 0 {
+                // No overlap possible — concatenate directly.
+                out.extend_from_slice(seg_b);
+                continue;
+            }
+
+            let a_tail = &seg_a[seg_a.len() - actual_fade..];
+            let b_head = &seg_b[..actual_fade];
+
+            for i in 0..actual_fade {
+                let t = i as f32 / actual_fade as f32;
+                let angle = t * half_pi;
+                let blended =
+                    (a_tail[i] as f32 * angle.cos() + b_head[i] as f32 * angle.sin())
+                        .round()
+                        .clamp(-32768.0, 32767.0) as i16;
+                out.push(blended);
+            }
+
+            // Write the non-fade body of seg_b (except its own tail which blends with the next).
+            let is_last = std::ptr::eq(pair[1], chunks[chunks.len() - 1]);
+            if is_last {
+                out.extend_from_slice(&seg_b[actual_fade..]);
+            } else if seg_b.len() > actual_fade + fade_len {
+                out.extend_from_slice(&seg_b[actual_fade..seg_b.len() - fade_len]);
+            }
+        }
+
+        out
     }
 }
 
