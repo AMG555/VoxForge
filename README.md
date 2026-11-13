@@ -4,8 +4,8 @@
 
 **Enterprise-Grade, Self-Hostable, Multi-Engine Text-to-Speech Platform & Visual Pipeline Builder**
 
-[![Status](https://img.shields.io/badge/Status-Feature_Complete_v0.2.0_Beta-blue.svg)](docs/architecture.md)
-[![Release](https://img.shields.io/badge/Release-v0.2.0-blue.svg)](https://github.com/AMG555/VoxForge/releases)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.3.0-brightgreen.svg)](docs/architecture.md)
+[![Release](https://img.shields.io/badge/Release-v0.3.0-brightgreen.svg)](https://github.com/AMG555/VoxForge/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)

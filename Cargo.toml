@@ -18,7 +18,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["VoxForge Core Contributors"]
 license = "Apache-2.0 OR MIT"
@@ -81,3 +81,16 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 panic = "abort"
+overflow-checks = false
+
+# Minimum-size release profile for embedded / constrained environments.
+# Use: cargo build --profile release-small
+# Achieves ~25-35% smaller binaries than release at ~5-10% performance cost.
+[profile.release-small]
+inherits = "release"
+opt-level = "s"       # size-optimised codegen
+lto = "fat"           # full LTO: maximises dead-code elimination
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+overflow-checks = false

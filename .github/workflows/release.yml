@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Build Web UI
         run: |
@@ -58,21 +58,21 @@ jobs:
 
       - name: Build Standalone Rust Binary (Windows & Linux)
         if: runner.os != 'macOS'
-        run: cargo build --release --bin voxforge
+        run: cargo build --profile release-small --bin voxforge
 
       - name: Build Standalone Rust Binary (macOS Universal via lipo)
         if: runner.os == 'macOS'
         run: |
-          cargo build --release --bin voxforge --target aarch64-apple-darwin
-          cargo build --release --bin voxforge --target x86_64-apple-darwin
+          cargo build --profile release-small --bin voxforge --target aarch64-apple-darwin
+          cargo build --profile release-small --bin voxforge --target x86_64-apple-darwin
 
       - name: Package Windows Release (.exe and .zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           mkdir dist -Force
-          Copy-Item target/release/voxforge.exe -Destination dist/voxforge-windows-x86_64.exe -Force
-          Copy-Item target/release/voxforge.exe -Destination dist/voxforge.exe -Force
+          Copy-Item target/release-small/voxforge.exe -Destination dist/voxforge-windows-x86_64.exe -Force
+          Copy-Item target/release-small/voxforge.exe -Destination dist/voxforge.exe -Force
           Copy-Item assets/voxforge.ico -Destination dist/voxforge.ico -Force
 
           # Create batch launcher
@@ -124,8 +124,8 @@ jobs:
         run: |
           mkdir -p dist
           lipo -create -output dist/voxforge-macos-universal \
-            target/aarch64-apple-darwin/release/voxforge \
-            target/x86_64-apple-darwin/release/voxforge
+            target/aarch64-apple-darwin/release-small/voxforge \
+            target/x86_64-apple-darwin/release-small/voxforge
           # Provide arch-specific copies so install.sh and npm runner succeed on any architecture
           cp dist/voxforge-macos-universal dist/voxforge-macos-aarch64
           cp dist/voxforge-macos-universal dist/voxforge-macos-x86_64
@@ -138,7 +138,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp target/release/voxforge dist/voxforge-linux-x86_64
+          cp target/release-small/voxforge dist/voxforge-linux-x86_64
           chmod +x dist/voxforge-linux-x86_64
           tar -czvf dist/voxforge-linux-x86_64.tar.gz -C dist voxforge-linux-x86_64
 
