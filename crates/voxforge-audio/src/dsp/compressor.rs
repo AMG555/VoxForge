@@ -106,7 +106,9 @@ mod tests {
 
     #[test]
     fn test_compressor_nan_parameters_use_defaults() {
-        // NaN parameters must fall back to safe defaults and never panic
+        // NaN parameters must fall back to safe defaults and never panic.
+        // Any i16 value is by definition in [i16::MIN, i16::MAX]; we just
+        // verify the vector is non-empty and no panic occurred.
         let mut samples = vec![16000i16; 100];
         DynamicCompressor::process(
             &mut samples,
@@ -117,7 +119,7 @@ mod tests {
             f32::NAN,
             f32::NAN,
         );
-        assert!(samples.iter().all(|&s| s >= i16::MIN && s <= i16::MAX));
+        assert!(!samples.is_empty());
     }
 
     #[test]
