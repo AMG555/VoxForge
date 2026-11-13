@@ -4,6 +4,7 @@
 //! |--------|------------------------------|-----------------------------------------|
 //! | GET    | `/v1/voices/profiles`        | List all persistent voice profiles      |
 //! | POST   | `/v1/voices/clone`           | Clone a voice from reference audio      |
+//! | POST   | `/v1/voices/profiles/{id}/refine` | Refine an existing voice profile   |
 //! | GET    | `/v1/voices/profiles/{id}`   | Retrieve a specific voice profile       |
 //! | DELETE | `/v1/voices/profiles/{id}`   | Delete a voice profile                  |
 
@@ -209,6 +210,98 @@ pub async fn clone_voice(
     state.voice_profiles.insert(profile.clone()).await;
 
     Ok((StatusCode::CREATED, Json(profile)))
+}
+
+/// `POST /v1/voices/profiles/{id}/refine` — add a new reference sample to an existing voice profile,
+/// updating the speaker embedding centroid and incrementing the profile version.
+#[derive(Debug, Deserialize)]
+pub struct RefineVoiceRequest {
+    /// Base64-encoded additional reference audio sample.
+    pub audio_base64: String,
+    /// Optional transcript of the additional sample.
+    pub transcript: Option<String>,
+}
+
+pub async fn refine_voice_profile(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<RefineVoiceRequest>,
+) -> Result<Json<VoiceProfile>, (StatusCode, Json<ProblemDetails>)> {
+    if body.audio_base64.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/empty-payload".to_string(),
+                title: "Missing Audio Payload".to_string(),
+                status: 400,
+                detail: "The 'audio_base64' field must not be empty".to_string(),
+                instance: format!("/v1/voices/profiles/{id}/refine"),
+            }),
+        ));
+    }
+
+    if body.audio_base64.len() > 35 * 1024 * 1024 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Audio Payload Too Large".to_string(),
+                status: 400,
+                detail: "Refinement audio payload exceeds maximum permitted size (35MB)".to_string(),
+                instance: format!("/v1/voices/profiles/{id}/refine"),
+            }),
+        ));
+    }
+
+    let profile = state.voice_profiles.get(&id).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Voice Profile Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{id}' not found"),
+                instance: format!("/v1/voices/profiles/{id}/refine"),
+            }),
+        )
+    })?;
+
+    let engine = state
+        .engine_registry
+        .get(&profile.engine_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/engine-not-found".to_string(),
+                    title: "Engine Not Found".to_string(),
+                    status: 400,
+                    detail: format!("Engine '{}' not registered", profile.engine_id),
+                    instance: format!("/v1/voices/profiles/{id}/refine"),
+                }),
+            )
+        })?;
+
+    let refined = engine
+        .refine_voice_embedding(&profile, &body.audio_base64)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/refinement-failed".to_string(),
+                    title: "Voice Refinement Failed".to_string(),
+                    status: 500,
+                    detail: e.to_string(),
+                    instance: format!("/v1/voices/profiles/{id}/refine"),
+                }),
+            )
+        })?;
+
+    state.voice_profiles.insert(refined.clone()).await;
+
+    Ok(Json(refined))
 }
 
 /// `DELETE /v1/voices/profiles/{id}` — remove a stored voice profile.

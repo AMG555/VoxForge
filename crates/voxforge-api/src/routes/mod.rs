@@ -102,6 +102,10 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/voices/profiles/:id",
             get(cloning::get_profile).delete(cloning::delete_profile),
         )
+        .route(
+            "/v1/voices/profiles/:id/refine",
+            post(cloning::refine_voice_profile),
+        )
         // Engine benchmarking
         .route("/v1/benchmark/results", get(benchmark::list_results))
         .route("/v1/benchmark/run", post(benchmark::trigger_run))
