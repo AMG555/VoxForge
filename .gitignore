@@ -52,3 +52,6 @@ run_clippy.bat
 build_release.bat
 clean.bat
 *.exe
+
+# Agent context documents (auto-generated, not for version control)
+AGENTS.md
