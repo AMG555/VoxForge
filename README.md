@@ -2,17 +2,17 @@
 
 # VoxForge
 
-**Enterprise-Grade, Self-Hostable, Multi-Engine Text-to-Speech Platform & Visual Pipeline Builder**
+**Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.3.0-brightgreen.svg)](docs/architecture.md)
-[![Release](https://img.shields.io/badge/Release-v0.3.0-brightgreen.svg)](https://github.com/AMG555/VoxForge/releases)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.4.0-brightgreen.svg)](docs/architecture.md)
+[![Release](https://img.shields.io/badge/Release-v0.4.0-brightgreen.svg)](https://github.com/AMG555/VoxForge/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
 [![API](https://img.shields.io/badge/API-OpenAI_TTS_Compatible-green.svg)](docs/api.md)
 [![Platform](https://img.shields.io/badge/Platform-Linux_%7C_macOS_%7C_Windows-lightgrey.svg)](docs/architecture.md)
 
-*An open-source, modular speech synthesis workstation. Self-host high-fidelity neural voices, chain complex multi-speaker audio graphs, and run locally or scale horizontally.*
+*An open-source, private, self-hosted alternative to ElevenLabs. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
 
 [Download .exe](#direct-downloads-desktop--standalone) • [Features](#key-features) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
@@ -21,8 +21,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: Feature-Complete (v0.2.0 Public Beta)**  
-> All core features built, tested, and operational: multi-engine neural TTS (Kokoro, Piper, Qwen3, Edge-TTS), zero-shot voice cloning, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests; currently in open public beta for community hardware & driver soak testing prior to v1.0 LTS.
+> **Project Status: Feature-Complete (v0.4.0 Stable)**  
+> All core features built, tested, and operational: multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  
