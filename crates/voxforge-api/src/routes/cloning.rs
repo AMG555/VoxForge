@@ -14,7 +14,6 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
 use voxforge_audio::AudioAnalyzer;
 use voxforge_core::error::ProblemDetails;
 use voxforge_core::models::{CloneVoiceRequest, VoiceProfile};
@@ -390,13 +389,8 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
     }
 
     if out.len() >= 12 && &out[0..4] == b"RIFF" && &out[8..12] == b"WAVE" {
-        let cursor = Cursor::new(&out);
-        if let Ok(mut reader) = hound::WavReader::new(cursor) {
-            let spec = reader.spec();
-            let samples: Result<Vec<i16>, _> = reader.samples::<i16>().collect();
-            if let Ok(s) = samples {
-                return Ok((s, spec.sample_rate, spec.channels));
-            }
+        if let Ok((pcm, sr, ch)) = voxforge_audio::WavEncoder::decode_wav_to_pcm16(&out) {
+            return Ok((pcm, sr, ch));
         }
     }
 
@@ -777,6 +771,117 @@ pub async fn verify_voice(
         cadence_match_percent,
         overall_biometric_score,
         recommendations,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// VoxPersona export via PersonaBundle
+// ---------------------------------------------------------------------------
+
+/// `GET /v1/voices/profiles/{id}/export` — export a stored voice profile as a downloadable
+/// `.voxpersona` bundle (JSON envelope wrapping the full VoiceProfile + 512-D embedding).
+/// Uses the canonical `PersonaBundle` format from `voxforge-engine`.
+pub async fn export_profile_as_bundle(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<voxforge_engine::PersonaBundle>, (StatusCode, Json<ProblemDetails>)> {
+    let profile = state.voice_profiles.get(&id).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Voice Profile Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{id}' not found"),
+                instance: format!("/v1/voices/profiles/{id}/export"),
+            }),
+        )
+    })?;
+
+    Ok(Json(voxforge_engine::PersonaBundle::from_profile(profile)))
+}
+
+
+/// `POST /v1/voices/profiles/compare` — compute embedding cosine similarity between two profiles.
+#[derive(Debug, Deserialize)]
+pub struct CompareProfilesRequest {
+    pub profile_id_a: String,
+    pub profile_id_b: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProfileComparisonResponse {
+    pub profile_id_a: String,
+    pub profile_id_b: String,
+    pub cosine_similarity: f32,
+    pub is_same_speaker: bool,
+    pub confidence: &'static str,
+}
+
+/// `POST /v1/voices/profiles/compare` — compare two stored voice profiles by embedding cosine similarity.
+pub async fn compare_profiles(
+    State(state): State<AppState>,
+    Json(body): Json<CompareProfilesRequest>,
+) -> Result<Json<ProfileComparisonResponse>, (StatusCode, Json<ProblemDetails>)> {
+    let profile_a = state.voice_profiles.get(&body.profile_id_a).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Profile A Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{}' not found", body.profile_id_a),
+                instance: "/v1/voices/profiles/compare".to_string(),
+            }),
+        )
+    })?;
+
+    let profile_b = state.voice_profiles.get(&body.profile_id_b).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Profile B Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{}' not found", body.profile_id_b),
+                instance: "/v1/voices/profiles/compare".to_string(),
+            }),
+        )
+    })?;
+
+    let emb_a = profile_a.embedding.as_deref().unwrap_or(&[]);
+    let emb_b = profile_b.embedding.as_deref().unwrap_or(&[]);
+
+    if emb_a.is_empty() || emb_b.is_empty() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/missing-embedding".to_string(),
+                title: "Missing Speaker Embedding".to_string(),
+                status: 422,
+                detail: "One or both profiles lack a speaker embedding vector".to_string(),
+                instance: "/v1/voices/profiles/compare".to_string(),
+            }),
+        ));
+    }
+
+    let cosine_similarity =
+        voxforge_engine::Qwen3TtsEngine::compute_cosine_similarity(emb_a, emb_b);
+    let is_same_speaker = cosine_similarity >= 0.78;
+    let confidence = if cosine_similarity >= 0.90 {
+        "high"
+    } else if cosine_similarity >= 0.78 {
+        "medium"
+    } else {
+        "low"
+    };
+
+    Ok(Json(ProfileComparisonResponse {
+        profile_id_a: body.profile_id_a,
+        profile_id_b: body.profile_id_b,
+        cosine_similarity,
+        is_same_speaker,
+        confidence,
     }))
 }
 

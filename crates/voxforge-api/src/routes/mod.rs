@@ -107,6 +107,14 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/voices/profiles/:id/refine",
             post(cloning::refine_voice_profile),
         )
+        .route(
+            "/v1/voices/profiles/:id/export",
+            get(cloning::export_profile_as_bundle),
+        )
+        .route(
+            "/v1/voices/profiles/compare",
+            post(cloning::compare_profiles),
+        )
         // Engine benchmarking
         .route("/v1/benchmark/results", get(benchmark::list_results))
         .route("/v1/benchmark/run", post(benchmark::trigger_run))

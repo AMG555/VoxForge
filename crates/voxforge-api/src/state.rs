@@ -5,6 +5,7 @@ use voxforge_catalog::ModelCatalogStore;
 use voxforge_core::store::DataStore;
 use voxforge_engine::{EngineRegistry, VoiceIdentityResolver, VoiceProfileStore};
 use voxforge_hardware::HardwareProfile;
+use voxforge_mcp::McpServer;
 use voxforge_pipeline::PipelineExecutor;
 use voxforge_pronunciation::{ProcessorConfig, PronunciationProcessor};
 use voxforge_router::VoiceRouter;
@@ -31,6 +32,8 @@ pub struct AppState {
     pub pipeline_executor: Arc<PipelineExecutor>,
     pub api_key: Option<String>,
     pub metrics: Arc<MetricsCollector>,
+    /// Pre-built MCP server — shared across all requests to avoid per-request engine re-registration.
+    pub mcp_server: Arc<McpServer>,
 }
 
 impl AppState {
@@ -54,6 +57,22 @@ impl AppState {
         let voice_ci_store = ProfileStore::new();
         let worker_pool = Arc::new(WorkerPool::new());
         let worker_client = Arc::new(WorkerClient::new());
+
+        // Build the MCP server once and share it across all HTTP requests via Arc.
+        // Previously, mcp_http.rs constructed a new McpServer on EVERY request, which
+        // re-registered all engines, re-probed hardware, and re-initialized all stores
+        // (6 Arc allocations + multiple Mutex write-locks) for each MCP call.
+        let mcp_server = Arc::new(McpServer {
+            engine_registry: engine_registry.clone(),
+            voice_profiles: voice_profiles.clone(),
+            asr_registry: asr_registry.clone(),
+            model_catalog: model_catalog.clone(),
+            pipeline_executor: pipeline_executor.clone(),
+            pronunciation: pronunciation.clone(),
+            hardware: hardware_profile.clone(),
+            worker_pool: worker_pool.clone(),
+        });
+
         Self {
             engine_registry,
             voice_router,
@@ -71,6 +90,7 @@ impl AppState {
             pipeline_executor,
             api_key,
             metrics,
+            mcp_server,
         }
     }
 }

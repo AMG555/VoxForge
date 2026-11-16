@@ -9,12 +9,15 @@ use axum::{
 };
 use futures::stream::{self, Stream};
 use std::convert::Infallible;
-use voxforge_mcp::McpServer;
 
 use crate::state::AppState;
 
 /// Streamable HTTP POST endpoint for Model Context Protocol (MCP) JSON-RPC 2.0 requests.
 /// Allows Claude Desktop, Cursor, Antigravity, and Windsurf to connect over HTTP directly.
+///
+/// The [`McpServer`] is built once at startup and stored in [`AppState`] — reusing it here
+/// avoids per-request engine re-registration and hardware re-probing (was ~6 Arc allocs +
+/// multiple Mutex write-locks on every call).
 pub async fn handle_mcp_post(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -28,18 +31,7 @@ pub async fn handle_mcp_post(
 
     tracing::debug!(client_id, "Handling incoming MCP request over HTTP");
 
-    let mcp_server = McpServer {
-        engine_registry: state.engine_registry.clone(),
-        voice_profiles: state.voice_profiles.clone(),
-        asr_registry: state.asr_registry.clone(),
-        model_catalog: state.model_catalog.clone(),
-        pipeline_executor: state.pipeline_executor.clone(),
-        pronunciation: state.pronunciation.clone(),
-        hardware: state.hardware_profile.clone(),
-        worker_pool: state.worker_pool.clone(),
-    };
-
-    if let Some(res_str) = mcp_server.handle_message(&body).await {
+    if let Some(res_str) = state.mcp_server.handle_message(&body).await {
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
