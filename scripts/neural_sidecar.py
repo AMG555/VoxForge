@@ -420,29 +420,59 @@ def encode_wav(samples_f32: np.ndarray, sample_rate: int = 24000, bit_depth: int
 
 def decode_ref_audio(b64_or_path: str) -> Tuple[np.ndarray, int, Optional[str]]:
     """Decodes reference audio base64 or file path into float32 samples and temporary WAV file."""
-    if os.path.isfile(b64_or_path):
-        with wave.open(b64_or_path, "rb") as wf:
-            sr = wf.getframerate()
-            frames = wf.readframes(wf.getnframes())
-            w = wf.getsampwidth()
-            if w == 2:
-                samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
-            elif w == 4:
-                samples = np.frombuffer(frames, dtype="<f4").astype(np.float32)
-            else:
-                samples = np.frombuffer(frames, dtype=np.int8).astype(np.float32) / 128.0
-        return samples, sr, b64_or_path
-
     try:
+        if os.path.isfile(b64_or_path):
+            try:
+                import soundfile as sf
+                samples, sr = sf.read(b64_or_path, dtype="float32")
+                if samples.ndim > 1:
+                    samples = samples.mean(axis=1)
+                samples = samples - np.mean(samples)
+                samples = apply_highpass_80hz(samples, sample_rate=sr)
+                return samples, sr, b64_or_path
+            except Exception:
+                with wave.open(b64_or_path, "rb") as wf:
+                    sr = wf.getframerate()
+                    frames = wf.readframes(wf.getnframes())
+                    w = wf.getsampwidth()
+                    if w == 2:
+                        samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+                    elif w == 4:
+                        samples = np.frombuffer(frames, dtype="<f4").astype(np.float32)
+                    else:
+                        samples = np.frombuffer(frames, dtype=np.int8).astype(np.float32) / 128.0
+                samples = samples - np.mean(samples)
+                samples = apply_highpass_80hz(samples, sample_rate=sr)
+                return samples, sr, b64_or_path
+
         raw = base64.b64decode(b64_or_path.split(",")[-1].strip())
-        with wave.open(io.BytesIO(raw), "rb") as wf:
-            sr = wf.getframerate()
-            frames = wf.readframes(wf.getnframes())
-            samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+        samples, sr = None, 24000
+        try:
+            import soundfile as sf
+            samples, sr = sf.read(io.BytesIO(raw), dtype="float32")
+            if samples.ndim > 1:
+                samples = samples.mean(axis=1)
+        except Exception:
+            with wave.open(io.BytesIO(raw), "rb") as wf:
+                sr = wf.getframerate()
+                frames = wf.readframes(wf.getnframes())
+                w = wf.getsampwidth()
+                if w == 2:
+                    samples = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+                elif w == 4:
+                    samples = np.frombuffer(frames, dtype="<f4").astype(np.float32)
+                else:
+                    samples = np.frombuffer(frames, dtype=np.int8).astype(np.float32) / 128.0
+
+        if samples is not None and samples.size > 0:
+            samples = samples - np.mean(samples)
+            samples = apply_highpass_80hz(samples, sample_rate=sr)
+
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp.write(raw)
+        cleaned_wav = encode_wav(samples if samples is not None else np.zeros(0, dtype=np.float32), sample_rate=sr, bit_depth=16)
+        tmp.write(cleaned_wav)
         tmp.close()
-        return samples, sr, tmp.name
+        return samples if samples is not None else np.zeros(0, dtype=np.float32), sr, tmp.name
     except Exception as e:
         log.warning("Reference audio decode fallback: %s", e)
         return np.array([], dtype=np.float32), 24000, None
