@@ -697,26 +697,50 @@ impl TtsEngine for Qwen3TtsEngine {
 
         let (pcm, ref_features) = if let Some(ref b64) = request.reference_audio_base64 {
             let bytes = decode_audio_payload(b64);
-            let samples = if bytes.starts_with(b"RIFF") {
+            let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
                 voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                    .map(|(samples, _, _)| samples)
+                    .map(|(samples, sr, _)| (samples, sr))
                     .unwrap_or_else(|_| {
-                        bytes
-                            .chunks_exact(2)
-                            .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                            .collect()
+                        (
+                            bytes
+                                .chunks_exact(2)
+                                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                                .collect(),
+                            24000,
+                        )
                     })
             } else {
-                bytes
-                    .chunks_exact(2)
-                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                    .collect()
+                (
+                    bytes
+                        .chunks_exact(2)
+                        .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                        .collect(),
+                    24000,
+                )
+            };
+            // Anti-aliased polyphase resampler — replaces naive 2:1 decimation that caused
+            // sibilance aliasing artifacts in cloned voices
+            let samples = resample_to_24k(&raw_samples, sr);
+            // For long recordings (>30s), extract the best 10s window via sliding-window
+            // quality scoring — mirrors Studio's validate_clone_reference() approach.
+            let samples = if samples.len() > 24000 * 30 {
+                let best = voxforge_audio::dsp::SilenceTrimmer::best_reference_window(
+                    &samples, 24000, 10.0, 2.0,
+                );
+                if best.len() >= 2400 { best } else { samples }
+            } else {
+                samples
+            };
+            // VAD-based silence trimming: strip dead air at edges (Studio pattern)
+            let samples = {
+                let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
+                if trimmed.len() >= 2400 { trimmed } else { samples }
             };
             let feat = voxforge_audio::ProsodyMirror::analyze(&samples, 24000);
             (samples, Some(feat))
         } else if let Some(ref path) = request.reference_audio_path {
-            let trimmed = path.trim();
-            let p = std::path::Path::new(trimmed);
+            let trimmed_path = path.trim();
+            let p = std::path::Path::new(trimmed_path);
             if p.components()
                 .any(|c| matches!(c, std::path::Component::ParentDir))
             {
@@ -727,20 +751,41 @@ impl TtsEngine for Qwen3TtsEngine {
             let bytes = std::fs::read(p).map_err(|e| {
                 VoxForgeError::Config(format!("Failed reading reference audio file: {e}"))
             })?;
-            let samples = if bytes.starts_with(b"RIFF") {
+            let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
                 voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                    .map(|(samples, _, _)| samples)
+                    .map(|(samples, sr, _)| (samples, sr))
                     .unwrap_or_else(|_| {
-                        bytes
-                            .chunks_exact(2)
-                            .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                            .collect()
+                        (
+                            bytes
+                                .chunks_exact(2)
+                                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                                .collect(),
+                            24000,
+                        )
                     })
             } else {
-                bytes
-                    .chunks_exact(2)
-                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                    .collect()
+                (
+                    bytes
+                        .chunks_exact(2)
+                        .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                        .collect(),
+                    24000,
+                )
+            };
+            let samples = resample_to_24k(&raw_samples, sr);
+            // For long recordings (>30s), extract the best 10s window via sliding-window
+            // quality scoring — mirrors Studio's validate_clone_reference() approach.
+            let samples = if samples.len() > 24000 * 30 {
+                let best = voxforge_audio::dsp::SilenceTrimmer::best_reference_window(
+                    &samples, 24000, 10.0, 2.0,
+                );
+                if best.len() >= 2400 { best } else { samples }
+            } else {
+                samples
+            };
+            let samples = {
+                let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
+                if trimmed.len() >= 2400 { trimmed } else { samples }
             };
             let feat = voxforge_audio::ProsodyMirror::analyze(&samples, 24000);
             (samples, Some(feat))
@@ -749,11 +794,13 @@ impl TtsEngine for Qwen3TtsEngine {
         };
 
         // Primary embedding from the first reference sample
+        // Score primary reference quality and store in metadata
+        let primary_quality = voxforge_audio::dsp::SilenceTrimmer::score_reference_quality(&pcm, 24000);
         let primary_embedding = Self::extract_speaker_embedding(&pcm);
 
         // Multi-sample aggregation: compute per-sample embeddings and average them.
         // Clips the additional sample list to 7 max to prevent excessive processing.
-        // Resamples 48kHz→24kHz inputs before extraction.
+        // Uses polyphase resampler (not naive 2:1 decimation) for each extra sample.
         let mut all_embeddings: Vec<Vec<f32>> = vec![primary_embedding.clone()];
         let extra_limit = request.additional_reference_audio_base64.len().min(7);
         for extra_b64 in &request.additional_reference_audio_base64[..extra_limit] {
@@ -771,14 +818,19 @@ impl TtsEngine for Qwen3TtsEngine {
                     24000,
                 )
             };
-            // Downsample from 48kHz to 24kHz by halving (simple 2:1 decimation)
-            let extra_samples = if extra_sr == 48000 {
-                downsample_2x(&extra_samples_raw)
-            } else {
-                extra_samples_raw
+            // Anti-aliased polyphase resampler for all extra samples
+            let extra_samples = resample_to_24k(&extra_samples_raw, extra_sr);
+            // VAD trimming on extra samples too
+            let extra_samples = {
+                let t = voxforge_audio::dsp::SilenceTrimmer::trim(&extra_samples, 24000, -45.0, 40);
+                if t.len() >= 2400 { t } else { extra_samples }
             };
             if extra_samples.len() >= 2400 {
-                all_embeddings.push(Self::extract_speaker_embedding(&extra_samples));
+                // Only include extra samples that pass the quality gate
+                let quality = voxforge_audio::dsp::SilenceTrimmer::score_reference_quality(&extra_samples, 24000);
+                if quality >= 0.2 {
+                    all_embeddings.push(Self::extract_speaker_embedding(&extra_samples));
+                }
             }
         }
 
@@ -894,6 +946,8 @@ impl TtsEngine for Qwen3TtsEngine {
         if let Some(sim) = similarity_score {
             metadata.insert("intra_sample_similarity".to_string(), format!("{:.4}", sim));
         }
+        // Reference audio quality score (0.0 = unusable, 1.0 = broadcast quality)
+        metadata.insert("reference_quality_score".to_string(), format!("{:.3}", primary_quality));
 
         let mut clone_capabilities = vec![
             "zero-shot".to_string(),
@@ -959,16 +1013,20 @@ impl TtsEngine for Qwen3TtsEngine {
 
         // Decode and extract embedding from the new sample
         let bytes = decode_audio_payload(new_reference_audio_base64);
-        let new_samples: Vec<i16> = if bytes.starts_with(b"RIFF") {
+        let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
             voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                .map(|(s, _, _)| s)
+                .map(|(s, sr, _)| (s, sr))
                 .unwrap_or_default()
         } else {
-            bytes
-                .chunks_exact(2)
-                .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                .collect()
+            (
+                bytes
+                    .chunks_exact(2)
+                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                    .collect(),
+                24000,
+            )
         };
+        let new_samples = resample_to_24k(&raw_samples, sr);
 
         if new_samples.len() < 2400 {
             return Err(VoxForgeError::Config(
@@ -1272,15 +1330,62 @@ impl TtsEngine for Qwen3TtsEngine {
         };
 
         // 7. Base voice synthesis pass
+        // For long texts (>400 chars), split at sentence boundaries and stitch with cross-fades.
+        // This matches Studio's cross_fade_chunks() approach: each sentence is synthesized
+        // individually so prosody resets naturally, then 50ms equal-power cross-fades blend seams.
         let edge = crate::edge_tts::EdgeTtsEngine::new();
-        let synth_req = SynthesisRequest {
-            text: request.text.clone(),
-            voice_id: fallback_voice.to_string(),
-            speed,
-            pitch: pitch_offset,
-            format: request.format,
+        let mut chunk = if request.text.len() > 400 {
+            let sentences = split_text_to_sentences(&request.text);
+            let mut chunks: Vec<AudioChunk> = Vec::with_capacity(sentences.len());
+            for sentence in &sentences {
+                if sentence.trim().is_empty() {
+                    continue;
+                }
+                let req = SynthesisRequest {
+                    text: sentence.clone(),
+                    voice_id: fallback_voice.to_string(),
+                    speed,
+                    pitch: pitch_offset,
+                    format: request.format,
+                };
+                if let Ok(c) = edge.synthesize(&req).await {
+                    chunks.push(c);
+                }
+            }
+            if chunks.is_empty() {
+                // Fallback to full text if chunking yielded nothing
+                let synth_req = SynthesisRequest {
+                    text: request.text.clone(),
+                    voice_id: fallback_voice.to_string(),
+                    speed,
+                    pitch: pitch_offset,
+                    format: request.format,
+                };
+                edge.synthesize(&synth_req).await?
+            } else {
+                let sample_rate = chunks[0].sample_rate;
+                let pcm_slices: Vec<&[i16]> = chunks.iter().map(|c| c.pcm_data.as_slice()).collect();
+                // 50ms equal-power cross-fade at every sentence seam
+                let stitched = voxforge_audio::AudioMerger::concatenate_with_equal_power_crossfade(
+                    &pcm_slices, sample_rate, 50,
+                );
+                AudioChunk {
+                    sample_rate,
+                    channels: 1,
+                    pcm_data: stitched,
+                    is_final: true,
+                }
+            }
+        } else {
+            let synth_req = SynthesisRequest {
+                text: request.text.clone(),
+                voice_id: fallback_voice.to_string(),
+                speed,
+                pitch: pitch_offset,
+                format: request.format,
+            };
+            edge.synthesize(&synth_req).await?
         };
-        let mut chunk = edge.synthesize(&synth_req).await?;
 
         // 8. Formant & Spectral Timbre Morphing (match cloned speaker's frequency envelope)
         if let Some(ref ref_samples) = ref_pcm {
@@ -1503,6 +1608,18 @@ impl TtsEngine for Qwen3TtsEngine {
             }
         }
 
+        // 15. EBU R128 / LUFS loudness normalization to -16 LUFS (podcast/voice standard).
+        //     Studio applies this as the final step of its mastering chain, ensuring
+        //     consistent perceived loudness regardless of the reference recording level.
+        //     This is a primary contributor to perceptual quality parity with Studio.
+        voxforge_audio::AudioNormalizer::lufs_normalize(
+            &mut chunk.pcm_data,
+            chunk.sample_rate,
+            voxforge_audio::LUFS_TARGET_VOICE,
+        );
+        // Final brickwall to guard against any LUFS gain boost causing clipping
+        voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
+
         Ok(chunk)
     }
 }
@@ -1511,20 +1628,16 @@ impl TtsEngine for Qwen3TtsEngine {
 // Private helpers used by Qwen3TtsEngine
 // ---------------------------------------------------------------------------
 
-/// 2:1 decimation: averages each pair of adjacent samples to halve the sample rate.
-/// Used to downsample 48kHz reference audio to the engine's 24kHz working rate
-/// without requiring an external resampling library.
-fn downsample_2x(samples: &[i16]) -> Vec<i16> {
-    if samples.len() < 2 {
+/// Resample audio to the engine's 24 kHz working rate using the polyphase anti-alias filter.
+///
+/// Replaces the previous naive 2:1 decimation which aliased high-frequency speech content
+/// (sibilance 5–8 kHz) into the baseband, causing "buzzy" or "robotic" artefacts in cloned voices.
+/// The polyphase resampler applies a Kaiser-windowed sinc anti-alias filter before decimation.
+fn resample_to_24k(samples: &[i16], src_rate: u32) -> Vec<i16> {
+    if src_rate == 24000 {
         return samples.to_vec();
     }
-    let out_len = samples.len() / 2;
-    let mut out = Vec::with_capacity(out_len);
-    for chunk in samples.chunks_exact(2) {
-        let avg = ((chunk[0] as i32 + chunk[1] as i32) / 2) as i16;
-        out.push(avg);
-    }
-    out
+    voxforge_audio::Resampler::resample(samples, src_rate, 24000)
 }
 
 /// Compute the L2-normalized centroid (mean) of a set of 512-D embeddings.
@@ -2211,5 +2324,129 @@ mod tests {
         // Verify refinement rejects empty audio
         let err = engine.refine_voice_embedding(&profile_v2, "").await;
         assert!(err.is_err());
+    }
+}
+
+/// Split text into sentence-sized chunks for chunked synthesis.
+///
+/// Splits on sentence-ending punctuation (`.`, `!`, `?`, `。`, `।`, `؟`)
+/// followed by whitespace or end-of-string. Respects common abbreviations
+/// by not splitting on single-char prefixes like "Dr." or "Mr.".
+/// Chunks that are too short (<10 chars) are merged into the previous chunk.
+/// Maximum chunk length: 300 chars (avoids Edge-TTS SSML length limits).
+fn split_text_to_sentences(text: &str) -> Vec<String> {
+    if text.is_empty() {
+        return vec![];
+    }
+
+    const MAX_CHUNK: usize = 300;
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    let chars: Vec<char> = text.chars().collect();
+    let n = chars.len();
+    let mut i = 0;
+
+    while i < n {
+        current.push(chars[i]);
+        let is_sentence_end = matches!(chars[i], '.' | '!' | '?' | '。' | '।' | '؟');
+
+        if is_sentence_end {
+            // Avoid splitting on "Dr.", "Mr.", "St.", etc. (single preceding word char)
+            let prev_word_len = current
+                .trim_end_matches(chars[i])
+                .split_whitespace()
+                .last()
+                .map(|w| w.len())
+                .unwrap_or(0);
+            let is_abbreviation = prev_word_len <= 2 && chars[i] == '.';
+
+            let next_is_space_or_end = i + 1 >= n || chars[i + 1].is_whitespace();
+
+            if !is_abbreviation && next_is_space_or_end {
+                let chunk = current.trim().to_string();
+                if chunk.len() >= 10 {
+                    chunks.push(chunk);
+                    current = String::new();
+                }
+                // Skip leading whitespace after sentence end
+                while i + 1 < n && chars[i + 1].is_whitespace() {
+                    i += 1;
+                }
+            }
+        }
+
+        // Force-split at max chunk length on whitespace boundary
+        if current.len() >= MAX_CHUNK {
+            if let Some(last_space) = current.rfind(' ') {
+                let head = current[..last_space].trim().to_string();
+                let tail = current[last_space + 1..].to_string();
+                if !head.is_empty() {
+                    chunks.push(head);
+                }
+                current = tail;
+            }
+        }
+
+        i += 1;
+    }
+
+    // Flush remainder
+    let remainder = current.trim().to_string();
+    if !remainder.is_empty() {
+        if remainder.len() < 10 && !chunks.is_empty() {
+            // Merge short tail into previous chunk
+            let last = chunks.last_mut().unwrap();
+            last.push(' ');
+            last.push_str(&remainder);
+        } else {
+            chunks.push(remainder);
+        }
+    }
+
+    if chunks.is_empty() {
+        vec![text.to_string()]
+    } else {
+        chunks
+    }
+}
+
+#[cfg(test)]
+mod sentence_splitter_tests {
+    use super::*;
+
+    #[test]
+    fn test_split_empty_and_short() {
+        assert!(split_text_to_sentences("").is_empty());
+        // Short text (<400 chars, but we test the splitter directly) — no split
+        let result = split_text_to_sentences("Hello world.");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "Hello world.");
+    }
+
+    #[test]
+    fn test_split_multiple_sentences() {
+        let text = "This is sentence one. This is sentence two! And sentence three?";
+        let result = split_text_to_sentences(text);
+        assert!(result.len() >= 2, "Must split into at least 2 chunks, got: {:?}", result);
+        assert!(result.iter().all(|s| !s.is_empty()));
+    }
+
+    #[test]
+    fn test_split_does_not_split_abbreviations() {
+        let text = "Dr. Smith was here. He left at 10 a.m.";
+        let result = split_text_to_sentences(text);
+        // "Dr." should not cause a split; at most 2 chunks
+        assert!(result.len() <= 2, "Should not split abbreviations, got: {:?}", result);
+    }
+
+    #[test]
+    fn test_split_long_text_max_chunk() {
+        // Build a long text without sentence punctuation (should force-split at MAX_CHUNK)
+        let long_word = "word ";
+        let text: String = long_word.repeat(100); // 500 chars
+        let result = split_text_to_sentences(&text);
+        assert!(result.iter().all(|c| c.len() <= 310), "No chunk exceeds max");
+        assert!(!result.is_empty());
     }
 }
