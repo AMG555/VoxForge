@@ -14,7 +14,7 @@ services:
       - VOXFORGE_HOST=0.0.0.0
       - VOXFORGE_ASR_URL=http://faster-whisper:8000/v1
       - VOXFORGE_PIPER_URL=http://kokoro-tts:8880
-      - VOXFORGE_QWEN3_URL=http://qwen3-cloning:9000
+      - VOXFORGE_QWEN3_URL=http://neural-cloning:9000
       - VOXFORGE_MODELS_DIR=/app/models
       - VOXFORGE_API_KEY=${VOXFORGE_API_KEY:-}
       - RUST_LOG=info
@@ -25,6 +25,8 @@ services:
       faster-whisper:
         condition: service_started
       kokoro-tts:
+        condition: service_started
+      neural-cloning:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -53,8 +55,25 @@ services:
     volumes:
       - kokoro-cache:/app/api/src/weights
 
+  neural-cloning:
+    image: python:3.11-slim
+    container_name: voxforge-neural-cloning
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    working_dir: /app
+    volumes:
+      - .:/app
+      - neural-cache:/root/.cache
+    environment:
+      - VOXFORGE_SIDECAR_PORT=9000
+    command: >
+      bash -c "pip install --no-cache-dir numpy soundfile faster-whisper omnivoice f5-tts &&
+               python scripts/neural_sidecar.py"
+
 volumes:
   voxforge-data:
   voxforge-models:
   whisper-cache:
   kokoro-cache:
+  neural-cache:
