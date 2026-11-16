@@ -3,7 +3,7 @@
 ; Requires Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VoxForge"
-#define MyAppVersion "0.3.0"
+#define MyAppVersion "0.4.0"
 #define MyAppPublisher "VoxForge Contributors"
 #define MyAppURL "https://github.com/AMG555/VoxForge"
 #define MyAppExeName "voxforge.exe"
@@ -23,7 +23,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\..\LICENSE-APACHE
 OutputDir=..\..\dist
-OutputBaseFilename=VoxForge-Setup-v0.3.0-windows-x64
+OutputBaseFilename=VoxForge_Setup_x64
 SetupIconFile=..\..\assets\voxforge.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

@@ -4,8 +4,10 @@
 
 **Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
 
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.4.0_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.4.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
+
 [![Status](https://img.shields.io/badge/Status-Production_Ready_v0.4.0-brightgreen.svg)](docs/architecture.md)
-[![Release](https://img.shields.io/badge/Release-v0.4.0-brightgreen.svg)](https://github.com/AMG555/VoxForge/releases)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
@@ -82,17 +84,24 @@ Install standalone binary into system PATH or cleanly remove it with 1 command:
 
 ---
 
-## Direct Downloads (Desktop & Standalone)
+## 📥 Direct Downloads & Instant Setup
 
-For creators and desktop users who prefer pre-compiled release binaries:
+Pre-compiled, standalone release binaries with the embedded React 19 UI:
 
 | Platform | Download | Package Format | Details |
 | :--- | :--- | :--- | :--- |
-| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard (`.exe`) | Professional installer with desktop shortcut & uninstaller |
-| **Windows 10 / 11 (Portable)** | [**Download Standalone .exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Portable Executable | Single zero-install binary with embedded studio UI |
-| **Windows 10 / 11 (Zip Bundle)** | [**Download .zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
-| **macOS (Universal)** | [**Download Universal**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Standalone Binary | Universal binary with embedded studio UI (Apple Silicon & Intel) |
+| **Windows 10 / 11 (Portable .exe)** | [**Download voxforge.exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge.exe) | Portable Executable (~7.2 MB) | Single zero-install binary with embedded studio UI |
+| **Windows 10 / 11 (Zip Bundle)** | [**Download VoxForge-Windows-x64.zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
+| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard (`.exe`) | Professional installer with desktop shortcut & uninstaller |
+| **macOS (Universal)** | [**Download Universal (.tar.gz)**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal.tar.gz) | Standalone Binary | Universal binary with embedded studio UI (Apple Silicon & Intel) |
 | **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | Zero-dependency standalone executable |
+| **Integrity Checksums** | [**checksums.txt**](https://github.com/AMG555/VoxForge/releases/latest/download/checksums.txt) | SHA-256 Signatures | Verify asset integrity across all releases |
+
+> **ℹ️ Note on Windows SmartScreen / Browser Warnings:**
+> VoxForge is a 100% open-source utility built transparently on GitHub Actions. Because it does not carry an expensive ($400/yr) proprietary corporate Authenticode certificate, Windows Defender SmartScreen or Chromium browsers may show an "Unrecognized app" notice on new releases:
+> * **Browser Download Notice**: Click `...` next to download -> **Keep** -> **Keep anyway**.
+> * **SmartScreen Popup**: Click **More info** -> **Run anyway**.
+> * **Instant Unblock via PowerShell**: Run `Unblock-File .\voxforge.exe` or use the 1-line installer below.
 
 ---
 

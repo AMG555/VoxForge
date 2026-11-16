@@ -90,7 +90,16 @@ jobs:
           choco install innosetup -y --no-progress
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           & $iscc scripts/installer/voxforge.iss
-          Write-Host "Installer built successfully"
+          Copy-Item dist/VoxForge_Setup_x64.exe dist/VoxForge-Setup-v0.4.0-windows-x64.exe -Force -ErrorAction SilentlyContinue
+          
+          # Generate SHA-256 checksums
+          $files = Get-ChildItem -Path "dist" -File | Where-Object { $_.Name -ne "checksums.txt" }
+          $hashes = foreach ($f in $files) {
+              $hash = (Get-FileHash -Path $f.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $($f.Name)"
+          }
+          Set-Content -Path dist/checksums.txt -Value $hashes -Force
+          Write-Host "Installer and checksums built successfully"
 
       - name: Sign Windows Binaries (if certificate configured)
         if: runner.os == 'Windows'
