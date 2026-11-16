@@ -12,7 +12,7 @@
 [![API](https://img.shields.io/badge/API-OpenAI_TTS_Compatible-green.svg)](docs/api.md)
 [![Platform](https://img.shields.io/badge/Platform-Linux_%7C_macOS_%7C_Windows-lightgrey.svg)](docs/architecture.md)
 
-*An open-source, private, self-hosted alternative to ElevenLabs. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
+*An open-source, private, self-hosted neural speech workstation. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
 
 [Download .exe](#direct-downloads-desktop--standalone) • [Features](#key-features) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
