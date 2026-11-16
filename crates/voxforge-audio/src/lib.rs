@@ -7,16 +7,16 @@ pub mod paralinguistics;
 pub mod wav;
 
 pub use dsp::{
-    AcousticEchoCanceller, AlgorithmicReverb, AudioWatermark, BrickwallLimiter, DeEsser,
-    DynamicCompressor, EchoDelay, HarmonicWarmth, HumanMicroTremor, MasteringProfile,
-    NaturalBreath, ParametricEq, ProsodyMirror, SilenceTrimmer, SmartFitPlanner, SoftEnvelope,
-    VocalChorus, VocalTractResonator, WatermarkDetectionResult, WsolaTimeStretch,
+    AcousticEchoCanceller, AcousticFeatures, AlgorithmicReverb, AudioWatermark, BrickwallLimiter,
+    DeEsser, DynamicCompressor, EchoDelay, HarmonicWarmth, HumanMicroTremor, MasteringProfile,
+    NaturalBreath, ParametricEq, ProsodyMirror, Resampler, SilenceTrimmer, SmartFitPlanner,
+    SoftEnvelope, VocalChorus, VocalTractResonator, WatermarkDetectionResult, WsolaTimeStretch,
     DEFAULT_SIGNATURE_PAYLOAD,
 };
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;
 pub use metrics::{AudioAnalyzer, AudioQualityMetrics};
-pub use normalizer::AudioNormalizer;
+pub use normalizer::{AudioNormalizer, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE};
 pub use paralinguistics::{
     has_paralinguistic_tags, parse_paralinguistic_text, ParalinguisticSegment,
     ParalinguisticSynthesizer, ParalinguisticTag,
