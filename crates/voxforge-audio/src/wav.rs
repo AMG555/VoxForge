@@ -48,10 +48,44 @@ impl WavEncoder {
                 "WAV sample count exceeds maximum supported limit (50M samples)".to_string(),
             ));
         }
-        let samples: std::result::Result<Vec<i16>, _> = reader.samples::<i16>().collect();
-        let pcm_samples = samples.map_err(|e| {
-            VoxForgeError::AudioProcessing(format!("Failed to read samples: {}", e))
-        })?;
+
+        let pcm_samples = match (spec.sample_format, spec.bits_per_sample) {
+            (hound::SampleFormat::Int, 16) => reader
+                .samples::<i16>()
+                .collect::<std::result::Result<Vec<i16>, _>>()
+                .map_err(|e| {
+                    VoxForgeError::AudioProcessing(format!("Failed to read 16-bit samples: {}", e))
+                })?,
+            (hound::SampleFormat::Int, 24) | (hound::SampleFormat::Int, 32) => {
+                let shift = spec.bits_per_sample - 16;
+                reader
+                    .samples::<i32>()
+                    .map(|res| res.map(|s| (s >> shift) as i16))
+                    .collect::<std::result::Result<Vec<i16>, _>>()
+                    .map_err(|e| {
+                        VoxForgeError::AudioProcessing(format!(
+                            "Failed to read {}-bit int samples: {}",
+                            spec.bits_per_sample, e
+                        ))
+                    })?
+            }
+            (hound::SampleFormat::Float, 32) => reader
+                .samples::<f32>()
+                .map(|res| res.map(|s| (s.clamp(-1.0, 1.0) * 32767.0).round() as i16))
+                .collect::<std::result::Result<Vec<i16>, _>>()
+                .map_err(|e| {
+                    VoxForgeError::AudioProcessing(format!(
+                        "Failed to read 32-bit float samples: {}",
+                        e
+                    ))
+                })?,
+            _ => reader
+                .samples::<i16>()
+                .collect::<std::result::Result<Vec<i16>, _>>()
+                .map_err(|e| {
+                    VoxForgeError::AudioProcessing(format!("Failed to read samples: {}", e))
+                })?,
+        };
 
         Ok((pcm_samples, spec.sample_rate, spec.channels))
     }

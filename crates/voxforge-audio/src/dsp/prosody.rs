@@ -173,14 +173,49 @@ impl ProsodyMirror {
                 }
 
                 let norm_r = best_r / frame_energy;
+                // Parabolic interpolation for sub-sample precision F0 estimation.
+                // Fits a parabola through the 3 autocorrelation values around the peak lag
+                // to find the true maximum at a fractional sample position.
                 if norm_r > 0.35 && best_lag > 0 {
-                    let pitch_hz = sr / best_lag as f32;
-                    f0_estimates.push(pitch_hz);
-                    let hnr = 10.0 * (norm_r / (1.0 - norm_r).max(1e-4)).log10();
-                    hnr_estimates.push(hnr);
-                    let frame_rms = (frame_energy / frame_size as f64).sqrt() as f32;
-                    voiced_amplitudes.push(frame_rms);
-                    voiced_frames += 1;
+                    let lag_f32 = if best_lag > min_lag && best_lag < max_lag.min(frame_size / 2) {
+                        // R[lag-1], R[lag], R[lag+1]
+                        let r_prev = {
+                            let lag = best_lag - 1;
+                            let mut rr = 0.0f64;
+                            for i in 0..(frame_size - lag) {
+                                rr += frame[i] as f64 * frame[i + lag] as f64;
+                            }
+                            rr / frame_energy
+                        };
+                        let r_next = {
+                            let lag = best_lag + 1;
+                            let mut rr = 0.0f64;
+                            for i in 0..(frame_size - lag) {
+                                rr += frame[i] as f64 * frame[i + lag] as f64;
+                            }
+                            rr / frame_energy
+                        };
+                        // Parabola vertex: d = 0.5 * (r_prev - r_next) / (r_prev - 2*r_curr + r_next)
+                        let denom = r_prev - 2.0 * norm_r + r_next;
+                        if denom.abs() > 1e-10 {
+                            let delta = 0.5 * (r_prev - r_next) / denom;
+                            (best_lag as f64 + delta.clamp(-0.5, 0.5)) as f32
+                        } else {
+                            best_lag as f32
+                        }
+                    } else {
+                        best_lag as f32
+                    };
+                    let pitch_hz = sr / lag_f32.max(1.0);
+                    // Guard against out-of-range pitches after interpolation
+                    if (65.0..=500.0).contains(&pitch_hz) {
+                        f0_estimates.push(pitch_hz);
+                        let hnr = 10.0 * (norm_r / (1.0 - norm_r).max(1e-4)).log10();
+                        hnr_estimates.push(hnr);
+                        let frame_rms = (frame_energy / frame_size as f64).sqrt() as f32;
+                        voiced_amplitudes.push(frame_rms);
+                        voiced_frames += 1;
+                    }
                 }
             }
 
