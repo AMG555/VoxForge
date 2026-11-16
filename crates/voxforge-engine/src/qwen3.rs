@@ -629,7 +629,7 @@ impl TtsEngine for Qwen3TtsEngine {
             -22.0,
             4.5,
         );
-        voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
+        voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
         voxforge_audio::SoftEnvelope::process(&mut chunk.pcm_data, chunk.sample_rate, 6.0, 24.0);
 
         if chunk.pcm_data.len() > (chunk.sample_rate as usize) {
@@ -736,6 +736,13 @@ impl TtsEngine for Qwen3TtsEngine {
                 let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
                 if trimmed.len() >= 2400 { trimmed } else { samples }
             };
+            // Snap window edges to natural pause boundaries (Studio trim_passage_to_pauses)
+            let samples = {
+                let snapped = voxforge_audio::dsp::SilenceTrimmer::trim_passage_to_pauses(
+                    &samples, 24000, 1500, 50, -55.0,
+                );
+                if snapped.len() >= 2400 { snapped } else { samples }
+            };
             let feat = voxforge_audio::ProsodyMirror::analyze(&samples, 24000);
             (samples, Some(feat))
         } else if let Some(ref path) = request.reference_audio_path {
@@ -786,6 +793,13 @@ impl TtsEngine for Qwen3TtsEngine {
             let samples = {
                 let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
                 if trimmed.len() >= 2400 { trimmed } else { samples }
+            };
+            // Snap window edges to natural pause boundaries (Studio trim_passage_to_pauses)
+            let samples = {
+                let snapped = voxforge_audio::dsp::SilenceTrimmer::trim_passage_to_pauses(
+                    &samples, 24000, 1500, 50, -55.0,
+                );
+                if snapped.len() >= 2400 { snapped } else { samples }
             };
             let feat = voxforge_audio::ProsodyMirror::analyze(&samples, 24000);
             (samples, Some(feat))
@@ -1365,9 +1379,11 @@ impl TtsEngine for Qwen3TtsEngine {
             } else {
                 let sample_rate = chunks[0].sample_rate;
                 let pcm_slices: Vec<&[i16]> = chunks.iter().map(|c| c.pcm_data.as_slice()).collect();
-                // 50ms equal-power cross-fade at every sentence seam
-                let stitched = voxforge_audio::AudioMerger::concatenate_with_equal_power_crossfade(
-                    &pcm_slices, sample_rate, 50,
+                // Studio-style: fade-out → 100ms silence gap → fade-in
+                // Avoids phase-mismatch clicks that equal-power overlap crossfade can produce
+                // when chunk boundaries fall on arbitrary phases of the speech waveform.
+                let stitched = voxforge_audio::AudioMerger::silence_gap_join(
+                    &pcm_slices, sample_rate, 20, 100,
                 );
                 AudioChunk {
                     sample_rate,
@@ -1515,7 +1531,13 @@ impl TtsEngine for Qwen3TtsEngine {
             5.0,
         );
 
-        // 11. Studio peak normalization & brickwall limiting
+        // 11. Phrase leveler (Studio's level_speech() — the primary perceptual quality step).
+        //     400ms slow EMA + speech gate: equalises phrase-to-phrase loudness WITHOUT
+        //     compressing syllable peaks. Must run BEFORE the mastering compressor so the
+        //     compressor sees an already-level signal and operates in its linear region.
+        voxforge_audio::PhraseLeveler::process(&mut chunk.pcm_data, chunk.sample_rate);
+
+        // 11b. Studio peak normalization & brickwall limiting (look-ahead, 5ms, 40ms release)
         let max_amp = chunk.pcm_data.iter().map(|&s| s.abs()).max().unwrap_or(0) as f32;
         if max_amp > 100.0 && max_amp < 28000.0 {
             let gain = (28000.0 / max_amp).min(1.6);
@@ -1523,12 +1545,17 @@ impl TtsEngine for Qwen3TtsEngine {
                 *s = ((*s as f32 * gain).clamp(-32767.0, 32767.0)) as i16;
             }
         }
-        voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
+        voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
 
-        // 11b. Broadcast mastering pass (EQ, compressor, de-esser, peak safety).
+        // 11c. Broadcast mastering pass (EQ, compressor, de-esser, peak safety).
         // Matches Studio's "broadcast mastering" post-chain for perceptually uniform
         // loudness and consistent spectral balance across synthesized clones.
         voxforge_audio::MasteringProfile::Broadcast.apply(&mut chunk.pcm_data, chunk.sample_rate);
+
+        // 11d. Room-tone gap fill: replace digital-zero pauses with spectrally-shaped
+        //      room tone from the take itself. Eliminates the gating artefact audible on
+        //      headphones. Studio's fill_gaps() is the reference.
+        voxforge_audio::RoomToneGapFill::process(&mut chunk.pcm_data, chunk.sample_rate);
 
         // 12. Soft anti-click envelope on speech core
         voxforge_audio::SoftEnvelope::process(&mut chunk.pcm_data, chunk.sample_rate, 6.0, 24.0);
@@ -1603,7 +1630,7 @@ impl TtsEngine for Qwen3TtsEngine {
 
             // Only replace if assembly produced a plausible result
             if assembled.len() >= chunk.pcm_data.len() / 2 {
-                voxforge_audio::BrickwallLimiter::process(&mut assembled, -0.5);
+                voxforge_audio::BrickwallLimiter::process_sr(&mut assembled, -0.5, sr);
                 chunk.pcm_data = assembled;
             }
         }
@@ -1617,8 +1644,8 @@ impl TtsEngine for Qwen3TtsEngine {
             chunk.sample_rate,
             voxforge_audio::LUFS_TARGET_VOICE,
         );
-        // Final brickwall to guard against any LUFS gain boost causing clipping
-        voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
+        // Final brickwall to guard against any LUFS gain boost causing clipping (look-ahead)
+        voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
 
         Ok(chunk)
     }

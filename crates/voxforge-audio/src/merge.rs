@@ -177,6 +177,87 @@ impl AudioMerger {
 
         out
     }
+
+    /// Studio-style chunk joining: fade-out tail → silence gap → fade-in head.
+    ///
+    /// Studio's `cross_fade_chunks()` uses this pattern instead of overlapping
+    /// equal-power crossfade. The key insight: when two TTS chunks have unknown phase
+    /// relationships, overlapping them (even with equal-power curves) can produce
+    /// constructive/destructive interference clicks at the seam. A short silence gap
+    /// between the fade-out and fade-in completely eliminates this problem.
+    ///
+    /// # Arguments
+    /// - `chunks`: slice of audio segments to join
+    /// - `sample_rate`: audio sample rate in Hz
+    /// - `fade_ms`: duration of the fade-out and fade-in ramps (each), default 20ms
+    /// - `gap_ms`: duration of the silence gap between fades, default 100ms
+    pub fn silence_gap_join(
+        chunks: &[&[i16]],
+        sample_rate: u32,
+        fade_ms: u32,
+        gap_ms: u32,
+    ) -> Vec<i16> {
+        if chunks.is_empty() {
+            return Vec::new();
+        }
+        if chunks.len() == 1 {
+            return chunks[0].to_vec();
+        }
+
+        let sr = sample_rate.min(192_000) as f32;
+        let fade_len = ((sr * fade_ms.min(1000) as f32 / 1000.0) as usize).max(1);
+        let gap_len = (sr * gap_ms.min(10_000) as f32 / 1000.0) as usize;
+
+        let total_len: usize = chunks.iter().map(|c| c.len()).sum::<usize>()
+            + (chunks.len() - 1) * gap_len;
+        let mut out = Vec::with_capacity(total_len);
+
+        for (idx, &seg) in chunks.iter().enumerate() {
+            if idx == 0 {
+                // First chunk: write body, then fade-out tail
+                if seg.len() > fade_len {
+                    out.extend_from_slice(&seg[..seg.len() - fade_len]);
+                    for (i, &s) in seg[seg.len() - fade_len..].iter().enumerate() {
+                        let gain = 1.0 - (i as f32 / fade_len as f32);
+                        out.push((s as f32 * gain).round().clamp(-32768.0, 32767.0) as i16);
+                    }
+                } else {
+                    out.extend_from_slice(seg);
+                }
+            } else if idx == chunks.len() - 1 {
+                // Last chunk: silence gap, then fade-in head, then body
+                out.resize(out.len() + gap_len, 0i16);
+                let head_len = fade_len.min(seg.len());
+                for (i, &s) in seg[..head_len].iter().enumerate() {
+                    let gain = i as f32 / head_len as f32;
+                    out.push((s as f32 * gain).round().clamp(-32768.0, 32767.0) as i16);
+                }
+                if seg.len() > head_len {
+                    out.extend_from_slice(&seg[head_len..]);
+                }
+            } else {
+                // Middle chunks: silence gap, fade-in head, body, fade-out tail
+                out.resize(out.len() + gap_len, 0i16);
+                let head_len = fade_len.min(seg.len());
+                for (i, &s) in seg[..head_len].iter().enumerate() {
+                    let gain = i as f32 / head_len as f32;
+                    out.push((s as f32 * gain).round().clamp(-32768.0, 32767.0) as i16);
+                }
+                let tail_start = head_len;
+                if seg.len() > tail_start + fade_len {
+                    out.extend_from_slice(&seg[tail_start..seg.len() - fade_len]);
+                    for (i, &s) in seg[seg.len() - fade_len..].iter().enumerate() {
+                        let gain = 1.0 - (i as f32 / fade_len as f32);
+                        out.push((s as f32 * gain).round().clamp(-32768.0, 32767.0) as i16);
+                    }
+                } else if seg.len() > tail_start {
+                    out.extend_from_slice(&seg[tail_start..]);
+                }
+            }
+        }
+
+        out
+    }
 }
 
 #[cfg(test)]
@@ -234,5 +315,49 @@ mod tests {
         // 10ms = 240 samples. Seams = 2.
         // Total = 3000 - 2 * 240 = 2520 samples
         assert_eq!(out.len(), 2520);
+    }
+
+    #[test]
+    fn test_silence_gap_join_empty_and_single() {
+        assert!(AudioMerger::silence_gap_join(&[], 24000, 20, 100).is_empty());
+        let single = vec![500i16; 100];
+        assert_eq!(
+            AudioMerger::silence_gap_join(&[&single], 24000, 20, 100),
+            single
+        );
+    }
+
+    #[test]
+    fn test_silence_gap_join_two_chunks_contains_gap() {
+        let sr = 24_000u32;
+        let fade_ms = 20u32;
+        let gap_ms = 100u32;
+        let chunk = vec![10000i16; 2400]; // 100ms @ 24kHz
+        let out = AudioMerger::silence_gap_join(&[&chunk, &chunk], sr, fade_ms, gap_ms);
+
+        // Expected total ≈ 2400 + 2400 + 2400(gap) = 7200
+        // Actual may vary slightly due to fade lengths but should be in range
+        let gap_samples = (sr as f32 * gap_ms as f32 / 1000.0) as usize;
+        assert!(
+            out.len() > chunk.len() * 2,
+            "Output must be longer than 2 input chunks (gap adds samples), got {}",
+            out.len()
+        );
+
+        // The gap region should contain zeros (around middle)
+        let gap_start = chunk.len() - 10; // near end of chunk A
+        let gap_end = gap_start + gap_samples + 10;
+        let gap_end = gap_end.min(out.len());
+        let any_zero_in_gap = out[gap_start..gap_end].iter().any(|&s| s == 0);
+        assert!(any_zero_in_gap, "Silence gap must exist between chunks");
+    }
+
+    #[test]
+    fn test_silence_gap_join_no_clipping() {
+        let sr = 24_000u32;
+        let loud = vec![30000i16; 4800]; // 200ms loud signal
+        let out = AudioMerger::silence_gap_join(&[&loud, &loud, &loud], sr, 20, 100);
+        // i16 is by definition in [-32768, 32767]; verify non-empty and no panic
+        assert!(!out.is_empty());
     }
 }

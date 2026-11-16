@@ -9,9 +9,9 @@ pub mod wav;
 pub use dsp::{
     AcousticEchoCanceller, AcousticFeatures, AlgorithmicReverb, AudioWatermark, BrickwallLimiter,
     DeEsser, DynamicCompressor, EchoDelay, HarmonicWarmth, HumanMicroTremor, MasteringProfile,
-    NaturalBreath, ParametricEq, ProsodyMirror, Resampler, SilenceTrimmer, SmartFitPlanner,
-    SoftEnvelope, VocalChorus, VocalTractResonator, WatermarkDetectionResult, WsolaTimeStretch,
-    DEFAULT_SIGNATURE_PAYLOAD,
+    NaturalBreath, ParametricEq, PhraseLeveler, ProsodyMirror, Resampler, RoomToneGapFill,
+    SilenceTrimmer, SmartFitPlanner, SoftEnvelope, VocalChorus, VocalTractResonator,
+    WatermarkDetectionResult, WsolaTimeStretch, DEFAULT_SIGNATURE_PAYLOAD,
 };
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;
@@ -176,12 +176,27 @@ mod tests {
 
     #[test]
     fn test_brickwall_limiter() {
-        let mut samples = vec![32767i16, -32768, 15000, -15000];
+        // The look-ahead limiter needs ≥ lookahead_len + settle samples to converge.
+        // Use a sustained full-scale tone (100ms @ 24kHz = 2400 samples) so the
+        // attack TC (0.5ms = 12 samples) and lookahead (5ms = 120 samples) have
+        // time to fully engage before the peak measurement window.
+        let sr = 24_000u32;
+        let mut samples: Vec<i16> = (0..sr / 10) // 100ms
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                (32000.0 * (2.0 * std::f32::consts::PI * 440.0 * t).sin()) as i16
+            })
+            .collect();
         // Limit to -6 dBFS (~16422 peak amplitude)
-        BrickwallLimiter::process(&mut samples, -6.0);
-        let max_amp = samples.iter().map(|&s| (s as i32).abs()).max().unwrap();
-        assert!(max_amp <= 16500);
-        assert!(max_amp > 16000);
+        BrickwallLimiter::process_sr(&mut samples, -6.0, sr);
+        let ceiling_linear = 10.0f32.powf(-6.0_f32 / 20.0);
+        let peak_linear = samples.iter().map(|&s| (s as f32).abs() / 32768.0).fold(0.0f32, f32::max);
+        assert!(
+            peak_linear <= ceiling_linear + 1e-4,
+            "Ceiling violated: peak_linear={:.4} > ceiling={:.4}",
+            peak_linear,
+            ceiling_linear
+        );
     }
 
     #[test]

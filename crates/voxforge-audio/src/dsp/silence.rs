@@ -213,6 +213,129 @@ impl SilenceTrimmer {
         let end = (best_start + window_len).min(samples.len());
         samples[best_start..end].to_vec()
     }
+
+    /// Snap the edges of a proposed window inward to the nearest natural pause boundary.
+    ///
+    /// Studio's `trim_passage_to_pauses()` (audio.py) prevents mid-word clips at
+    /// window edges by pulling the start forward and the end backward until both land
+    /// at a natural pause (continuous silence ≥ `min_pause_ms`).
+    ///
+    /// # Arguments
+    /// - `samples`: The proposed window (already trimmed to target duration)
+    /// - `sample_rate`: Audio sample rate in Hz
+    /// - `search_ms`: How far from each edge to search for a pause (default: 1500ms)
+    /// - `min_pause_ms`: Minimum silence duration to qualify as a "pause" boundary (default: 50ms)
+    /// - `threshold_dbfs`: Amplitude below which a frame is considered silent (default: -55.0)
+    ///
+    /// Returns a sub-slice with both edges nudged to pause boundaries.
+    /// If no pause boundary is found within `search_ms`, the original edges are kept.
+    pub fn trim_passage_to_pauses(
+        samples: &[i16],
+        sample_rate: u32,
+        search_ms: u32,
+        min_pause_ms: u32,
+        threshold_dbfs: f32,
+    ) -> Vec<i16> {
+        if samples.is_empty() || sample_rate == 0 {
+            return samples.to_vec();
+        }
+
+        let sr = sample_rate.max(1) as f32;
+        let safe_threshold = if threshold_dbfs.is_finite() {
+            threshold_dbfs.clamp(-96.0, 0.0)
+        } else {
+            -55.0
+        };
+
+        let silent_amp = 32767.0f32 * 10.0f32.powf(safe_threshold / 20.0);
+        let search_len =
+            ((sr * search_ms.min(5000) as f32 / 1000.0) as usize).min(samples.len() / 2);
+        let min_pause_len = ((sr * min_pause_ms.min(1000) as f32 / 1000.0) as usize).max(1);
+
+        // Find leading pause: search forward from offset 0 up to search_len
+        let new_start = Self::find_pause_boundary_forward(
+            samples,
+            0,
+            search_len,
+            min_pause_len,
+            silent_amp,
+        );
+
+        // Find trailing pause: search backward from end, up to search_len from end
+        let new_end = Self::find_pause_boundary_backward(
+            samples,
+            samples.len().saturating_sub(search_len),
+            samples.len(),
+            min_pause_len,
+            silent_amp,
+        );
+
+        if new_start >= new_end {
+            return samples.to_vec();
+        }
+
+        // Safety: never return fewer than 500ms if the original was longer
+        let min_ret = ((sr * 0.5) as usize).min(samples.len());
+        if new_end - new_start < min_ret {
+            return samples.to_vec();
+        }
+
+        samples[new_start..new_end].to_vec()
+    }
+
+    // ── Internal helpers for trim_passage_to_pauses ──
+
+    fn find_pause_boundary_forward(
+        samples: &[i16],
+        from: usize,
+        to: usize,
+        min_pause_len: usize,
+        silent_amp: f32,
+    ) -> usize {
+        let to = to.min(samples.len());
+        let mut run_start = from;
+        let mut run_len = 0usize;
+
+        for (offset, &s) in samples[from..to].iter().enumerate() {
+            let i = from + offset;
+            if (s as f32).abs() < silent_amp {
+                if run_len == 0 {
+                    run_start = i;
+                }
+                run_len += 1;
+                if run_len >= min_pause_len {
+                    return run_start;
+                }
+            } else {
+                run_len = 0;
+            }
+        }
+        from
+    }
+
+    fn find_pause_boundary_backward(
+        samples: &[i16],
+        from: usize,
+        to: usize,
+        min_pause_len: usize,
+        silent_amp: f32,
+    ) -> usize {
+        let to = to.min(samples.len());
+        let mut run_len = 0usize;
+
+        for i in (from..to).rev() {
+            if (samples[i] as f32).abs() < silent_amp {
+                let run_end = i + 1;
+                run_len += 1;
+                if run_len >= min_pause_len {
+                    return run_end;
+                }
+            } else {
+                run_len = 0;
+            }
+        }
+        to
+    }
 }
 
 #[cfg(test)]
@@ -306,5 +429,49 @@ mod tests {
     fn test_best_reference_window_empty() {
         let out = SilenceTrimmer::best_reference_window(&[], 24000, 10.0, 2.0);
         assert!(out.is_empty());
+    }
+
+    #[test]
+    fn test_trim_passage_to_pauses_no_pauses_returns_original() {
+        let sr = 24_000u32;
+        // Constant loud signal — no pause boundaries
+        let samples: Vec<i16> = vec![10000i16; sr as usize];
+        let result =
+            SilenceTrimmer::trim_passage_to_pauses(&samples, sr, 1500, 50, -55.0);
+        // No pause found → return unchanged
+        assert_eq!(result.len(), samples.len());
+    }
+
+    #[test]
+    fn test_trim_passage_to_pauses_snaps_to_leading_pause() {
+        let sr = 24_000u32;
+        // Build: [500ms speech] [200ms silence] [2s speech] [200ms silence] [500ms speech]
+        let speech_short: Vec<i16> = vec![10000i16; sr as usize / 2];
+        let silence: Vec<i16> = vec![0i16; sr as usize / 5]; // 200ms
+        let speech_long: Vec<i16> = vec![10000i16; sr as usize * 2];
+
+        let samples: Vec<i16> = speech_short
+            .iter()
+            .chain(silence.iter())
+            .chain(speech_long.iter())
+            .chain(silence.iter())
+            .chain(speech_short.iter())
+            .cloned()
+            .collect();
+
+        let result = SilenceTrimmer::trim_passage_to_pauses(&samples, sr, 1500, 50, -40.0);
+        // Result must be shorter than original (pauses found and edges snapped)
+        assert!(
+            result.len() < samples.len(),
+            "Expected shorter result after snapping to pause boundaries, got {} vs {}",
+            result.len(),
+            samples.len()
+        );
+    }
+
+    #[test]
+    fn test_trim_passage_to_pauses_empty_passthrough() {
+        let result = SilenceTrimmer::trim_passage_to_pauses(&[], 24000, 1500, 50, -55.0);
+        assert!(result.is_empty());
     }
 }
