@@ -500,26 +500,10 @@ impl TtsEngine for Qwen3TtsEngine {
             cost_per_1k_chars: 0.0,
             avg_latency_ms: 120,
             quality_score: 0.95,
-            languages: vec![
-                "en-US".to_string(),
-                "en-GB".to_string(),
-                "ml-IN".to_string(),
-                "hi-IN".to_string(),
-                "ta-IN".to_string(),
-                "te-IN".to_string(),
-                "kn-IN".to_string(),
-                "bn-IN".to_string(),
-                "mr-IN".to_string(),
-                "gu-IN".to_string(),
-                "ur-IN".to_string(),
-                "pa-IN".to_string(),
-                "de-DE".to_string(),
-                "fr-FR".to_string(),
-                "es-ES".to_string(),
-                "zh-CN".to_string(),
-                "ja-JP".to_string(),
-                "ko-KR".to_string(),
-            ],
+            languages: EDGE_TTS_LANG_TABLE
+                .iter()
+                .map(|(bcp47, _, _)| bcp47.to_string())
+                .collect(),
             is_local: true,
             supports_cloning: true,
             supports_streaming: true,
@@ -769,47 +753,68 @@ impl TtsEngine for Qwen3TtsEngine {
 
         // Multi-sample aggregation: compute per-sample embeddings and average them.
         // Clips the additional sample list to 7 max to prevent excessive processing.
+        // Resamples 48kHz→24kHz inputs before extraction.
         let mut all_embeddings: Vec<Vec<f32>> = vec![primary_embedding.clone()];
         let extra_limit = request.additional_reference_audio_base64.len().min(7);
         for extra_b64 in &request.additional_reference_audio_base64[..extra_limit] {
             let extra_bytes = decode_audio_payload(extra_b64);
-            let extra_samples: Vec<i16> = if extra_bytes.starts_with(b"RIFF") {
+            let (extra_samples_raw, extra_sr): (Vec<i16>, u32) = if extra_bytes.starts_with(b"RIFF") {
                 voxforge_audio::WavEncoder::decode_wav_to_pcm16(&extra_bytes)
-                    .map(|(s, _, _)| s)
+                    .map(|(s, sr, _)| (s, sr))
                     .unwrap_or_default()
             } else {
-                extra_bytes
-                    .chunks_exact(2)
-                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                    .collect()
+                (
+                    extra_bytes
+                        .chunks_exact(2)
+                        .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                        .collect(),
+                    24000,
+                )
+            };
+            // Downsample from 48kHz to 24kHz by halving (simple 2:1 decimation)
+            let extra_samples = if extra_sr == 48000 {
+                downsample_2x(&extra_samples_raw)
+            } else {
+                extra_samples_raw
             };
             if extra_samples.len() >= 2400 {
                 all_embeddings.push(Self::extract_speaker_embedding(&extra_samples));
             }
         }
 
-        // Centroid aggregation: element-wise mean across all sample embeddings, then L2-normalize.
-        let embedding = if all_embeddings.len() == 1 {
-            primary_embedding.clone()
+        // Outlier rejection: drop embeddings whose cosine distance from the preliminary centroid
+        // exceeds 2.0 std deviations. Protects against noisy/background reference samples.
+        let embedding = if all_embeddings.len() <= 2 {
+            // With 1-2 samples, compute centroid directly — not enough for outlier statistics.
+            compute_l2_centroid(&all_embeddings)
         } else {
-            let n = all_embeddings.len() as f32;
-            let mut centroid = vec![0.0f32; 512];
-            for emb in &all_embeddings {
-                for (slot, &val) in centroid.iter_mut().zip(emb.iter()) {
-                    *slot += val;
-                }
+            // 1. Preliminary centroid
+            let prelim = compute_l2_centroid(&all_embeddings);
+            // 2. Compute cosine similarities to centroid
+            let sims: Vec<f32> = all_embeddings
+                .iter()
+                .map(|e| Self::compute_cosine_similarity(e, &prelim))
+                .collect();
+            // 3. Mean and std dev of similarities
+            let mean_sim = sims.iter().sum::<f32>() / sims.len() as f32;
+            let std_sim = {
+                let var = sims.iter().map(|&s| (s - mean_sim).powi(2)).sum::<f32>()
+                    / sims.len() as f32;
+                var.sqrt().max(1e-6)
+            };
+            // 4. Keep embeddings within mean ± 2.0σ
+            let threshold = mean_sim - 2.0 * std_sim;
+            let kept: Vec<Vec<f32>> = all_embeddings
+                .iter()
+                .zip(sims.iter())
+                .filter_map(|(e, &s)| if s >= threshold { Some(e.clone()) } else { None })
+                .collect();
+            // Fall back to all embeddings if outlier rejection removed everything
+            if kept.is_empty() {
+                compute_l2_centroid(&all_embeddings)
+            } else {
+                compute_l2_centroid(&kept)
             }
-            for slot in &mut centroid {
-                *slot /= n;
-            }
-            // Re-normalize centroid to unit sphere
-            let l2: f32 = centroid.iter().map(|&x| x * x).sum::<f32>().sqrt();
-            if l2 > 1e-6 {
-                for slot in &mut centroid {
-                    *slot /= l2;
-                }
-            }
-            centroid
         };
 
         // Intra-sample cosine similarity: measures how consistent the reference samples are.
@@ -1042,6 +1047,18 @@ impl TtsEngine for Qwen3TtsEngine {
         let sidecar_url = self.resolve_sidecar_url();
 
         if let Some(ref url) = sidecar_url {
+            let num_step: u32 = request
+                .profile
+                .metadata
+                .get("num_step")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(32);
+            let instruct = request
+                .profile
+                .metadata
+                .get("instruct")
+                .cloned();
+
             let payload = serde_json::json!({
                 "text": request.text,
                 "voice_profile_id": request.profile.id,
@@ -1049,7 +1066,10 @@ impl TtsEngine for Qwen3TtsEngine {
                 "reference_transcript": request.profile.reference_transcript,
                 "language": request.profile.language,
                 "speed": request.speed,
-                "pitch": request.pitch
+                "pitch": request.pitch,
+                "num_step": num_step,
+                "instruct": instruct,
+                "mastering": true
             });
 
             if let Ok(resp) = self.client.post(url).json(&payload).send().await {
@@ -1400,6 +1420,11 @@ impl TtsEngine for Qwen3TtsEngine {
         }
         voxforge_audio::BrickwallLimiter::process(&mut chunk.pcm_data, -0.5);
 
+        // 11b. Broadcast mastering pass (EQ, compressor, de-esser, peak safety).
+        // Matches Studio's "broadcast mastering" post-chain for perceptually uniform
+        // loudness and consistent spectral balance across synthesized clones.
+        voxforge_audio::MasteringProfile::Broadcast.apply(&mut chunk.pcm_data, chunk.sample_rate);
+
         // 12. Soft anti-click envelope on speech core
         voxforge_audio::SoftEnvelope::process(&mut chunk.pcm_data, chunk.sample_rate, 6.0, 24.0);
 
@@ -1482,148 +1507,327 @@ impl TtsEngine for Qwen3TtsEngine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Private helpers used by Qwen3TtsEngine
+// ---------------------------------------------------------------------------
+
+/// 2:1 decimation: averages each pair of adjacent samples to halve the sample rate.
+/// Used to downsample 48kHz reference audio to the engine's 24kHz working rate
+/// without requiring an external resampling library.
+fn downsample_2x(samples: &[i16]) -> Vec<i16> {
+    if samples.len() < 2 {
+        return samples.to_vec();
+    }
+    let out_len = samples.len() / 2;
+    let mut out = Vec::with_capacity(out_len);
+    for chunk in samples.chunks_exact(2) {
+        let avg = ((chunk[0] as i32 + chunk[1] as i32) / 2) as i16;
+        out.push(avg);
+    }
+    out
+}
+
+/// Compute the L2-normalized centroid (mean) of a set of 512-D embeddings.
+fn compute_l2_centroid(embeddings: &[Vec<f32>]) -> Vec<f32> {
+    if embeddings.is_empty() {
+        return vec![0.0f32; 512];
+    }
+    if embeddings.len() == 1 {
+        return embeddings[0].clone();
+    }
+    let n = embeddings.len() as f32;
+    let dim = embeddings[0].len();
+    let mut centroid = vec![0.0f32; dim];
+    for emb in embeddings {
+        for (slot, &val) in centroid.iter_mut().zip(emb.iter()) {
+            *slot += val;
+        }
+    }
+    for slot in &mut centroid {
+        *slot /= n;
+    }
+    // Re-normalize to unit sphere
+    let l2: f32 = centroid.iter().map(|&x| x * x).sum::<f32>().sqrt();
+    if l2 > 1e-6 {
+        for slot in &mut centroid {
+            *slot /= l2;
+        }
+    }
+    centroid
+}
+
+/// Comprehensive Edge-TTS language voice table: (BCP-47 prefix, male voice, female voice).
+///
+/// Covers all languages supported by Microsoft Edge-TTS neural voices.
+/// Script-based detection handles non-Latin scripts (Indic, CJK, Arabic, etc.);
+/// BCP-47 prefix matching covers all Latin-script languages.
+///
+/// Based on `edge-tts --list-voices` — 100+ language/locale pairs.
+pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
+    // ── Indic (script-detected, also prefix-matched) ──────────────────────
+    ("ml-IN", "ml-IN-MidhunNeural",    "ml-IN-SobhanaNeural"),
+    ("hi-IN", "hi-IN-MadhurNeural",    "hi-IN-SwaraNeural"),
+    ("ta-IN", "ta-IN-ValluvarNeural",  "ta-IN-PallaviNeural"),
+    ("te-IN", "te-IN-MohanNeural",     "te-IN-ShrutiNeural"),
+    ("kn-IN", "kn-IN-GaganNeural",     "kn-IN-SapnaNeural"),
+    ("bn-IN", "bn-IN-BashkarNeural",   "bn-IN-TanishaaNeural"),
+    ("bn-BD", "bn-BD-PradeepNeural",   "bn-BD-NabanitaNeural"),
+    ("gu-IN", "gu-IN-NiranjanNeural",  "gu-IN-DhwaniNeural"),
+    ("pa-IN", "pa-IN-OjasNeural",      "pa-IN-VaaniNeural"),
+    ("mr-IN", "mr-IN-ManoharNeural",   "mr-IN-AarohiNeural"),
+    ("ur-IN", "ur-IN-SalmanNeural",    "ur-IN-GulNeural"),
+    ("ur-PK", "ur-PK-AsadNeural",      "ur-PK-UzmaNeural"),
+    ("or-IN", "or-IN-SukantNeural",    "or-IN-SubhasiniNeural"),
+    ("ne-NP", "ne-NP-SagarNeural",     "ne-NP-HemkalaNeural"),
+    ("si-LK", "si-LK-SameeraNeural",   "si-LK-ThiliniNeural"),
+    ("my-MM", "my-MM-ThihaNeural",     "my-MM-NilarNeural"),
+    ("km-KH", "km-KH-PisethNeural",    "km-KH-SreymomNeural"),
+    ("lo-LA", "lo-LA-ChanthavongNeural","lo-LA-KeomanyNeural"),
+    // ── East Asian ────────────────────────────────────────────────────────
+    ("ja-JP", "ja-JP-KeitaNeural",     "ja-JP-NanamiNeural"),
+    ("zh-CN", "zh-CN-YunxiNeural",     "zh-CN-XiaoxiaoNeural"),
+    ("zh-TW", "zh-TW-YunJheNeural",    "zh-TW-HsiaoChenNeural"),
+    ("zh-HK", "zh-HK-WanLungNeural",   "zh-HK-HiuGaaiNeural"),
+    ("ko-KR", "ko-KR-InJoonNeural",    "ko-KR-SunHiNeural"),
+    ("mn-CN", "mn-CN-NaranbaatarNeural","mn-CN-YesuiNeural"),
+    ("mn-MN", "mn-MN-BataaNeural",     "mn-MN-YesuiNeural"),
+    // ── Southeast Asian ───────────────────────────────────────────────────
+    ("id-ID", "id-ID-ArdiNeural",      "id-ID-GadisNeural"),
+    ("ms-MY", "ms-MY-OsmanNeural",     "ms-MY-YasminNeural"),
+    ("th-TH", "th-TH-NiwatNeural",     "th-TH-PremwadeeNeural"),
+    ("vi-VN", "vi-VN-NamMinhNeural",   "vi-VN-HoaiMyNeural"),
+    ("fil-PH","fil-PH-AngeloNeural",   "fil-PH-BlessicaNeural"),
+    ("jv-ID", "jv-ID-DimasNeural",     "jv-ID-SitiNeural"),
+    ("su-ID", "su-ID-JajangNeural",    "su-ID-TutiNeural"),
+    // ── Middle East / North Africa ────────────────────────────────────────
+    ("ar-SA", "ar-SA-HamedNeural",     "ar-SA-ZariyahNeural"),
+    ("ar-EG", "ar-EG-ShakirNeural",    "ar-EG-SalmaNeural"),
+    ("ar-AE", "ar-AE-HamdanNeural",    "ar-AE-FatimaNeural"),
+    ("ar-DZ", "ar-DZ-IsmaelNeural",    "ar-DZ-AminaNeural"),
+    ("ar-BH", "ar-BH-AliNeural",       "ar-BH-LailaNeural"),
+    ("ar-IQ", "ar-IQ-BasselNeural",    "ar-IQ-RanaNeural"),
+    ("ar-JO", "ar-JO-TaimNeural",      "ar-JO-SanaNeural"),
+    ("ar-KW", "ar-KW-FahedNeural",     "ar-KW-NouraNeural"),
+    ("ar-LB", "ar-LB-RamiNeural",      "ar-LB-LaylaNeural"),
+    ("ar-LY", "ar-LY-OmarNeural",      "ar-LY-ImanNeural"),
+    ("ar-MA", "ar-MA-JamalNeural",     "ar-MA-MounaNeural"),
+    ("ar-OM", "ar-OM-AbdullahNeural",  "ar-OM-AyshaNeural"),
+    ("ar-QA", "ar-QA-MoazNeural",      "ar-QA-AmalNeural"),
+    ("ar-SY", "ar-SY-LaithNeural",     "ar-SY-AmanyNeural"),
+    ("ar-TN", "ar-TN-HediNeural",      "ar-TN-ReemNeural"),
+    ("ar-YE", "ar-YE-SalehNeural",     "ar-YE-MaryamNeural"),
+    ("fa-IR", "fa-IR-FaridNeural",     "fa-IR-DilaraNeural"),
+    ("he-IL", "he-IL-AvriNeural",      "he-IL-HilaNeural"),
+    ("tr-TR", "tr-TR-AhmetNeural",     "tr-TR-EmelNeural"),
+    // ── English variants ──────────────────────────────────────────────────
+    ("en-US", "en-US-GuyNeural",       "en-US-AriaNeural"),
+    ("en-GB", "en-GB-RyanNeural",      "en-GB-SoniaNeural"),
+    ("en-AU", "en-AU-WilliamNeural",   "en-AU-NatashaNeural"),
+    ("en-CA", "en-CA-LiamNeural",      "en-CA-ClaraNeural"),
+    ("en-NZ", "en-NZ-MitchellNeural",  "en-NZ-MollyNeural"),
+    ("en-IN", "en-IN-PrabhatNeural",   "en-IN-NeerjaNeural"),
+    ("en-IE", "en-IE-ConnorNeural",    "en-IE-EmilyNeural"),
+    ("en-ZA", "en-ZA-LukeNeural",      "en-ZA-LeahNeural"),
+    ("en-SG", "en-SG-WayneNeural",     "en-SG-LunaNeural"),
+    ("en-TZ", "en-TZ-ElimuNeural",     "en-TZ-ImaniNeural"),
+    ("en-KE", "en-KE-AsilNeural",      "en-KE-ChiamaNeural"),
+    ("en-NG", "en-NG-AbeoNeural",      "en-NG-EzinneNeural"),
+    ("en-PH", "en-PH-JamesNeural",     "en-PH-RosaNeural"),
+    ("en-HK", "en-HK-SamNeural",       "en-HK-YanNeural"),
+    // ── Western Europe ────────────────────────────────────────────────────
+    ("de-DE", "de-DE-ConradNeural",    "de-DE-KatjaNeural"),
+    ("de-AT", "de-AT-JonasNeural",     "de-AT-IngridNeural"),
+    ("de-CH", "de-CH-JanNeural",       "de-CH-LeniNeural"),
+    ("fr-FR", "fr-FR-HenriNeural",     "fr-FR-DeniseNeural"),
+    ("fr-BE", "fr-BE-GerardNeural",    "fr-BE-CharlineNeural"),
+    ("fr-CH", "fr-CH-FabriceNeural",   "fr-CH-ArianeNeural"),
+    ("fr-CA", "fr-CA-AntoineNeural",   "fr-CA-SylvieNeural"),
+    ("es-ES", "es-ES-AlvaroNeural",    "es-ES-ElviraNeural"),
+    ("es-MX", "es-MX-JorgeNeural",     "es-MX-DaliaNeural"),
+    ("es-AR", "es-AR-TomasNeural",     "es-AR-ElenaNeural"),
+    ("es-CO", "es-CO-GonzaloNeural",   "es-CO-SalomeNeural"),
+    ("es-CL", "es-CL-LorenzoNeural",   "es-CL-CatalinaNeural"),
+    ("es-PE", "es-PE-AlexNeural",      "es-PE-CamilaNeural"),
+    ("es-VE", "es-VE-SebastianNeural", "es-VE-PaolaNeural"),
+    ("es-US", "es-US-AlonsoNeural",    "es-US-PalomaNeural"),
+    ("es-CU", "es-CU-ManuelNeural",    "es-CU-BelkysNeural"),
+    ("es-UY", "es-UY-MateoNeural",     "es-UY-ValentinaNeural"),
+    ("es-PY", "es-PY-MarioNeural",     "es-PY-TaniaNeural"),
+    ("es-NI", "es-NI-FedericoNeural",  "es-NI-YolandaNeural"),
+    ("es-PA", "es-PA-RobertoNeural",   "es-PA-MargaritaNeural"),
+    ("es-DO", "es-DO-EmilioNeural",    "es-DO-RamonaNeural"),
+    ("es-EC", "es-EC-AndresNeural",    "es-EC-AndreaNeural"),
+    ("es-GT", "es-GT-AndresNeural",    "es-GT-MartaNeural"),
+    ("es-HN", "es-HN-CarlosNeural",    "es-HN-KarlaNeural"),
+    ("es-SV", "es-SV-RodrigoNeural",   "es-SV-LorenaNeural"),
+    ("es-BO", "es-BO-MarceloNeural",   "es-BO-SofiaNeural"),
+    ("es-PR", "es-PR-VictorNeural",    "es-PR-KarinaNeural"),
+    ("es-CR", "es-CR-JuanNeural",      "es-CR-MariaNeural"),
+    ("es-GQ", "es-GQ-JavierNeural",    "es-GQ-TeresaNeural"),
+    ("pt-BR", "pt-BR-AntonioNeural",   "pt-BR-FranciscaNeural"),
+    ("pt-PT", "pt-PT-DuarteNeural",    "pt-PT-RaquelNeural"),
+    ("it-IT", "it-IT-DiegoNeural",     "it-IT-ElsaNeural"),
+    ("nl-NL", "nl-NL-MaartenNeural",   "nl-NL-FennaNeural"),
+    ("nl-BE", "nl-BE-ArnaudNeural",    "nl-BE-DenaNeural"),
+    ("sv-SE", "sv-SE-MattiasNeural",   "sv-SE-SofieNeural"),
+    ("nb-NO", "nb-NO-FinnNeural",      "nb-NO-PernilleNeural"),
+    ("da-DK", "da-DK-JeppeNeural",     "da-DK-ChristelNeural"),
+    ("fi-FI", "fi-FI-HarriNeural",     "fi-FI-NooraNeural"),
+    ("pl-PL", "pl-PL-MarekNeural",     "pl-PL-ZofiaNeural"),
+    ("cs-CZ", "cs-CZ-AntoninNeural",   "cs-CZ-VlastaNeural"),
+    ("sk-SK", "sk-SK-LukasNeural",     "sk-SK-ViktoriaNeural"),
+    ("hu-HU", "hu-HU-TamasNeural",     "hu-HU-NoemiNeural"),
+    ("ro-RO", "ro-RO-EmilNeural",      "ro-RO-AlinaNeural"),
+    ("bg-BG", "bg-BG-BorislavNeural",  "bg-BG-KalinaNeural"),
+    ("hr-HR", "hr-HR-SreckoNeural",    "hr-HR-GabrijelaNeural"),
+    ("sl-SI", "sl-SI-RokNeural",       "sl-SI-PetraNeural"),
+    ("sr-RS", "sr-RS-NicholasNeural",  "sr-RS-SophieNeural"),
+    ("bs-BA", "bs-BA-GoranNeural",     "bs-BA-VesnaNeural"),
+    ("mk-MK", "mk-MK-AleksandarNeural","mk-MK-MarijaNeural"),
+    ("sq-AL", "sq-AL-IlirNeural",      "sq-AL-AnilaNeural"),
+    ("mt-MT", "mt-MT-JosephNeural",    "mt-MT-GraceNeural"),
+    ("is-IS", "is-IS-GunnarNeural",    "is-IS-GudrunNeural"),
+    ("lv-LV", "lv-LV-NilsNeural",      "lv-LV-EveritaNeural"),
+    ("lt-LT", "lt-LT-LeonasNeural",    "lt-LT-OnaNeural"),
+    ("et-EE", "et-EE-KertNeural",      "et-EE-AnuNeural"),
+    ("ga-IE", "ga-IE-ColmNeural",      "ga-IE-OrlaNeural"),
+    ("cy-GB", "cy-GB-AledNeural",      "cy-GB-NiaNeural"),
+    // ── Eastern Europe / Former Soviet ────────────────────────────────────
+    ("ru-RU", "ru-RU-DmitryNeural",    "ru-RU-SvetlanaNeural"),
+    ("uk-UA", "uk-UA-OstapNeural",     "uk-UA-PolinaNeural"),
+    ("be-BY", "be-BY-NikolayNeural",   "be-BY-YanaNeural"),
+    ("az-AZ", "az-AZ-BabekNeural",     "az-AZ-BanuNeural"),
+    ("kk-KZ", "kk-KZ-DauletNeural",   "kk-KZ-AigulNeural"),
+    ("ky-KG", "ky-KG-IshenbekNeural",  "ky-KG-AizatNeural"),
+    ("uz-UZ", "uz-UZ-SardorNeural",    "uz-UZ-MadinaNeural"),
+    ("tk-TM", "tk-TM-AgabekNeural",    "tk-TM-EzzatNeural"),
+    ("ka-GE", "ka-GE-GiorgiNeural",    "ka-GE-EkaNeural"),
+    ("hy-AM", "hy-AM-HaykNeural",      "hy-AM-AnahitNeural"),
+    ("az-AZ", "az-AZ-BabekNeural",     "az-AZ-BanuNeural"),
+    // ── Africa ────────────────────────────────────────────────────────────
+    ("af-ZA", "af-ZA-WillemNeural",    "af-ZA-AdriNeural"),
+    ("sw-KE", "sw-KE-RafikiNeural",    "sw-KE-ZuriNeural"),
+    ("sw-TZ", "sw-TZ-DaudiNeural",     "sw-TZ-RehemaNeural"),
+    ("am-ET", "am-ET-AmehaNeural",     "am-ET-MekdesNeural"),
+    ("so-SO", "so-SO-MuuseNeural",     "so-SO-UbaxNeural"),
+    ("zu-ZA", "zu-ZA-ThandoNeural",    "zu-ZA-ThandekileNeural"),
+    ("yo-NG", "yo-NG-IsiolaNeural",    "yo-NG-EzinneNeural"),
+    ("ig-NG", "ig-NG-EchewuNeural",    "ig-NG-EzinneNeural"),
+    ("ha-NG", "ha-NG-OmaruNeural",     "ha-NG-HalimaNeural"),
+    ("ps-AF", "ps-AF-GulNawazNeural",  "ps-AF-LatifaNeural"),
+    // ── Americas (additional) ─────────────────────────────────────────────
+    ("gl-ES", "gl-ES-RoiNeural",       "gl-ES-SabelaNeural"),
+    ("ca-ES", "ca-ES-EnricNeural",     "ca-ES-AlbaNeural"),
+    ("eu-ES", "eu-ES-AitorNeural",     "eu-ES-AinhoaNeural"),
+    ("ht-HT", "ht-HT-RamaNeural",     "ht-HT-KellyNeural"),
+    ("qu-PE", "qu-PE-NinanNeural",     "qu-PE-ChuraNeural"),
+    // ── Pacific ───────────────────────────────────────────────────────────
+    ("wuu-CN","wuu-CN-YunzheNeural",   "wuu-CN-XiaotongNeural"),
+    ("yue-CN","yue-CN-YunSongNeural",  "yue-CN-XiaoMinNeural"),
+    ("zh-CN-liaoning", "zh-CN-liaoning-XiaobeiNeural", "zh-CN-liaoning-XiaobeiNeural"),
+];
+
+/// Detect which Unicode script block dominates the text.
+/// Returns a BCP-47 script-based language code or empty string if Latin/unknown.
+fn detect_script_lang(text: &str) -> &'static str {
+    let mut counts = [0u32; 16];
+    // indices: 0=ml, 1=hi/mr/Sanskrit, 2=ta, 3=te, 4=kn, 5=bn, 6=gu, 7=pa,
+    //          8=ar/ur, 9=ja, 10=cjk, 11=ko, 12=si, 13=km, 14=lo, 15=my
+    for c in text.chars() {
+        let cp = c as u32;
+        match cp {
+            0x0D00..=0x0D7F => counts[0] += 1,  // Malayalam
+            0x0900..=0x097F => counts[1] += 1,  // Devanagari
+            0x0B80..=0x0BFF => counts[2] += 1,  // Tamil
+            0x0C00..=0x0C7F => counts[3] += 1,  // Telugu
+            0x0C80..=0x0CFF => counts[4] += 1,  // Kannada
+            0x0980..=0x09FF => counts[5] += 1,  // Bengali
+            0x0A80..=0x0AFF => counts[6] += 1,  // Gujarati
+            0x0A00..=0x0A7F => counts[7] += 1,  // Gurmukhi
+            0x0600..=0x06FF | 0x0750..=0x077F | 0xFB50..=0xFDFF => counts[8] += 1, // Arabic/Persian
+            0x3040..=0x30FF | 0x31F0..=0x31FF   => counts[9] += 1,  // Japanese kana
+            0x4E00..=0x9FFF | 0x3400..=0x4DBF   => counts[10] += 1, // CJK
+            0xAC00..=0xD7A3 | 0x1100..=0x11FF   => counts[11] += 1, // Korean
+            0x0D80..=0x0DFF => counts[12] += 1, // Sinhala
+            0x1780..=0x17FF => counts[13] += 1, // Khmer
+            0x0E80..=0x0EFF => counts[14] += 1, // Lao
+            0x1000..=0x109F => counts[15] += 1, // Myanmar
+            _ => {}
+        }
+    }
+    let max_idx = counts.iter().enumerate().max_by_key(|(_, &v)| v).map(|(i, _)| i).unwrap_or(0);
+    if counts[max_idx] == 0 {
+        return "";
+    }
+    match max_idx {
+        0  => "ml",
+        1  => "hi",
+        2  => "ta",
+        3  => "te",
+        4  => "kn",
+        5  => "bn",
+        6  => "gu",
+        7  => "pa",
+        8  => "ar",
+        9  => "ja",
+        10 => "zh",
+        11 => "ko",
+        12 => "si",
+        13 => "km",
+        14 => "lo",
+        15 => "my",
+        _  => "",
+    }
+}
+
+/// Resolve the best-matching Edge-TTS base voice for a given speaker gender + language tag.
+///
+/// Resolution priority:
+/// 1. Script detection from text (non-Latin scripts only).
+/// 2. Exact BCP-47 locale match in `EDGE_TTS_LANG_TABLE` (e.g. `en-GB`).
+/// 3. Language-prefix match (e.g. `ar-` matches `ar-SA` as first entry).
+/// 4. English fallback.
 pub fn resolve_cross_lingual_base_voice(
     gender: Option<&Gender>,
     text: &str,
     profile_lang: &str,
 ) -> &'static str {
     let is_male = matches!(gender, Some(Gender::Male));
+    let pick = |male: &'static str, female: &'static str| {
+        if is_male { male } else { female }
+    };
 
-    // 1. Script detection (Unicode ranges) or profile language tag
-    let has_malayalam = text
-        .chars()
-        .any(|c| (0x0D00..=0x0D7F).contains(&(c as u32)))
-        || profile_lang.starts_with("ml");
-    if has_malayalam {
-        return if is_male {
-            "ml-IN-MidhunNeural"
-        } else {
-            "ml-IN-SobhanaNeural"
-        };
-    }
+    // 1. Script detection — non-Latin scripts short-circuit the profile tag entirely.
+    //    e.g. Malayalam text with profile_lang="en-US" must still return an ml-* voice.
+    let script_lang = if text.len() >= 3 { detect_script_lang(text) } else { "" };
 
-    let has_hindi = text
-        .chars()
-        .any(|c| (0x0900..=0x097F).contains(&(c as u32)))
-        || profile_lang.starts_with("hi");
-    if has_hindi {
-        return if is_male {
-            "hi-IN-MadhurNeural"
-        } else {
-            "hi-IN-SwaraNeural"
-        };
+    if !script_lang.is_empty() {
+        // Script was detected: search by script prefix first, then exact script-locale match.
+        let script_prefix = script_lang.split('-').next().unwrap_or(script_lang);
+        for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
+            if bcp47.starts_with(script_prefix) {
+                return pick(male, female);
+            }
+        }
     }
 
-    let has_tamil = text
-        .chars()
-        .any(|c| (0x0B80..=0x0BFF).contains(&(c as u32)))
-        || profile_lang.starts_with("ta");
-    if has_tamil {
-        return if is_male {
-            "ta-IN-ValluvarNeural"
-        } else {
-            "ta-IN-PallaviNeural"
-        };
+    // 2. Exact locale match (e.g. "en-GB", "fr-CA") — only reached for Latin/undetected scripts.
+    for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
+        if profile_lang.eq_ignore_ascii_case(bcp47) {
+            return pick(male, female);
+        }
     }
 
-    let has_telugu = text
-        .chars()
-        .any(|c| (0x0C00..=0x0C7F).contains(&(c as u32)))
-        || profile_lang.starts_with("te");
-    if has_telugu {
-        return if is_male {
-            "te-IN-MohanNeural"
-        } else {
-            "te-IN-ShrutiNeural"
-        };
+    // 3. Language-prefix match on profile_lang (e.g. "ar" matches first "ar-*" entry)
+    let prefix = profile_lang.split('-').next().unwrap_or(profile_lang);
+    for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
+        if bcp47.starts_with(prefix) && !prefix.is_empty() {
+            return pick(male, female);
+        }
     }
 
-    let has_kannada = text
-        .chars()
-        .any(|c| (0x0C80..=0x0CFF).contains(&(c as u32)))
-        || profile_lang.starts_with("kn");
-    if has_kannada {
-        return if is_male {
-            "kn-IN-GaganNeural"
-        } else {
-            "kn-IN-SapnaNeural"
-        };
-    }
-
-    let has_bengali = text
-        .chars()
-        .any(|c| (0x0980..=0x09FF).contains(&(c as u32)))
-        || profile_lang.starts_with("bn");
-    if has_bengali {
-        return if is_male {
-            "bn-IN-BashkarNeural"
-        } else {
-            "bn-IN-TanishaaNeural"
-        };
-    }
-
-    let has_gujarati = text
-        .chars()
-        .any(|c| (0x0A80..=0x0AFF).contains(&(c as u32)))
-        || profile_lang.starts_with("gu");
-    if has_gujarati {
-        return if is_male {
-            "gu-IN-NiranjanNeural"
-        } else {
-            "gu-IN-DhwaniNeural"
-        };
-    }
-
-    let has_punjabi = text
-        .chars()
-        .any(|c| (0x0A00..=0x0A7F).contains(&(c as u32)))
-        || profile_lang.starts_with("pa");
-    if has_punjabi {
-        return if is_male {
-            "pa-IN-OjasNeural"
-        } else {
-            "pa-IN-VaaniNeural"
-        };
-    }
-
-    let has_japanese = text
-        .chars()
-        .any(|c| (0x3040..=0x30FF).contains(&(c as u32)))
-        || profile_lang.starts_with("ja");
-    if has_japanese {
-        return "ja-JP-NanamiNeural";
-    }
-
-    let has_chinese = text
-        .chars()
-        .any(|c| (0x4E00..=0x9FFF).contains(&(c as u32)))
-        || profile_lang.starts_with("zh");
-    if has_chinese {
-        return "zh-CN-XiaoxiaoNeural";
-    }
-
-    if profile_lang.starts_with("de") {
-        return "de-DE-KatjaNeural";
-    }
-    if profile_lang.starts_with("fr") {
-        return "fr-FR-DeniseNeural";
-    }
-    if profile_lang.starts_with("es") {
-        return "es-ES-AlvaroNeural";
-    }
-    if profile_lang.starts_with("en-GB") {
-        return if is_male {
-            "en-GB-RyanNeural"
-        } else {
-            "en-GB-SoniaNeural"
-        };
-    }
-
-    if is_male {
-        "en-US-GuyNeural"
-    } else {
-        "en-US-AriaNeural"
-    }
+    // 4. English fallback
+    pick("en-US-GuyNeural", "en-US-AriaNeural")
 }
 
 fn auto_detect_local_port(port: u16) -> bool {
