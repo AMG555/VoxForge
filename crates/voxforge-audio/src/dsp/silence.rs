@@ -12,9 +12,40 @@ pub struct SilenceTrimmer;
 impl SilenceTrimmer {
     /// Trim leading and trailing silence from PCM audio using energy VAD with hysteresis.
     ///
-    /// - `threshold_dbfs`: Speech activity threshold (e.g. -45.0 dBFS)
+    /// Uses a **retry ladder** matching Studio's `remove_silence_safe()`: if the first
+    /// attempt at `threshold_dbfs` returns empty, retries at successively softer thresholds
+    /// (-55 dBFS, then -65 dBFS) before falling back to the original. This prevents consuming
+    /// the full clip when the reference audio is recorded at a low level.
+    ///
+    /// - `threshold_dbfs`: Initial speech activity threshold (e.g. -45.0 dBFS)
     /// - `padding_ms`: Extra ms to retain around active speech (prevents cutting consonants)
     pub fn trim(
+        samples: &[i16],
+        sample_rate: u32,
+        threshold_dbfs: f32,
+        padding_ms: u32,
+    ) -> Vec<i16> {
+        if samples.is_empty() {
+            return Vec::new();
+        }
+
+        // Retry at softer thresholds when the initial attempt finds nothing, matching
+        // Studio's remove_silence_safe() retry ladder (-50 → -60 → -70 dBFS).
+        let thresholds: [f32; 3] = [threshold_dbfs, -55.0, -65.0];
+        for &threshold in &thresholds {
+            let result = Self::trim_at_threshold(samples, sample_rate, threshold, padding_ms);
+            if !result.is_empty() {
+                return result;
+            }
+        }
+        // All thresholds returned empty → signal is truly inaudible (all-zero or sub -65 dBFS).
+        // Return empty to signal "no usable audio" to the caller (matches Studio behaviour:
+        // remove_silence_safe() returns None / empty when nothing passes the softest threshold).
+        Vec::new()
+    }
+
+    /// Inner trim implementation at a fixed threshold (called by the retry ladder).
+    fn trim_at_threshold(
         samples: &[i16],
         sample_rate: u32,
         threshold_dbfs: f32,

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use axum::{
     extract::State,
@@ -7,15 +8,47 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
+use tokio::net::TcpStream;
 
 use crate::state::AppState;
 
 pub async fn health_check() -> Json<Value> {
+    // Probe neural sidecar backend if running (non-blocking, 200ms timeout)
+    let sidecar_info = probe_sidecar_backend().await;
     Json(json!({
         "status": "healthy",
         "service": "voxforge",
-        "version": env!("CARGO_PKG_VERSION")
+        "version": env!("CARGO_PKG_VERSION"),
+        "neural_sidecar": sidecar_info,
     }))
+}
+
+/// Non-blocking probe of the neural sidecar backend via TCP connect.
+///
+/// Tries each well-known sidecar port (OmniVoice, F5-TTS, CosyVoice2, Kokoro).
+/// Returns `{"running": true, "url": "http://127.0.0.1:<port>"}` for the first
+/// reachable port, or `{"running": false}` if none respond within 200ms.
+/// Uses Tokio `TcpStream::connect` — no extra HTTP client crate needed.
+async fn probe_sidecar_backend() -> Value {
+    // Well-known sidecar ports: OmniVoice=9000, F5-TTS=8880, CosyVoice2=9880,
+    // Kokoro=8000, generic neural sidecar=5000
+    let ports = [9000u16, 8880, 9880, 8000, 5000];
+    let timeout = Duration::from_millis(200);
+
+    for port in ports {
+        let addr = format!("127.0.0.1:{}", port);
+        if tokio::time::timeout(timeout, TcpStream::connect(&addr))
+            .await
+            .is_ok_and(|r| r.is_ok())
+        {
+            return json!({
+                "running": true,
+                "url": format!("http://127.0.0.1:{}", port),
+            });
+        }
+    }
+
+    json!({ "running": false })
 }
 
 pub async fn readiness_check(State(state): State<AppState>) -> Response {
@@ -93,6 +126,8 @@ mod tests {
         assert_eq!(res.0["status"], "healthy");
         assert_eq!(res.0["service"], "voxforge");
         assert!(!res.0["version"].as_str().unwrap().is_empty());
+        // neural_sidecar field must be present (running: true or false)
+        assert!(res.0.get("neural_sidecar").is_some());
     }
 
     #[tokio::test]

@@ -16,7 +16,7 @@ pub use dsp::{
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;
 pub use metrics::{AudioAnalyzer, AudioQualityMetrics};
-pub use normalizer::{AudioNormalizer, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE};
+pub use normalizer::{AudioNormalizer, LUFS_TARGET_BROADCAST, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE};
 pub use paralinguistics::{
     has_paralinguistic_tags, parse_paralinguistic_text, ParalinguisticSegment,
     ParalinguisticSynthesizer, ParalinguisticTag,

@@ -348,7 +348,7 @@ mod tests {
         let gap_start = chunk.len() - 10; // near end of chunk A
         let gap_end = gap_start + gap_samples + 10;
         let gap_end = gap_end.min(out.len());
-        let any_zero_in_gap = out[gap_start..gap_end].iter().any(|&s| s == 0);
+        let any_zero_in_gap = out[gap_start..gap_end].contains(&0);
         assert!(any_zero_in_gap, "Silence gap must exist between chunks");
     }
 

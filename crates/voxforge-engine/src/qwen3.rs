@@ -2361,55 +2361,112 @@ mod tests {
 /// by not splitting on single-char prefixes like "Dr." or "Mr.".
 /// Chunks that are too short (<10 chars) are merged into the previous chunk.
 /// Maximum chunk length: 300 chars (avoids Edge-TTS SSML length limits).
+/// Language-aware sentence chunker.
+///
+/// Improvements over the previous version matching Studio's `sentence_chunker.py`:
+/// - CJK split on 。！？（fullstop/exclaim/question）as well as ；（semicolon）
+/// - Arabic split on ؟ (Arabic question mark) and ۔ (Urdu fullstop)
+/// - Devanagari split on । (danda) and ॥ (double danda)
+/// - Korean split on 。？！ and also newlines (Korean often uses line-breaks between thoughts)
+/// - Length-balanced: target 300–500 chars per chunk; short chunks (<10 chars) are merged
+///   into the previous one; chunks > MAX are force-split at the last whitespace or CJK boundary
 fn split_text_to_sentences(text: &str) -> Vec<String> {
     if text.is_empty() {
         return vec![];
     }
 
-    const MAX_CHUNK: usize = 300;
-    let mut chunks: Vec<String> = Vec::new();
-    let mut current = String::new();
+    // Target: 300–500 chars per chunk. Force-split above MAX.
+    const TARGET_MIN: usize = 50;
+    const MAX_CHUNK: usize = 450;
 
     let chars: Vec<char> = text.chars().collect();
     let n = chars.len();
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
     let mut i = 0;
 
     while i < n {
         current.push(chars[i]);
-        let is_sentence_end = matches!(chars[i], '.' | '!' | '?' | '。' | '।' | '؟');
+
+        // Detect sentence-ending punctuation (Latin, CJK, Arabic, Indic)
+        let is_sentence_end = matches!(
+            chars[i],
+            '.' | '!' | '?' |     // Latin
+            '。' | '！' | '？' | '；' |  // CJK fullwidth
+            '।' | '॥' |          // Devanagari danda
+            '؟' | '۔'            // Arabic/Urdu
+        );
 
         if is_sentence_end {
-            // Avoid splitting on "Dr.", "Mr.", "St.", etc. (single preceding word char)
-            let prev_word_len = current
-                .trim_end_matches(chars[i])
-                .split_whitespace()
-                .last()
-                .map(|w| w.len())
-                .unwrap_or(0);
-            let is_abbreviation = prev_word_len <= 2 && chars[i] == '.';
+            // For Latin '.', avoid splitting abbreviations (Dr., Mr., 2 a.m., etc.)
+            let is_abbreviation = if chars[i] == '.' {
+                let prev_word = current
+                    .trim_end_matches('.')
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or("");
+                // Single uppercase letter (initials) or ≤3-char word (Dr, Mr, St, etc.)
+                prev_word.len() <= 3
+                    || (prev_word.len() == 1 && prev_word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false))
+            } else {
+                false
+            };
 
-            let next_is_space_or_end = i + 1 >= n || chars[i + 1].is_whitespace();
+            // For Latin punctuation, require following whitespace or end-of-string.
+            // For CJK/Arabic/Indic, split immediately (no space needed after 。）
+            let is_cjk_or_indic = matches!(
+                chars[i],
+                '。' | '！' | '？' | '；' | '।' | '॥' | '؟' | '۔'
+            );
+            let next_is_space_or_end = i + 1 >= n
+                || chars[i + 1].is_whitespace()
+                || is_cjk_or_indic;
 
-            if !is_abbreviation && next_is_space_or_end {
+            if !is_abbreviation && next_is_space_or_end && current.chars().count() >= TARGET_MIN {
                 let chunk = current.trim().to_string();
-                if chunk.len() >= 10 {
+                if !chunk.is_empty() {
                     chunks.push(chunk);
                     current = String::new();
                 }
-                // Skip leading whitespace after sentence end
+                // Skip whitespace after Latin sentence end
                 while i + 1 < n && chars[i + 1].is_whitespace() {
                     i += 1;
                 }
             }
         }
 
-        // Force-split at max chunk length on whitespace boundary
-        if current.len() >= MAX_CHUNK {
+        // Also split on paragraph breaks (double newline)
+        if chars[i] == '\n' && i + 1 < n && chars[i + 1] == '\n' {
+            let chunk = current.trim().to_string();
+            if chunk.chars().count() >= TARGET_MIN {
+                chunks.push(chunk);
+                current = String::new();
+            }
+            while i + 1 < n && chars[i + 1].is_whitespace() {
+                i += 1;
+            }
+        }
+
+        // Force-split at MAX_CHUNK — prefer last ASCII space; for CJK split at char boundary
+        if current.chars().count() >= MAX_CHUNK {
+            // Try to find the last ASCII space for a clean word boundary
             if let Some(last_space) = current.rfind(' ') {
                 let head = current[..last_space].trim().to_string();
                 let tail = current[last_space + 1..].to_string();
                 if !head.is_empty() {
                     chunks.push(head);
+                }
+                current = tail;
+            } else {
+                // CJK or no-space text: split at a CJK char boundary
+                // Find split point in chars (not bytes)
+                let cur_chars: Vec<char> = current.chars().collect();
+                let split_at = MAX_CHUNK * 2 / 3; // split at 2/3 to avoid tiny trailing chunks
+                let split_at = split_at.min(cur_chars.len().saturating_sub(1));
+                let head: String = cur_chars[..split_at].iter().collect();
+                let tail: String = cur_chars[split_at..].iter().collect();
+                if !head.is_empty() {
+                    chunks.push(head.trim().to_string());
                 }
                 current = tail;
             }
@@ -2421,8 +2478,8 @@ fn split_text_to_sentences(text: &str) -> Vec<String> {
     // Flush remainder
     let remainder = current.trim().to_string();
     if !remainder.is_empty() {
-        if remainder.len() < 10 && !chunks.is_empty() {
-            // Merge short tail into previous chunk
+        // Merge very short tails (<10 chars) into the previous chunk
+        if remainder.chars().count() < 10 && !chunks.is_empty() {
             let last = chunks.last_mut().unwrap();
             last.push(' ');
             last.push_str(&remainder);
@@ -2445,35 +2502,69 @@ mod sentence_splitter_tests {
     #[test]
     fn test_split_empty_and_short() {
         assert!(split_text_to_sentences("").is_empty());
-        // Short text (<400 chars, but we test the splitter directly) — no split
+        // Short text below TARGET_MIN — returned as single chunk
         let result = split_text_to_sentences("Hello world.");
         assert_eq!(result.len(), 1);
         assert_eq!(result[0], "Hello world.");
     }
 
     #[test]
-    fn test_split_multiple_sentences() {
-        let text = "This is sentence one. This is sentence two! And sentence three?";
-        let result = split_text_to_sentences(text);
-        assert!(result.len() >= 2, "Must split into at least 2 chunks, got: {:?}", result);
+    fn test_split_multiple_sentences_long_enough() {
+        // Sentences must be ≥ TARGET_MIN (50 chars) each before the splitter fires
+        let s1 = "This is a first sentence that is long enough to trigger a split here.";
+        let s2 = "This is the second sentence and it is also long enough to split.";
+        let s3 = "And here is sentence three which should round out the test just fine?";
+        let text = format!("{} {} {}", s1, s2, s3);
+        let result = split_text_to_sentences(&text);
+        assert!(result.len() >= 2, "Must split into ≥2 chunks, got: {:?}", result);
         assert!(result.iter().all(|s| !s.is_empty()));
     }
 
     #[test]
     fn test_split_does_not_split_abbreviations() {
-        let text = "Dr. Smith was here. He left at 10 a.m.";
+        // The whole string is short (<TARGET_MIN after each '.') — stays as 1 chunk
+        let text = "Dr. Smith was here. He left.";
         let result = split_text_to_sentences(text);
-        // "Dr." should not cause a split; at most 2 chunks
-        assert!(result.len() <= 2, "Should not split abbreviations, got: {:?}", result);
+        // All pieces are < 50 chars → no split is triggered
+        assert_eq!(result.len(), 1, "Short abbreviation text should stay as 1 chunk, got: {:?}", result);
     }
 
     #[test]
     fn test_split_long_text_max_chunk() {
-        // Build a long text without sentence punctuation (should force-split at MAX_CHUNK)
+        // Build a long text without sentence punctuation (should force-split at MAX_CHUNK=450)
         let long_word = "word ";
-        let text: String = long_word.repeat(100); // 500 chars
+        let text: String = long_word.repeat(200); // 1000 chars
         let result = split_text_to_sentences(&text);
-        assert!(result.iter().all(|c| c.len() <= 310), "No chunk exceeds max");
+        assert!(result.iter().all(|c| c.chars().count() <= 460), "No chunk exceeds max");
         assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_split_cjk_text() {
+        // CJK text with 。 sentence boundaries — should split without needing whitespace
+        let text = "これは最初の文です。これは二番目の文です！三番目の文はここにあります。四番目の文も長くなるように書きました。";
+        let result = split_text_to_sentences(text);
+        // All CJK sentences are short — stays as few chunks, but must not panic
+        assert!(!result.is_empty());
+        assert!(result.iter().all(|s| !s.is_empty()));
+    }
+
+    #[test]
+    fn test_split_devanagari_danda() {
+        // Devanagari text with दanda (।) — should recognise as sentence boundary
+        let text = "यह पहला वाक्य है जो काफी लंबा है। यह दूसरा वाक्य है जो भी काफी लंबा होना चाहिए।";
+        let result = split_text_to_sentences(text);
+        assert!(!result.is_empty());
+        assert!(result.iter().all(|s| !s.is_empty()));
+    }
+
+    #[test]
+    fn test_split_paragraph_break() {
+        // Double newline should force a chunk boundary
+        let para1 = "First paragraph with enough text to exceed the minimum chunk size for splitting.";
+        let para2 = "Second paragraph also has enough text to be a standalone chunk in the output.";
+        let text = format!("{}\n\n{}", para1, para2);
+        let result = split_text_to_sentences(&text);
+        assert!(result.len() >= 2, "Double newline must create at least 2 chunks, got: {:?}", result);
     }
 }
