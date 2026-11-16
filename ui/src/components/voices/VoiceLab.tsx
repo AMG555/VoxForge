@@ -703,6 +703,8 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           speed,
           pitch,
           instruct: instruct.trim() || undefined,
+          num_step: refinementSteps,
+          precision: audioPrecision,
         });
       } catch (backendErr) {
         console.warn('Backend synthesis unreachable; falling back to studio reference synthesis sample:', backendErr);
@@ -2159,6 +2161,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             </div>
 
             <textarea
+              dir="auto"
               rows={4}
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -3566,6 +3569,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     )}
                   </label>
                   <textarea
+                    dir="auto"
                     rows={2}
                     value={cloneTranscript}
                     onChange={(e) => setCloneTranscript(e.target.value)}
@@ -3850,6 +3854,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   Natural Language Voice Description <span className="text-purple-400">*</span>
                 </label>
                 <textarea
+                  dir="auto"
                   rows={3}
                   value={designPrompt}
                   onChange={(e) => setDesignPrompt(e.target.value)}

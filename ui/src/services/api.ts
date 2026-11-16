@@ -1,6 +1,8 @@
 import {
   AbTestComparison,
   AbTestScenario,
+  BlendVoicesPayload,
+  BlendVoicesResponse,
   CatalogItem,
   CloneVoicePayload,
   HardwareInfo,
@@ -59,6 +61,8 @@ export const api = {
     pitch?: number;
     instruct?: string;
     crossfade_ms?: number;
+    num_step?: number;
+    precision?: number;
   }): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/audio/speech`, {
       method: 'POST',
@@ -78,6 +82,8 @@ export const api = {
         speed: options.speed ?? 1.0,
         pitch: options.pitch ?? 0.0,
         instruct: options.instruct,
+        num_step: options.num_step,
+        precision: options.precision,
         crossfade_ms: options.crossfade_ms,
         response_format: 'wav',
       }),
@@ -336,6 +342,19 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Failed to import persona bundle' }));
       throw new Error(err.detail || 'Failed to import persona bundle');
+    }
+    return res.json();
+  },
+
+  async blendVoices(payload: BlendVoicesPayload): Promise<BlendVoicesResponse> {
+    const res = await fetch(`${BASE_URL}/v1/voices/profiles/blend`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed to blend voice profiles' }));
+      throw new Error(err.detail || 'Failed to blend voice profiles');
     }
     return res.json();
   },

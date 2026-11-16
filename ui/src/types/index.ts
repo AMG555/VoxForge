@@ -220,3 +220,18 @@ export interface PersonaBundle {
   avatar_base64?: string;
 }
 
+export interface BlendVoicesPayload {
+  name: string;
+  profile_id_a: string;
+  profile_id_b: string;
+  weight_b?: number;
+  description?: string;
+}
+
+export interface BlendVoicesResponse {
+  blended_profile: VoiceProfile;
+  interpolation_weight_b: number;
+  cosine_similarity_to_a: number;
+  cosine_similarity_to_b: number;
+}
+
