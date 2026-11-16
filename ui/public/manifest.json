@@ -1,0 +1,33 @@
+{
+  "name": "VoxForge — Neural Speech Studio",
+  "short_name": "VoxForge",
+  "description": "Production zero-shot voice cloning, studio TTS server, and visual audio workstation.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0E14",
+  "theme_color": "#F59E0B",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

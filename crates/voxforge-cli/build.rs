@@ -43,11 +43,11 @@ fn main() {
         res.set("ProductName", "VoxForge");
         res.set("FileDescription", "VoxForge Neural Speech Studio");
         res.set("CompanyName", "VoxForge Team");
-        res.set("LegalCopyright", "Copyright (c) 2025 VoxForge Contributors");
+        res.set("LegalCopyright", "Copyright (c) 2026 VoxForge Contributors");
         res.set("OriginalFilename", "voxforge.exe");
         res.set("InternalName", "voxforge");
-        res.set_version_info(winres::VersionInfo::PRODUCTVERSION, 0x0001_0000_0000_0000);
-        res.set_version_info(winres::VersionInfo::FILEVERSION, 0x0001_0000_0000_0000);
+        res.set_version_info(winres::VersionInfo::PRODUCTVERSION, 0x0004_0000_0000_0000);
+        res.set_version_info(winres::VersionInfo::FILEVERSION, 0x0004_0000_0000_0000);
 
         if let Err(e) = res.compile() {
             eprintln!("cargo:warning=winres compile failed: {e}");
