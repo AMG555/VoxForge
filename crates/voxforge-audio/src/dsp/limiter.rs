@@ -1,9 +1,9 @@
 //! Brickwall peak limiter with true look-ahead.
 //!
-//! Studio uses a pure-numpy look-ahead limiter in `peak_limit()`:
+//! Uses a studio-grade look-ahead limiter:
 //!   - 5ms look-ahead window
 //!   - 40ms release
-//!   - van Herk/Gil-Werman running-minimum to find the smallest gain needed
+//!   - Running-minimum to find the smallest gain needed
 //!     across the future look-ahead window, so the gain is *pre-applied* before
 //!     the peak arrives, not clipped after the fact.
 //!
@@ -28,10 +28,10 @@ use std::collections::VecDeque;
 pub struct BrickwallLimiter;
 
 impl BrickwallLimiter {
-    /// Look-ahead duration (matches Studio `LOOKAHEAD_MS = 5`).
+    /// Look-ahead duration (5 ms window).
     const LOOKAHEAD_MS: f32 = 5.0;
 
-    /// Gain-release time constant in ms (matches Studio `RELEASE_MS = 40`).
+    /// Gain-release time constant in ms (40 ms release).
     const RELEASE_MS: f32 = 40.0;
 
     /// Hard-clip & peak-limit `samples` to the given ceiling (dBFS, e.g. -0.5).

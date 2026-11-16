@@ -596,7 +596,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [isCloning, setIsCloning] = useState<boolean>(false);
   const [audioQuality, setAudioQuality] = useState<AudioQualityAssessment | null>(null);
   const [isAutoTranscribing, setIsAutoTranscribing] = useState<boolean>(false);
-  // Studio parity: Refinement Steps (Sampling Steps) and Export Precision
+  // Studio parameters: Refinement Steps (Sampling Steps) and Export Precision
   const [refinementSteps, setRefinementSteps] = useState<number>(32); // 8-64 steps, 32 = Best Quality
   const [audioPrecision, setAudioPrecision] = useState<16 | 24 | 32>(16); // 16-bit, 24-bit, 32-bit float
   const [languageSearchTerm, setLanguageSearchTerm] = useState<string>('');
@@ -3738,7 +3738,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   </p>
                 </div>
 
-                {/* Studio Parity: Refinement & Precision Settings */}
+                {/* Studio Controls: Refinement & Precision Settings */}
                 <div className="bg-[#0B0E14] border border-[#242E3D] rounded-xl p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-400">

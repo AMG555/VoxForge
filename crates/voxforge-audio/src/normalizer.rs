@@ -4,7 +4,7 @@ pub const LUFS_TARGET_YOUTUBE: f32 = -14.0;  // YouTube / streaming (-14 LUFS)
 pub const LUFS_TARGET_BROADCAST: f32 = -23.0; // EBU R128 broadcast (-23 LUFS)
 
 /// Duration threshold above which the two-pass LUFS algorithm is used.
-/// Studio applies two-pass loudnorm for audiobook/dub content (>60s).
+/// Two-pass loudnorm is applied for audiobook/dub content (>60s).
 const TWO_PASS_THRESHOLD_SECS: f32 = 60.0;
 
 pub struct AudioNormalizer;
@@ -15,7 +15,7 @@ impl AudioNormalizer {
     /// For audio ≤ 60 seconds: single-pass K-weighted RMS measurement → constant gain.
     ///
     /// For audio > 60 seconds (audiobook / dub): **two-pass** algorithm matching
-    /// Studio's two-pass ffmpeg `loudnorm` behaviour. Pass 1 measures integrated
+    /// standard broadcast two-pass ffmpeg `loudnorm` behaviour. Pass 1 measures integrated
     /// loudness over the whole file using 400ms gating blocks (EBU R128 §2.11) that
     /// exclude pauses and room noise. Pass 2 applies the correction gain from pass 1,
     /// giving an accurate integrated loudness reading for long-form content.

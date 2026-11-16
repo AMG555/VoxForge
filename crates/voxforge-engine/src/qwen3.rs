@@ -722,7 +722,7 @@ impl TtsEngine for Qwen3TtsEngine {
             // sibilance aliasing artifacts in cloned voices
             let samples = resample_to_24k(&raw_samples, sr);
             // For long recordings (>30s), extract the best 10s window via sliding-window
-            // quality scoring — mirrors Studio's validate_clone_reference() approach.
+            // quality scoring.
             let samples = if samples.len() > 24000 * 30 {
                 let best = voxforge_audio::dsp::SilenceTrimmer::best_reference_window(
                     &samples, 24000, 10.0, 2.0,
@@ -731,12 +731,12 @@ impl TtsEngine for Qwen3TtsEngine {
             } else {
                 samples
             };
-            // VAD-based silence trimming: strip dead air at edges (Studio pattern)
+            // VAD-based silence trimming: strip dead air at edges
             let samples = {
                 let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
                 if trimmed.len() >= 2400 { trimmed } else { samples }
             };
-            // Snap window edges to natural pause boundaries (Studio trim_passage_to_pauses)
+            // Snap window edges to natural pause boundaries
             let samples = {
                 let snapped = voxforge_audio::dsp::SilenceTrimmer::trim_passage_to_pauses(
                     &samples, 24000, 1500, 50, -55.0,
@@ -781,7 +781,7 @@ impl TtsEngine for Qwen3TtsEngine {
             };
             let samples = resample_to_24k(&raw_samples, sr);
             // For long recordings (>30s), extract the best 10s window via sliding-window
-            // quality scoring — mirrors Studio's validate_clone_reference() approach.
+            // quality scoring.
             let samples = if samples.len() > 24000 * 30 {
                 let best = voxforge_audio::dsp::SilenceTrimmer::best_reference_window(
                     &samples, 24000, 10.0, 2.0,
@@ -794,7 +794,7 @@ impl TtsEngine for Qwen3TtsEngine {
                 let trimmed = voxforge_audio::dsp::SilenceTrimmer::trim(&samples, 24000, -45.0, 40);
                 if trimmed.len() >= 2400 { trimmed } else { samples }
             };
-            // Snap window edges to natural pause boundaries (Studio trim_passage_to_pauses)
+            // Snap window edges to natural pause boundaries
             let samples = {
                 let snapped = voxforge_audio::dsp::SilenceTrimmer::trim_passage_to_pauses(
                     &samples, 24000, 1500, 50, -55.0,
@@ -1345,8 +1345,7 @@ impl TtsEngine for Qwen3TtsEngine {
 
         // 7. Base voice synthesis pass
         // For long texts (>400 chars), split at sentence boundaries and stitch with cross-fades.
-        // This matches Studio's cross_fade_chunks() approach: each sentence is synthesized
-        // individually so prosody resets naturally, then 50ms equal-power cross-fades blend seams.
+        // Each sentence is synthesized individually so prosody resets naturally, then 50ms equal-power cross-fades blend seams.
         let edge = crate::edge_tts::EdgeTtsEngine::new();
         let mut chunk = if request.text.len() > 400 {
             let sentences = split_text_to_sentences(&request.text);
@@ -1379,7 +1378,7 @@ impl TtsEngine for Qwen3TtsEngine {
             } else {
                 let sample_rate = chunks[0].sample_rate;
                 let pcm_slices: Vec<&[i16]> = chunks.iter().map(|c| c.pcm_data.as_slice()).collect();
-                // Studio-style: fade-out → 100ms silence gap → fade-in
+                // Studio standard: fade-out → 100ms silence gap → fade-in
                 // Avoids phase-mismatch clicks that equal-power overlap crossfade can produce
                 // when chunk boundaries fall on arbitrary phases of the speech waveform.
                 let stitched = voxforge_audio::AudioMerger::silence_gap_join(
@@ -1531,7 +1530,7 @@ impl TtsEngine for Qwen3TtsEngine {
             5.0,
         );
 
-        // 11. Phrase leveler (Studio's level_speech() — the primary perceptual quality step).
+        // 11. Phrase leveler (primary perceptual quality step).
         //     400ms slow EMA + speech gate: equalises phrase-to-phrase loudness WITHOUT
         //     compressing syllable peaks. Must run BEFORE the mastering compressor so the
         //     compressor sees an already-level signal and operates in its linear region.
@@ -1548,13 +1547,13 @@ impl TtsEngine for Qwen3TtsEngine {
         voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
 
         // 11c. Broadcast mastering pass (EQ, compressor, de-esser, peak safety).
-        // Matches Studio's "broadcast mastering" post-chain for perceptually uniform
+        // Broadcast mastering post-chain for perceptually uniform
         // loudness and consistent spectral balance across synthesized clones.
         voxforge_audio::MasteringProfile::Broadcast.apply(&mut chunk.pcm_data, chunk.sample_rate);
 
         // 11d. Room-tone gap fill: replace digital-zero pauses with spectrally-shaped
         //      room tone from the take itself. Eliminates the gating artefact audible on
-        //      headphones. Studio's fill_gaps() is the reference.
+        //      headphones.
         voxforge_audio::RoomToneGapFill::process(&mut chunk.pcm_data, chunk.sample_rate);
 
         // 12. Soft anti-click envelope on speech core
@@ -1636,9 +1635,7 @@ impl TtsEngine for Qwen3TtsEngine {
         }
 
         // 15. EBU R128 / LUFS loudness normalization to -16 LUFS (podcast/voice standard).
-        //     Studio applies this as the final step of its mastering chain, ensuring
-        //     consistent perceived loudness regardless of the reference recording level.
-        //     This is a primary contributor to perceptual quality parity with Studio.
+        //     Ensures consistent perceived loudness regardless of the reference recording level.
         voxforge_audio::AudioNormalizer::lufs_normalize(
             &mut chunk.pcm_data,
             chunk.sample_rate,
@@ -2363,7 +2360,7 @@ mod tests {
 /// Maximum chunk length: 300 chars (avoids Edge-TTS SSML length limits).
 /// Language-aware sentence chunker.
 ///
-/// Improvements over the previous version matching Studio's `sentence_chunker.py`:
+/// Advanced multilingual sentence chunking:
 /// - CJK split on 。！？（fullstop/exclaim/question）as well as ；（semicolon）
 /// - Arabic split on ؟ (Arabic question mark) and ۔ (Urdu fullstop)
 /// - Devanagari split on । (danda) and ॥ (double danda)

@@ -1,7 +1,6 @@
-//! Phrase-level loudness leveler — the key perceptual quality improvement from Studio.
+//! Phrase-level loudness leveler for studio broadcast mastering.
 //!
-//! Studio's `level_speech()` function (backend/services/audio_dsp.py) works as a
-//! **slow phrase leveler**, NOT a traditional compressor. The key difference:
+//! Works as a **slow phrase leveler**, NOT a traditional compressor. The key difference:
 //!
 //! - Traditional compressor: 5–50ms attack → flattens syllable peaks → "pumping"
 //! - Phrase leveler: 400ms measurement window → equalises phrase-to-phrase loudness
@@ -18,7 +17,7 @@
 
 pub struct PhraseLeveler;
 
-/// Default parameters matching Studio's level_speech() tuning.
+/// Default parameters for studio broadcast leveler tuning.
 impl PhraseLeveler {
     /// Target RMS amplitude for leveled output (≈ -20 dBFS in linear i16 domain).
     const TARGET_RMS: f32 = 32767.0 * 0.100; // -20 dBFS

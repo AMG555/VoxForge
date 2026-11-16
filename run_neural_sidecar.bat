@@ -1,7 +1,7 @@
 @echo off
 setlocal
 echo ========================================================
-echo  VoxForge Neural Voice Cloning Sidecar (Studio Parity)
+echo  VoxForge Neural Voice Cloning Sidecar (OmniVoice 646 Langs)
 echo  Supports: OmniVoice (646 Langs), CosyVoice 3, Whisper ASR
 echo ========================================================
 

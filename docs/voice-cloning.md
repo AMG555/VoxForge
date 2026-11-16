@@ -1,7 +1,7 @@
 # Voice Cloning — VoxForge
 
-> **Quality parity with Studio (voxforge/studio)**  
-> VoxForge's cloning pipeline now matches Studio's OmniVoice model across four key
+> **Studio-Grade Voice Cloning**  
+> VoxForge's cloning pipeline provides high-fidelity voice cloning across four key
 > quality axes: sub-semitone F0 precision, robust multi-sample aggregation, 25-language
 > cross-lingual transfer, and broadcast-grade mastering. For true zero-shot neural audio
 > token cloning, attach the optional [Neural Sidecar](#neural-sidecar) below.
@@ -50,8 +50,7 @@ pitch, formants, jitter, shimmer, and timbre. High quality; no GPU required.
 
 **With a neural sidecar**: The raw reference audio and text are forwarded to a local
 neural model (F5-TTS, CosyVoice2, or Kokoro). The model performs true zero-shot speaker
-identity transfer via latent space conditioning — the same technique used by Studio's
-OmniVoice engine. GPU recommended (CUDA/MPS), falls back to CPU.
+identity transfer via latent space conditioning. GPU recommended (CUDA/MPS), falls back to CPU.
 
 ---
 
@@ -203,13 +202,13 @@ VoxForge automatically selects the correct base voice for 25 languages based on:
 
 ## Neural Sidecar — True Zero-Shot Cloning & 646 Languages
 
-The Neural Sidecar upgrades VoxForge to **exact quality parity with Studio (`voxforge/studio`)**:
+The Neural Sidecar upgrades VoxForge to **studio-grade zero-shot neural cloning with 646 languages**:
 
 ### Supported Neural Backends
 
 | Backend | Quality | GPU Required | Languages | Key Advantage |
 |---|---|---|---|---|
-| **OmniVoice** (`k2-fsa/OmniVoice`) | ⭐⭐⭐⭐⭐ | Recommended (CUDA/MPS) | **646 languages** (581k hrs) | Studio's default engine; massive multilingual zero-shot cloning |
+| **OmniVoice** (`k2-fsa/OmniVoice`) | ⭐⭐⭐⭐⭐ | Recommended (CUDA/MPS) | **646 languages** (581k hrs) | Massive multilingual zero-shot cloning across 646 locales |
 | **CosyVoice 3** (`Fun-CosyVoice3-0.5B`) | ⭐⭐⭐⭐⭐ | Recommended (CUDA/MPS) | Multilingual | SOTA voice cloning, cross-lingual transfer & emotion/instruction steering |
 | **F5-TTS** | ⭐⭐⭐⭐⭐ | Recommended | EN, ZH, multilingual | Fast flow-matching with high audio fidelity |
 | **Kokoro-82M** | ⭐⭐⭐⭐ | No (CPU OK) | EN, FR, JA, KO, ZH, PT, ES, IT, HI | Lightweight, runs fully offline without dedicated GPU |
@@ -355,7 +354,7 @@ Returns `cosine_similarity`, `is_same_speaker` (threshold: 0.78), and `confidenc
 ## DSP Quality Chain
 
 The DSP path (used when no neural sidecar is active) applies a 14-step processing chain
-that mirrors Studio's broadcast mastering pre-stage:
+for broadcast-grade mastering:
 
 | Step | Processor | Purpose |
 |---|---|---|
@@ -377,7 +376,7 @@ that mirrors Studio's broadcast mastering pre-stage:
 
 ### Broadcast Mastering Profile
 
-Applied at step 13, matches Studio's audio quality post-chain:
+Applied at step 13, provides studio-grade audio quality post-chain:
 - **Pre-EQ**: 80 Hz HPF, 5 kHz presence boost (+2 dB), 12 kHz air shelf (+1.5 dB)
 - **Compressor**: 3:1 ratio, −20 dBFS threshold, 5 ms attack, 50 ms release
 - **De-esser**: 6.5 kHz dynamic suppression (−3 dB)

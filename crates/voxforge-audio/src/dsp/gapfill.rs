@@ -1,7 +1,6 @@
 //! Room-tone gap filler.
 //!
-//! Studio's `fill_gaps()` (backend/services/audio_dsp.py) replaces digital-zero
-//! pause gaps with spectrally-shaped "room tone" noise extracted from the quietest
+//! Replaces digital-zero pause gaps with spectrally-shaped "room tone" noise extracted from the quietest
 //! 100ms frames of the same recording. This prevents the unnatural gating effect heard
 //! on headphones when a voice recording drops to true digital silence between sentences.
 //!

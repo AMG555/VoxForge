@@ -178,9 +178,9 @@ impl AudioMerger {
         out
     }
 
-    /// Studio-style chunk joining: fade-out tail → silence gap → fade-in head.
+    /// Studio chunk joining: fade-out tail → silence gap → fade-in head.
     ///
-    /// Studio's `cross_fade_chunks()` uses this pattern instead of overlapping
+    /// Uses this pattern instead of overlapping
     /// equal-power crossfade. The key insight: when two TTS chunks have unknown phase
     /// relationships, overlapping them (even with equal-power curves) can produce
     /// constructive/destructive interference clicks at the seam. A short silence gap

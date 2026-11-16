@@ -2,7 +2,7 @@
 """
 VoxForge Neural Sidecar — High-Fidelity Zero-Shot Voice Cloning & 646-Language Studio
 =====================================================================================
-Matches and exceeds Studio (voxforge/studio) zero-shot voice cloning quality:
+Production zero-shot neural voice cloning pipeline:
 
   1. OmniVoice (k2-fsa/OmniVoice) — Default engine.
      - Massively multilingual: 646 languages (581k hours training).

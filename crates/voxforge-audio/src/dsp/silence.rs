@@ -12,7 +12,7 @@ pub struct SilenceTrimmer;
 impl SilenceTrimmer {
     /// Trim leading and trailing silence from PCM audio using energy VAD with hysteresis.
     ///
-    /// Uses a **retry ladder** matching Studio's `remove_silence_safe()`: if the first
+    /// Uses a **retry ladder**: if the first
     /// attempt at `threshold_dbfs` returns empty, retries at successively softer thresholds
     /// (-55 dBFS, then -65 dBFS) before falling back to the original. This prevents consuming
     /// the full clip when the reference audio is recorded at a low level.
@@ -29,8 +29,8 @@ impl SilenceTrimmer {
             return Vec::new();
         }
 
-        // Retry at softer thresholds when the initial attempt finds nothing, matching
-        // Studio's remove_silence_safe() retry ladder (-50 → -60 → -70 dBFS).
+        // Retry at softer thresholds when the initial attempt finds nothing,
+        // using a progressive retry ladder (-50 → -60 → -70 dBFS).
         let thresholds: [f32; 3] = [threshold_dbfs, -55.0, -65.0];
         for &threshold in &thresholds {
             let result = Self::trim_at_threshold(samples, sample_rate, threshold, padding_ms);
@@ -39,8 +39,7 @@ impl SilenceTrimmer {
             }
         }
         // All thresholds returned empty → signal is truly inaudible (all-zero or sub -65 dBFS).
-        // Return empty to signal "no usable audio" to the caller (matches Studio behaviour:
-        // remove_silence_safe() returns None / empty when nothing passes the softest threshold).
+        // Return empty to signal "no usable audio" to the caller when nothing passes the softest threshold.
         Vec::new()
     }
 
@@ -131,8 +130,8 @@ impl SilenceTrimmer {
     /// - Peak-to-RMS ratio (crest factor): too high → impulsive noise; too low → clipping
     /// - Zero-crossing rate: very high → noise or music artefacts
     ///
-    /// Studio uses a similar quality gate to pick the "best window" from a
-    /// long reference recording (`validate_clone_reference` in audio.py).
+    /// Uses a quality gate to pick the "best window" from a
+    /// long reference recording.
     pub fn score_reference_quality(samples: &[i16], sample_rate: u32) -> f32 {
         if samples.len() < 240 || sample_rate == 0 {
             return 0.0;
@@ -187,8 +186,7 @@ impl SilenceTrimmer {
     }
     /// Select the highest-quality fixed-length window from a long recording.
     ///
-    /// Studio's `validate_clone_reference()` uses a similar approach: it slides
-    /// a window over the reference audio and scores each candidate segment, returning
+    /// Slides a window over the reference audio and scores each candidate segment, returning
     /// the one with the highest voiced-fraction / SNR score.
     ///
     /// # Arguments
@@ -247,8 +245,7 @@ impl SilenceTrimmer {
 
     /// Snap the edges of a proposed window inward to the nearest natural pause boundary.
     ///
-    /// Studio's `trim_passage_to_pauses()` (audio.py) prevents mid-word clips at
-    /// window edges by pulling the start forward and the end backward until both land
+    /// Prevents mid-word clips at window edges by pulling the start forward and the end backward until both land
     /// at a natural pause (continuous silence ≥ `min_pause_ms`).
     ///
     /// # Arguments
