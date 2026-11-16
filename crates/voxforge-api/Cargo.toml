@@ -19,7 +19,6 @@ voxforge-asr           = { workspace = true }
 voxforge-catalog       = { workspace = true }
 voxforge-mcp           = { workspace = true }
 axum.workspace = true
-tower.workspace = true
 tower-http.workspace = true
 tokio = { workspace = true }
 serde.workspace = true
