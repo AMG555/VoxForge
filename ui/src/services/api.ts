@@ -74,7 +74,8 @@ export const api = {
           options.voice.startsWith('cloned-') ||
           options.voice.startsWith('designed-') ||
           options.voice.startsWith('persona-') ||
-          options.voice.startsWith('custom-')
+          options.voice.startsWith('custom-') ||
+          options.voice.startsWith('blended-')
             ? 'qwen3-tts'
             : 'edge-tts'),
         input: options.input,

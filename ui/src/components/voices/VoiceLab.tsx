@@ -89,12 +89,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   }, [voices]);
 
   const isCustomVoice = (v: Voice) =>
-    v.tags?.some((t) => ['cloned', 'designed', 'imported', 'custom'].includes(t)) ||
+    v.tags?.some((t) => ['cloned', 'designed', 'imported', 'custom', 'blended'].includes(t)) ||
     v.id.startsWith('cloned-') ||
     v.id.startsWith('qwen3-cloned-') ||
     v.id.startsWith('designed-') ||
     v.id.startsWith('persona-') ||
-    v.id.startsWith('custom-');
+    v.id.startsWith('custom-') ||
+    v.id.startsWith('blended-') ||
+    v.id.startsWith('qwen3-blended-');
 
   const handleDeleteCustomVoice = (voiceId: string, voiceName: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -187,6 +189,20 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [isDesigning, setIsDesigning] = useState<boolean>(false);
   const [designStatus, setDesignStatus] = useState<string | null>(null);
 
+  // Voice Blend Studio State
+  const [showBlendModal, setShowBlendModal] = useState<boolean>(false);
+  const [blendName, setBlendName] = useState<string>('');
+  const [blendVoiceA, setBlendVoiceA] = useState<string>('');
+  const [blendVoiceB, setBlendVoiceB] = useState<string>('');
+  const [blendWeightB, setBlendWeightB] = useState<number>(0.5);
+  const [blendDescription, setBlendDescription] = useState<string>('');
+  const [isBlending, setIsBlending] = useState<boolean>(false);
+  const [blendStatus, setBlendStatus] = useState<string | null>(null);
+  const [blendResultMetrics, setBlendResultMetrics] = useState<{
+    simA: number;
+    simB: number;
+  } | null>(null);
+
   // Persona Bundle Ref
   const personaFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -244,6 +260,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
     }
   };
   const manualVoiceOverrideRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (showBlendModal) {
+      const customOnes = localVoices.filter(isCustomVoice);
+      if (customOnes.length > 0 && !blendVoiceA) {
+        setBlendVoiceA(customOnes[0].id);
+      }
+      if (customOnes.length > 1 && (!blendVoiceB || blendVoiceB === customOnes[0].id)) {
+        setBlendVoiceB(customOnes[1].id);
+      } else if (customOnes.length > 0 && !blendVoiceB) {
+        setBlendVoiceB(customOnes[0].id);
+      }
+      setBlendStatus(null);
+      setBlendResultMetrics(null);
+    }
+  }, [showBlendModal, localVoices]);
 
   const handleInsertTag = (tag: string) => {
     setText((prev) => {
@@ -1239,6 +1271,63 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
     }
   };
 
+  const handleBlendSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blendName.trim() || !blendVoiceA || !blendVoiceB) return;
+    setIsBlending(true);
+    setBlendStatus(null);
+    setBlendResultMetrics(null);
+    try {
+      const res = await api.blendVoices({
+        name: blendName.trim(),
+        profile_id_a: blendVoiceA,
+        profile_id_b: blendVoiceB,
+        weight_b: blendWeightB,
+        description: blendDescription.trim() || undefined,
+      });
+
+      const voiceAObj = localVoices.find((v) => v.id === blendVoiceA);
+      const voiceBObj = localVoices.find((v) => v.id === blendVoiceB);
+
+      const newVoice: Voice = {
+        id: res.blended_profile.id,
+        name: res.blended_profile.name,
+        engine_id: res.blended_profile.engine_id || 'qwen3-tts',
+        language: res.blended_profile.language || voiceAObj?.language || 'en-US',
+        gender: (res.blended_profile.gender as any) || voiceAObj?.gender || 'neutral',
+        sample_rate_hz: 24000,
+        tags: ['blended', 'hybrid', 'zero-shot', 'cross-lingual'],
+        description:
+          blendDescription.trim() ||
+          `Hybrid blend: ${voiceAObj?.name || 'Voice A'} (${((1 - blendWeightB) * 100).toFixed(0)}%) + ${
+            voiceBObj?.name || 'Voice B'
+          } (${(blendWeightB * 100).toFixed(0)}%)`,
+        similarity_score: Math.max(res.cosine_similarity_to_a, res.cosine_similarity_to_b),
+      };
+
+      setLocalVoices((prev) => [newVoice, ...prev.filter((v) => v.id !== newVoice.id)]);
+      onVoiceCreated?.(newVoice);
+      manualVoiceOverrideRef.current = true;
+      setSelectedVoiceId(newVoice.id);
+      setBlendResultMetrics({
+        simA: res.cosine_similarity_to_a,
+        simB: res.cosine_similarity_to_b,
+      });
+      setBlendStatus(`Successfully blended voice "${newVoice.name}"!`);
+      setTimeout(() => {
+        setShowBlendModal(false);
+        setBlendName('');
+        setBlendDescription('');
+        setBlendStatus(null);
+        setBlendResultMetrics(null);
+      }, 1500);
+    } catch (err: any) {
+      setBlendStatus(`Voice blending failed: ${err.message || err}`);
+    } finally {
+      setIsBlending(false);
+    }
+  };
+
   const handleExportPersona = async (voiceId: string) => {
     try {
       const bundle = await api.exportPersona(voiceId);
@@ -1343,22 +1432,30 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       {/* Voices List Sidebar */}
       <div className="w-80 border-r border-[#242E3D] bg-[#121820] flex flex-col h-full select-none">
         <div className="p-3 border-b border-[#242E3D] space-y-2">
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() => setShowCloneModal(true)}
-              className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-mono font-semibold transition-colors shadow-sm"
+              className="flex items-center justify-center space-x-1 py-2 px-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-mono font-semibold transition-colors shadow-sm"
               title="Clone voice profile from microphone or audio file"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Clone Voice</span>
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>Clone</span>
             </button>
             <button
               onClick={() => setShowDesignModal(true)}
-              className="flex items-center justify-center space-x-1.5 py-2 px-2 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs font-mono font-semibold transition-colors shadow-sm"
+              className="flex items-center justify-center space-x-1 py-2 px-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[11px] font-mono font-semibold transition-colors shadow-sm"
               title="Design new voice with prompt & 5-axis Director AI"
             >
-              <Wand2 className="w-3.5 h-3.5" />
-              <span>Design Voice</span>
+              <Wand2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Design</span>
+            </button>
+            <button
+              onClick={() => setShowBlendModal(true)}
+              className="flex items-center justify-center space-x-1 py-2 px-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono font-semibold transition-colors shadow-sm"
+              title="Blend two voice profiles into a new hybrid persona"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+              <span>Blend</span>
             </button>
           </div>
           <button
@@ -4043,6 +4140,254 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   <>
                     <Wand2 className="w-3.5 h-3.5" />
                     <span>Synthesize Voice</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voice Blend Studio Modal */}
+      {showBlendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-[#121820] border border-[#242E3D] rounded-xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150 max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b border-[#242E3D] flex items-center justify-between shrink-0 bg-[#0E131A]">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <ArrowRightLeft className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Voice Blend Studio</h3>
+                  <p className="text-[11px] text-[#94A3B8] font-mono">
+                    Interpolate 512-D neural speaker embeddings between two voice profiles
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBlendModal(false)}
+                className="p-1 rounded-lg text-[#64748B] hover:text-white hover:bg-[#1A222D] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form id="voice-blend-form" onSubmit={handleBlendSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Check if at least 2 custom voices exist */}
+              {localVoices.filter(isCustomVoice).length < 2 && (
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-2">
+                  <div className="flex items-center space-x-2 font-semibold">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Two or more custom profiles required</span>
+                  </div>
+                  <p className="text-[#94A3B8] leading-relaxed">
+                    Voice blending interpolates continuous acoustic speaker embeddings between custom voices. Please
+                    clone or design at least two custom voice profiles first, or import a .voxpersona bundle.
+                  </p>
+                </div>
+              )}
+
+              {/* Hybrid Voice Name */}
+              <div>
+                <label className="block text-xs font-semibold text-[#CBD5E1] mb-1.5">
+                  Blended Persona Name <span className="text-emerald-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={blendName}
+                  onChange={(e) => setBlendName(e.target.value)}
+                  placeholder="e.g. Silas & Sarah Hybrid"
+                  className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white placeholder-[#64748B] focus:border-emerald-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Parent Voice Selectors */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#CBD5E1] mb-1.5">
+                    Parent Voice A <span className="text-emerald-400">*</span>
+                  </label>
+                  <select
+                    value={blendVoiceA}
+                    onChange={(e) => setBlendVoiceA(e.target.value)}
+                    className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none font-mono"
+                    required
+                  >
+                    <option value="" disabled>Select Voice A</option>
+                    {localVoices.filter(isCustomVoice).map((v) => (
+                      <option key={`blend-a-${v.id}`} value={v.id}>
+                        {v.name} ({v.language})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#CBD5E1] mb-1.5">
+                    Parent Voice B <span className="text-emerald-400">*</span>
+                  </label>
+                  <select
+                    value={blendVoiceB}
+                    onChange={(e) => setBlendVoiceB(e.target.value)}
+                    className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none font-mono"
+                    required
+                  >
+                    <option value="" disabled>Select Voice B</option>
+                    {localVoices.filter(isCustomVoice).map((v) => (
+                      <option key={`blend-b-${v.id}`} value={v.id}>
+                        {v.name} ({v.language})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Interpolation Weight Slider */}
+              <div className="p-3.5 rounded-lg bg-[#0E131A] border border-[#242E3D] space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[#CBD5E1]">Interpolation Balance</span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    {((1 - blendWeightB) * 100).toFixed(0)}% A / {(blendWeightB * 100).toFixed(0)}% B
+                  </span>
+                </div>
+
+                {/* Visual Ratio Bar */}
+                <div className="h-2 w-full bg-[#1A222D] rounded-full overflow-hidden flex">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-sky-400 transition-all duration-150"
+                    style={{ width: `${(1 - blendWeightB) * 100}%` }}
+                    title={`Voice A: ${((1 - blendWeightB) * 100).toFixed(0)}%`}
+                  />
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-150"
+                    style={{ width: `${blendWeightB * 100}%` }}
+                    title={`Voice B: ${(blendWeightB * 100).toFixed(0)}%`}
+                  />
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={blendWeightB}
+                  onChange={(e) => setBlendWeightB(parseFloat(e.target.value))}
+                  className="w-full accent-emerald-500 cursor-pointer"
+                />
+
+                {/* Quick Preset Buttons */}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setBlendWeightB(0.25)}
+                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                      blendWeightB === 0.25
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-[#161D26] text-[#94A3B8] hover:text-white border border-[#242E3D]'
+                    }`}
+                  >
+                    75% A / 25% B
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBlendWeightB(0.5)}
+                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                      blendWeightB === 0.5
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-[#161D26] text-[#94A3B8] hover:text-white border border-[#242E3D]'
+                    }`}
+                  >
+                    50% / 50% (Balanced)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBlendWeightB(0.75)}
+                    className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+                      blendWeightB === 0.75
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                        : 'bg-[#161D26] text-[#94A3B8] hover:text-white border border-[#242E3D]'
+                    }`}
+                  >
+                    25% A / 75% B
+                  </button>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-semibold text-[#CBD5E1] mb-1.5">
+                  Description / Notes <span className="text-[#64748B] font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={blendDescription}
+                  onChange={(e) => setBlendDescription(e.target.value)}
+                  placeholder="e.g. Blended archetype for corporate tech narration"
+                  className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white placeholder-[#64748B] focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Status & Results */}
+              {blendStatus && (
+                <div
+                  className={`p-3 rounded-lg text-xs font-mono flex items-center space-x-2 ${
+                    blendStatus.includes('failed')
+                      ? 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+                      : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                  }`}
+                >
+                  {blendStatus.includes('failed') ? (
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{blendStatus}</span>
+                </div>
+              )}
+
+              {blendResultMetrics && (
+                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-[#0E131A] border border-[#242E3D] text-[11px] font-mono">
+                  <div className="text-[#94A3B8]">
+                    Sim to Voice A: <span className="text-emerald-400 font-bold">{(blendResultMetrics.simA * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="text-[#94A3B8]">
+                    Sim to Voice B: <span className="text-emerald-400 font-bold">{(blendResultMetrics.simB * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+              )}
+            </form>
+
+            {/* Sticky Action Footer */}
+            <div className="p-4 border-t border-[#242E3D] bg-[#0E131A] shrink-0 flex items-center justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowBlendModal(false)}
+                className="px-4 py-2 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="voice-blend-form"
+                disabled={
+                  isBlending ||
+                  !blendName.trim() ||
+                  !blendVoiceA ||
+                  !blendVoiceB ||
+                  blendVoiceA === blendVoiceB ||
+                  localVoices.filter(isCustomVoice).length < 2
+                }
+                className="flex items-center space-x-2 px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-semibold transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              >
+                {isBlending ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Interpolating Embeddings...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span>Blend Profiles</span>
                   </>
                 )}
               </button>
