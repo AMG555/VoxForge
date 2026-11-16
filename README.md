@@ -71,11 +71,14 @@ Install standalone binary into system PATH or cleanly remove it with 1 command:
 
 ## ✨ Key Capabilities
 
-- **🎙️ Unified Multi-Engine Speech Synthesis**: Abstract 10+ local and cloud speech engines (Piper ONNX, Kokoro-82M, KittenTTS, Qwen3-TTS, ChatTTS, StyleTTS2, and Edge-TTS) behind a single OpenAI-compatible API (`/v1/audio/speech`).
-- **🧬 Zero-Shot Voice Cloning & Voice Lab**: Extract 512-D neural speaker identity embeddings from 3-second reference audio (`POST /v1/voices/clone`). Includes 80Hz Butterworth filtering, adaptive noise gating, peak normalization (-0.5 dBFS), 5-axis Director AI controls, and `.voxpersona` bundle sharing.
+- **🎙️ Unified Multi-Engine Speech Synthesis**: Abstract local neural and cloud speech engines (OmniVoice, CosyVoice 3, Kokoro-82M, Piper ONNX, Edge-TTS, and OpenAI Router) behind a single OpenAI-compatible API (`/v1/audio/speech`).
+- **🧬 Zero-Shot Voice Cloning & Voice Lab**: Extract 512-D neural speaker identity embeddings from 3-second reference audio (`POST /v1/voices/clone`). Includes 80Hz Butterworth filtering, adaptive energy VAD, peak normalization (-0.5 dBFS), 5-axis Director AI controls, and portable `.voxpersona` bundle sharing.
+- **🌐 646+ Languages & Cross-Lingual Synthesis**: Synthesize speech across 646+ languages and dialects with native Unicode script detection (Devanagari, Arabic, CJK, Malayalam, Cyrillic, Latin) and automatic RTL text alignment.
+- **🔀 Voice Blend Studio & Biometric Verification**: Interpolate continuous acoustic speaker embeddings between two voice profiles with spherical linear interpolation (`POST /v1/voices/profiles/blend`), and verify speaker identity similarity across 5 acoustic dimensions (`POST /v1/voices/verify`).
 - **🎛️ Visual DAG Pipeline Studio**: Infinite node canvas with focal zoom (`0.25x` to `2.5x`), Kahn's topological execution, magnetic snapping, multi-node clipboard copying (`Ctrl+C`), video dubbing time-stretching (WSOLA), and audiobook resumption checkpointing (`resume.json`).
-- **🤖 Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 stdio server (`voxforge mcp`) providing 14 speech tools and 4 resource streams directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
-- **🛡️ Enterprise Hardware & Audio DSP**: Automated hardware profiler detecting AVX2/AVX-512, NVIDIA CUDA, and Apple MPS; real-time Acoustic Echo Cancellation (NLMS); and spread-spectrum acoustic watermarking (`0x5658`).
+- **🤖 Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 server over `stdio` and `HTTP` providing 14 speech tools, 4 resource streams, and 2 prompts directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
+- **🎧 Studio Broadcast DSP Mastering**: Two-pass EBU R128 LUFS loudness normalization (-16 LUFS voice target), true 5ms look-ahead brickwall limiter, slow phrase leveler with speech gate, and room-tone gap filling.
+- **🛡️ Enterprise Hardware Profiler**: Automated hardware detection for AVX2/AVX-512, NVIDIA CUDA, and Apple MPS; SLA policy routing; real-time Acoustic Echo Cancellation (NLMS); and spread-spectrum acoustic watermarking (`0x5658`).
 
 ---
 

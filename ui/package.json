@@ -2,6 +2,19 @@
   "name": "voxforge-ui",
   "private": true,
   "version": "0.4.0",
+  "description": "Production zero-shot voice cloning studio, visual DAG audio pipeline canvas, and neural speech synthesizer for VoxForge",
+  "homepage": "https://github.com/AMG555/VoxForge",
+  "keywords": [
+    "voice-cloning",
+    "zero-shot",
+    "text-to-speech",
+    "tts",
+    "speech-synthesis",
+    "ai-voice",
+    "voice-generator",
+    "mcp-server",
+    "react-19"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
