@@ -6,6 +6,8 @@
  * - World languages (English, Spanish, French, German, Japanese, Chinese)
  */
 
+import languages646Raw from '../constants/languages646.json';
+
 export interface DetectedLanguage {
   code: string;
   name: string;
@@ -27,27 +29,156 @@ export interface LanguageOption {
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'AUTO', name: 'Auto-Detect Language', flag: '🌐' },
+
+  // ── Indian Scripts & Romanized Dialects ───────────────────────────────
   { code: 'ml-Latn', name: 'Manglish (Malayalam Romanized)', flag: '🌴', isRomanized: true },
-  { code: 'ml-IN', name: 'Malayalam (മലയാളം)', flag: '🇮🇳', nativeScript: 'മലയാളം' },
-  { code: 'hi-Latn', name: 'Hinglish (Hindi Romanized)', flag: '🇮🇳', isRomanized: true },
-  { code: 'hi-IN', name: 'Hindi (हिन्दी)', flag: '🇮🇳', nativeScript: 'हिन्दी' },
-  { code: 'ta-Latn', name: 'Tanglish (Tamil Romanized)', flag: '🇮🇳', isRomanized: true },
-  { code: 'ta-IN', name: 'Tamil (தமிழ்)', flag: '🇮🇳', nativeScript: 'தமிழ்' },
-  { code: 'te-IN', name: 'Telugu (తెలుగు)', flag: '🇮🇳', nativeScript: 'తెలుగు' },
-  { code: 'kn-IN', name: 'Kannada (ಕನ್ನಡ)', flag: '🇮🇳', nativeScript: 'ಕನ್ನಡ' },
-  { code: 'bn-IN', name: 'Bengali (বাংলা)', flag: '🇮🇳', nativeScript: 'বাংলা' },
-  { code: 'mr-IN', name: 'Marathi (मराठी)', flag: '🇮🇳', nativeScript: 'मराठी' },
-  { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)', flag: '🇮🇳', nativeScript: 'ગુજરાતી' },
-  { code: 'ur-IN', name: 'Urdu (اردو)', flag: '🇮🇳', nativeScript: 'اردو' },
-  { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)', flag: '🇮🇳', nativeScript: 'ਪੰਜਾਬੀ' },
-  { code: 'en-US', name: 'English (US)', flag: '🇺🇸' },
-  { code: 'en-GB', name: 'English (UK)', flag: '🇬🇧' },
-  { code: 'en-IN', name: 'Indian English', flag: '🇮🇳' },
-  { code: 'es-ES', name: 'Spanish (Español)', flag: '🇪🇸' },
-  { code: 'fr-FR', name: 'French (Français)', flag: '🇫🇷' },
-  { code: 'de-DE', name: 'German (Deutsch)', flag: '🇩🇪' },
-  { code: 'ja-JP', name: 'Japanese (日本語)', flag: '🇯🇵' },
-  { code: 'zh-CN', name: 'Mandarin Chinese (中文)', flag: '🇨🇳' },
+  { code: 'ml-IN',   name: 'Malayalam (മലയാളം)',              flag: '🇮🇳', nativeScript: 'മലയാളം' },
+  { code: 'hi-Latn', name: 'Hinglish (Hindi Romanized)',      flag: '🇮🇳', isRomanized: true },
+  { code: 'hi-IN',   name: 'Hindi (हिन्दी)',                  flag: '🇮🇳', nativeScript: 'हिन्दी' },
+  { code: 'ta-Latn', name: 'Tanglish (Tamil Romanized)',      flag: '🇮🇳', isRomanized: true },
+  { code: 'ta-IN',   name: 'Tamil (தமிழ்)',                   flag: '🇮🇳', nativeScript: 'தமிழ்' },
+  { code: 'te-IN',   name: 'Telugu (తెలుగు)',                 flag: '🇮🇳', nativeScript: 'తెలుగు' },
+  { code: 'kn-IN',   name: 'Kannada (ಕನ್ನಡ)',                 flag: '🇮🇳', nativeScript: 'ಕನ್ನಡ' },
+  { code: 'bn-IN',   name: 'Bengali India (বাংলা)',           flag: '🇮🇳', nativeScript: 'বাংলা' },
+  { code: 'bn-BD',   name: 'Bengali Bangladesh (বাংলা)',      flag: '🇧🇩', nativeScript: 'বাংলা' },
+  { code: 'mr-IN',   name: 'Marathi (मराठी)',                 flag: '🇮🇳', nativeScript: 'मराठी' },
+  { code: 'gu-IN',   name: 'Gujarati (ગુજરાતી)',              flag: '🇮🇳', nativeScript: 'ગુજરાતી' },
+  { code: 'pa-IN',   name: 'Punjabi India (ਪੰਜਾਬੀ)',          flag: '🇮🇳', nativeScript: 'ਪੰਜਾਬੀ' },
+  { code: 'ur-IN',   name: 'Urdu India (اردو)',               flag: '🇮🇳', nativeScript: 'اردو' },
+  { code: 'ur-PK',   name: 'Urdu Pakistan (اردو)',            flag: '🇵🇰', nativeScript: 'اردو' },
+  { code: 'or-IN',   name: 'Odia (ଓଡ଼ିଆ)',                   flag: '🇮🇳', nativeScript: 'ଓଡ଼ିଆ' },
+  { code: 'ne-NP',   name: 'Nepali (नेपाली)',                 flag: '🇳🇵', nativeScript: 'नेपाली' },
+  { code: 'si-LK',   name: 'Sinhala (සිංහල)',                 flag: '🇱🇰', nativeScript: 'සිංහල' },
+  { code: 'my-MM',   name: 'Burmese (မြန်မာ)',                flag: '🇲🇲', nativeScript: 'မြန်မာ' },
+  { code: 'km-KH',   name: 'Khmer (ខ្មែរ)',                   flag: '🇰🇭', nativeScript: 'ខ្មែរ' },
+  { code: 'lo-LA',   name: 'Lao (ລາວ)',                       flag: '🇱🇦', nativeScript: 'ລາວ' },
+
+  // ── English variants ───────────────────────────────────────────────────
+  { code: 'en-US', name: 'English (US)',           flag: '🇺🇸' },
+  { code: 'en-GB', name: 'English (UK)',           flag: '🇬🇧' },
+  { code: 'en-AU', name: 'English (Australia)',    flag: '🇦🇺' },
+  { code: 'en-CA', name: 'English (Canada)',       flag: '🇨🇦' },
+  { code: 'en-NZ', name: 'English (New Zealand)',  flag: '🇳🇿' },
+  { code: 'en-IN', name: 'English (India)',        flag: '🇮🇳' },
+  { code: 'en-IE', name: 'English (Ireland)',      flag: '🇮🇪' },
+  { code: 'en-ZA', name: 'English (South Africa)', flag: '🇿🇦' },
+  { code: 'en-SG', name: 'English (Singapore)',   flag: '🇸🇬' },
+  { code: 'en-NG', name: 'English (Nigeria)',      flag: '🇳🇬' },
+  { code: 'en-KE', name: 'English (Kenya)',        flag: '🇰🇪' },
+  { code: 'en-TZ', name: 'English (Tanzania)',     flag: '🇹🇿' },
+  { code: 'en-PH', name: 'English (Philippines)',  flag: '🇵🇭' },
+  { code: 'en-HK', name: 'English (Hong Kong)',    flag: '🇭🇰' },
+
+  // ── East Asian ─────────────────────────────────────────────────────────
+  { code: 'ja-JP',   name: 'Japanese (日本語)',          flag: '🇯🇵', nativeScript: '日本語' },
+  { code: 'zh-CN',   name: 'Mandarin (Simplified 中文)',  flag: '🇨🇳', nativeScript: '中文' },
+  { code: 'zh-TW',   name: 'Chinese Traditional (繁體)',  flag: '🇹🇼', nativeScript: '繁體中文' },
+  { code: 'zh-HK',   name: 'Cantonese HK (粵語)',         flag: '🇭🇰', nativeScript: '粵語' },
+  { code: 'ko-KR',   name: 'Korean (한국어)',              flag: '🇰🇷', nativeScript: '한국어' },
+  { code: 'mn-MN',   name: 'Mongolian (Монгол)',           flag: '🇲🇳', nativeScript: 'Монгол' },
+
+  // ── Southeast Asian ────────────────────────────────────────────────────
+  { code: 'id-ID',   name: 'Indonesian (Bahasa)',   flag: '🇮🇩' },
+  { code: 'ms-MY',   name: 'Malay (Bahasa Melayu)', flag: '🇲🇾' },
+  { code: 'th-TH',   name: 'Thai (ภาษาไทย)',         flag: '🇹🇭', nativeScript: 'ภาษาไทย' },
+  { code: 'vi-VN',   name: 'Vietnamese (Tiếng Việt)', flag: '🇻🇳' },
+  { code: 'fil-PH',  name: 'Filipino (Tagalog)',     flag: '🇵🇭' },
+
+  // ── Middle East & North Africa ─────────────────────────────────────────
+  { code: 'ar-SA',   name: 'Arabic (Saudi العربية)',   flag: '🇸🇦', nativeScript: 'العربية' },
+  { code: 'ar-EG',   name: 'Arabic (Egypt)',           flag: '🇪🇬', nativeScript: 'العربية' },
+  { code: 'ar-AE',   name: 'Arabic (UAE)',             flag: '🇦🇪', nativeScript: 'العربية' },
+  { code: 'ar-MA',   name: 'Arabic (Morocco)',         flag: '🇲🇦', nativeScript: 'العربية' },
+  { code: 'fa-IR',   name: 'Persian / Farsi (فارسی)',  flag: '🇮🇷', nativeScript: 'فارسی' },
+  { code: 'he-IL',   name: 'Hebrew (עברית)',           flag: '🇮🇱', nativeScript: 'עברית' },
+  { code: 'tr-TR',   name: 'Turkish (Türkçe)',         flag: '🇹🇷' },
+
+  // ── Western Europe ─────────────────────────────────────────────────────
+  { code: 'de-DE',   name: 'German (Deutsch)',         flag: '🇩🇪' },
+  { code: 'de-AT',   name: 'German (Austria)',         flag: '🇦🇹' },
+  { code: 'de-CH',   name: 'German (Switzerland)',     flag: '🇨🇭' },
+  { code: 'fr-FR',   name: 'French (Français)',        flag: '🇫🇷' },
+  { code: 'fr-BE',   name: 'French (Belgium)',         flag: '🇧🇪' },
+  { code: 'fr-CA',   name: 'French (Canada)',          flag: '🇨🇦' },
+  { code: 'es-ES',   name: 'Spanish (España)',         flag: '🇪🇸' },
+  { code: 'es-MX',   name: 'Spanish (Mexico)',         flag: '🇲🇽' },
+  { code: 'es-AR',   name: 'Spanish (Argentina)',      flag: '🇦🇷' },
+  { code: 'es-CO',   name: 'Spanish (Colombia)',       flag: '🇨🇴' },
+  { code: 'es-US',   name: 'Spanish (US)',             flag: '🇺🇸' },
+  { code: 'pt-BR',   name: 'Portuguese (Brasil)',      flag: '🇧🇷' },
+  { code: 'pt-PT',   name: 'Portuguese (Portugal)',    flag: '🇵🇹' },
+  { code: 'it-IT',   name: 'Italian (Italiano)',       flag: '🇮🇹' },
+  { code: 'nl-NL',   name: 'Dutch (Nederlands)',       flag: '🇳🇱' },
+  { code: 'nl-BE',   name: 'Dutch (Belgium)',          flag: '🇧🇪' },
+  { code: 'sv-SE',   name: 'Swedish (Svenska)',        flag: '🇸🇪' },
+  { code: 'nb-NO',   name: 'Norwegian (Norsk)',        flag: '🇳🇴' },
+  { code: 'da-DK',   name: 'Danish (Dansk)',           flag: '🇩🇰' },
+  { code: 'fi-FI',   name: 'Finnish (Suomi)',          flag: '🇫🇮' },
+  { code: 'pl-PL',   name: 'Polish (Polski)',          flag: '🇵🇱' },
+  { code: 'cs-CZ',   name: 'Czech (Čeština)',          flag: '🇨🇿' },
+  { code: 'sk-SK',   name: 'Slovak (Slovenčina)',      flag: '🇸🇰' },
+  { code: 'hu-HU',   name: 'Hungarian (Magyar)',       flag: '🇭🇺' },
+  { code: 'ro-RO',   name: 'Romanian (Română)',        flag: '🇷🇴' },
+  { code: 'bg-BG',   name: 'Bulgarian (Български)',    flag: '🇧🇬', nativeScript: 'Български' },
+  { code: 'hr-HR',   name: 'Croatian (Hrvatski)',      flag: '🇭🇷' },
+  { code: 'sl-SI',   name: 'Slovenian (Slovenščina)',  flag: '🇸🇮' },
+  { code: 'sr-RS',   name: 'Serbian (Српски)',         flag: '🇷🇸', nativeScript: 'Српски' },
+  { code: 'bs-BA',   name: 'Bosnian (Bosanski)',       flag: '🇧🇦' },
+  { code: 'mk-MK',   name: 'Macedonian (Македонски)',  flag: '🇲🇰', nativeScript: 'Македонски' },
+  { code: 'sq-AL',   name: 'Albanian (Shqip)',         flag: '🇦🇱' },
+  { code: 'mt-MT',   name: 'Maltese (Malti)',          flag: '🇲🇹' },
+  { code: 'is-IS',   name: 'Icelandic (Íslenska)',     flag: '🇮🇸' },
+  { code: 'lv-LV',   name: 'Latvian (Latviešu)',       flag: '🇱🇻' },
+  { code: 'lt-LT',   name: 'Lithuanian (Lietuvių)',    flag: '🇱🇹' },
+  { code: 'et-EE',   name: 'Estonian (Eesti)',         flag: '🇪🇪' },
+  { code: 'ga-IE',   name: 'Irish Gaelic (Gaeilge)',   flag: '🇮🇪' },
+  { code: 'cy-GB',   name: 'Welsh (Cymraeg)',          flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿' },
+  { code: 'ca-ES',   name: 'Catalan (Català)',         flag: '🏳️' },
+  { code: 'gl-ES',   name: 'Galician (Galego)',        flag: '🏳️' },
+  { code: 'eu-ES',   name: 'Basque (Euskara)',         flag: '🏳️' },
+
+  // ── Eastern Europe / Central Asia ─────────────────────────────────────
+  { code: 'ru-RU',   name: 'Russian (Русский)',        flag: '🇷🇺', nativeScript: 'Русский' },
+  { code: 'uk-UA',   name: 'Ukrainian (Українська)',   flag: '🇺🇦', nativeScript: 'Українська' },
+  { code: 'be-BY',   name: 'Belarusian (Беларуская)',  flag: '🇧🇾', nativeScript: 'Беларуская' },
+  { code: 'kk-KZ',   name: 'Kazakh (Қазақша)',         flag: '🇰🇿', nativeScript: 'Қазақша' },
+  { code: 'uz-UZ',   name: 'Uzbek (Oʻzbekcha)',        flag: '🇺🇿' },
+  { code: 'ky-KG',   name: 'Kyrgyz (Кыргызча)',        flag: '🇰🇬', nativeScript: 'Кыргызча' },
+  { code: 'tk-TM',   name: 'Turkmen (Türkmen)',        flag: '🇹🇲' },
+  { code: 'az-AZ',   name: 'Azerbaijani (Azərbaycan)', flag: '🇦🇿' },
+  { code: 'ka-GE',   name: 'Georgian (ქართული)',        flag: '🇬🇪', nativeScript: 'ქართული' },
+  { code: 'hy-AM',   name: 'Armenian (Հայերեն)',        flag: '🇦🇲', nativeScript: 'Հայերեն' },
+
+  // ── Africa ─────────────────────────────────────────────────────────────
+  { code: 'af-ZA',   name: 'Afrikaans',                flag: '🇿🇦' },
+  { code: 'sw-KE',   name: 'Swahili (Kenya)',          flag: '🇰🇪' },
+  { code: 'sw-TZ',   name: 'Swahili (Tanzania)',       flag: '🇹🇿' },
+  { code: 'am-ET',   name: 'Amharic (አማርኛ)',           flag: '🇪🇹', nativeScript: 'አማርኛ' },
+  { code: 'so-SO',   name: 'Somali (Soomaali)',        flag: '🇸🇴' },
+  { code: 'zu-ZA',   name: 'Zulu (isiZulu)',           flag: '🇿🇦' },
+  { code: 'yo-NG',   name: 'Yoruba',                   flag: '🇳🇬' },
+  { code: 'ha-NG',   name: 'Hausa',                    flag: '🇳🇬' },
+  { code: 'ig-NG',   name: 'Igbo',                     flag: '🇳🇬' },
+  { code: 'ps-AF',   name: 'Pashto (پښتو)',            flag: '🇦🇫', nativeScript: 'پښتو' },
+];
+
+export const ALL_646_LANGUAGES: LanguageOption[] = [
+  ...SUPPORTED_LANGUAGES,
+  ...languages646Raw
+    .filter(
+      (l) =>
+        !SUPPORTED_LANGUAGES.some(
+          (s) =>
+            s.code.toLowerCase().startsWith(l.id.toLowerCase()) ||
+            s.code.toLowerCase() === l.iso.toLowerCase() ||
+            s.name.toLowerCase().includes(l.name.toLowerCase())
+        )
+    )
+    .map((l) => ({
+      code: l.id,
+      name: `${l.name} (${l.iso.toUpperCase()})`,
+      flag: '🌐',
+    })),
 ];
 
 // Lexicon for Romanized Manglish (Malayalam written in Latin script)
@@ -122,6 +253,7 @@ export function detectLanguage(text: string): DetectedLanguage {
   let arabicChars = 0;
   let cjkChars = 0;
   let japaneseChars = 0;
+  let koreanChars = 0;
   let totalScriptChars = 0;
 
   for (let i = 0; i < trimmed.length; i++) {
@@ -169,6 +301,11 @@ export function detectLanguage(text: string): DetectedLanguage {
     // Arabic / Urdu: U+0600 - U+06FF
     else if (code >= 0x0600 && code <= 0x06ff) {
       arabicChars++;
+      totalScriptChars++;
+    }
+    // Korean Hangul syllables: U+AC00 - U+D7A3, Hangul Jamo: U+1100 - U+11FF
+    else if ((code >= 0xac00 && code <= 0xd7a3) || (code >= 0x1100 && code <= 0x11ff)) {
+      koreanChars++;
       totalScriptChars++;
     }
     // Japanese Hiragana & Katakana: U+3040 - U+30FF
@@ -272,13 +409,26 @@ export function detectLanguage(text: string): DetectedLanguage {
     };
   }
 
-  if (arabicChars >= 2 || (arabicChars > 0 && totalScriptChars === arabicChars)) {
+  if (koreanChars >= 1) {
     return {
-      code: 'ur-IN',
-      name: 'Urdu (اردو)',
-      flag: '🇮🇳',
+      code: 'ko-KR',
+      name: 'Korean (한국어)',
+      flag: '🇰🇷',
       isRomanizedDialect: false,
-      suggestedVoiceId: 'ur-IN-GulNeural',
+      suggestedVoiceId: 'ko-KR-SunHiNeural',
+      confidence: Math.min(1.0, 0.7 + (koreanChars / trimmed.length) * 0.3),
+    };
+  }
+
+  if (arabicChars >= 2 || (arabicChars > 0 && totalScriptChars === arabicChars)) {
+    // Distinguish Arabic (ar-SA) from Urdu (ur-IN) based on context — default to Arabic
+    // since we now surface ar-SA in the language selector
+    return {
+      code: 'ar-SA',
+      name: 'Arabic (العربية)',
+      flag: '🇸🇦',
+      isRomanizedDialect: false,
+      suggestedVoiceId: 'ar-SA-ZariyahNeural',
       confidence: Math.min(1.0, 0.7 + (arabicChars / trimmed.length) * 0.3),
     };
   }

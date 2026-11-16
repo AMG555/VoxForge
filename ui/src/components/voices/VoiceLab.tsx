@@ -54,6 +54,7 @@ import {
   detectLanguage,
   DetectedLanguage,
   SUPPORTED_LANGUAGES,
+  ALL_646_LANGUAGES,
 } from '../../services/languageDetector';
 import {
   transliterateToNativeScript,
@@ -563,6 +564,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [isCloning, setIsCloning] = useState<boolean>(false);
   const [audioQuality, setAudioQuality] = useState<AudioQualityAssessment | null>(null);
   const [isAutoTranscribing, setIsAutoTranscribing] = useState<boolean>(false);
+  // Studio parity: Refinement Steps (Sampling Steps) and Export Precision
+  const [refinementSteps, setRefinementSteps] = useState<number>(32); // 8-64 steps, 32 = Best Quality
+  const [audioPrecision, setAudioPrecision] = useState<16 | 24 | 32>(16); // 16-bit, 24-bit, 32-bit float
+  const [languageSearchTerm, setLanguageSearchTerm] = useState<string>('');
   // Multi-sample additional reference audio for enhanced embedding accuracy
   const [additionalSamples, setAdditionalSamples] = useState<{ name: string; base64: string }[]>([]);
   const additionalSampleInputRef = useRef<HTMLInputElement | null>(null);
@@ -1122,6 +1127,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             : undefined,
           gender: cloneGender,
           language: resolvedLang,
+          metadata: {
+            num_step: refinementSteps.toString(),
+            precision: audioPrecision.toString(),
+          },
         });
       } catch (backendErr) {
         console.warn('Backend cloning offline; registering local zero-shot voice profile:', backendErr);
@@ -3587,30 +3596,108 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   </div>
                 </div>
 
-                {/* Speaker Primary Language / Dialect Selector */}
+                {/* Speaker Primary Language / Dialect Selector (646 Languages) */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
-                      Speaker Native Language / Dialect
+                      Speaker Language / Dialect ({ALL_646_LANGUAGES.length} Languages)
                     </label>
-                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      Cross-Lingual Ready
+                    <span className="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      646 Multilingual Catalog
                     </span>
+                  </div>
+                  <div className="relative mb-1.5">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#64748B]" />
+                    <input
+                      type="text"
+                      value={languageSearchTerm}
+                      onChange={(e) => setLanguageSearchTerm(e.target.value)}
+                      placeholder="Search 646 languages (e.g. Malayalam, Hindi, Spanish, Arabic, Japanese, Quechua)..."
+                      className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg pl-8 pr-3 py-1.5 text-white text-xs focus:border-amber-500 focus:outline-none"
+                    />
                   </div>
                   <select
                     value={cloneLanguage}
                     onChange={(e) => setCloneLanguage(e.target.value)}
                     className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg px-3 py-2 text-white text-xs focus:border-amber-500 focus:outline-none font-mono"
+                    size={languageSearchTerm ? 5 : 1}
                   >
-                    {SUPPORTED_LANGUAGES.map((lang) => (
+                    {ALL_646_LANGUAGES.filter((lang) =>
+                      !languageSearchTerm ||
+                      lang.name.toLowerCase().includes(languageSearchTerm.toLowerCase()) ||
+                      lang.code.toLowerCase().includes(languageSearchTerm.toLowerCase())
+                    ).map((lang) => (
                       <option key={lang.code} value={lang.code}>
                         {lang.flag} {lang.name}
                       </option>
                     ))}
                   </select>
                   <p className="text-[11px] text-[#64748B] font-mono mt-1.5 leading-relaxed">
-                    Your cloned voice timbre can speak across <span className="text-amber-400 font-semibold">ALL supported languages</span> (Malayalam, Hindi, Tamil, Telugu, English, German, French, etc.) via neural cross-lingual synthesis.
+                    Powered by OmniVoice & CosyVoice: supports zero-shot cross-lingual cloning across <span className="text-amber-400 font-semibold">646 languages</span> with 581,000+ hours of speech data.
                   </p>
+                </div>
+
+                {/* Studio Parity: Refinement & Precision Settings */}
+                <div className="bg-[#0B0E14] border border-[#242E3D] rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>Studio Refinement & Audio Precision</span>
+                    </div>
+                    {refinementSteps === 32 && (
+                      <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-semibold">
+                        Best Quality (32 Steps)
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-[#94A3B8] mb-1">
+                      <span>Refinement Sampling Steps</span>
+                      <span className="font-mono text-white font-semibold">{refinementSteps} steps {refinementSteps === 32 ? '★ Default' : ''}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={8}
+                      max={64}
+                      step={4}
+                      value={refinementSteps}
+                      onChange={(e) => setRefinementSteps(Number(e.target.value))}
+                      className="w-full accent-amber-500 h-1.5 bg-[#242E3D] rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] font-mono text-[#64748B] mt-1">
+                      <span>8 (Fastest)</span>
+                      <span>32 (Best Quality Studio Standard)</span>
+                      <span>64 (Max Fidelity)</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-[#94A3B8] uppercase font-semibold mb-1">
+                      WAV Export Precision
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { bits: 16, label: 'Standard (16-bit)', desc: 'Smallest, broad support' },
+                        { bits: 24, label: 'Editing (24-bit)', desc: 'Professional DAW grade' },
+                        { bits: 32, label: 'Original (32-bit float)', desc: 'Highest precision ceiling' },
+                      ].map((p) => (
+                        <button
+                          key={p.bits}
+                          type="button"
+                          onClick={() => setAudioPrecision(p.bits as 16 | 24 | 32)}
+                          className={`p-2 rounded-lg border text-left transition-all ${
+                            audioPrecision === p.bits
+                              ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-semibold'
+                              : 'bg-[#121820] border-[#242E3D] text-[#94A3B8] hover:border-[#3B485C]'
+                          }`}
+                        >
+                          <div className="text-[11px] font-medium">{p.label}</div>
+                          <div className="text-[9px] text-[#64748B] font-mono mt-0.5">{p.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Multi-sample additional reference audio panel */}

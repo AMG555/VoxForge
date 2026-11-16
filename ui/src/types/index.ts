@@ -180,6 +180,7 @@ export interface CloneVoicePayload {
   language?: string;
   gender?: 'male' | 'female' | 'neutral';
   description?: string;
+  metadata?: Record<string, string>;
 }
 
 export interface RefineVoicePayload {

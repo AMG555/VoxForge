@@ -1,0 +1,3878 @@
+[
+  {
+    "id": "aae",
+    "name": "Arb\u00ebresh\u00eb Albanian",
+    "iso": "aae",
+    "duration_hours": 6.11
+  },
+  {
+    "id": "aal",
+    "name": "Afade",
+    "iso": "aal",
+    "duration_hours": 10.19
+  },
+  {
+    "id": "aao",
+    "name": "Algerian Saharan Arabic",
+    "iso": "aao",
+    "duration_hours": 2.02
+  },
+  {
+    "id": "ab",
+    "name": "Abkhazian",
+    "iso": "abk",
+    "duration_hours": 57.27
+  },
+  {
+    "id": "abb",
+    "name": "Bankon",
+    "iso": "abb",
+    "duration_hours": 11.2
+  },
+  {
+    "id": "abn",
+    "name": "Abua",
+    "iso": "abn",
+    "duration_hours": 10.27
+  },
+  {
+    "id": "abr",
+    "name": "Abron",
+    "iso": "abr",
+    "duration_hours": 9.22
+  },
+  {
+    "id": "abs",
+    "name": "Ambonese Malay",
+    "iso": "abs",
+    "duration_hours": 10.03
+  },
+  {
+    "id": "abv",
+    "name": "Baharna Arabic",
+    "iso": "abv",
+    "duration_hours": 10.41
+  },
+  {
+    "id": "acm",
+    "name": "Mesopotamian Arabic",
+    "iso": "acm",
+    "duration_hours": 3.78
+  },
+  {
+    "id": "acw",
+    "name": "Hijazi Arabic",
+    "iso": "acw",
+    "duration_hours": 22.32
+  },
+  {
+    "id": "acx",
+    "name": "Omani Arabic",
+    "iso": "acx",
+    "duration_hours": 22.03
+  },
+  {
+    "id": "adf",
+    "name": "Dhofari Arabic",
+    "iso": "adf",
+    "duration_hours": 0.31
+  },
+  {
+    "id": "adx",
+    "name": "Amdo Tibetan",
+    "iso": "adx",
+    "duration_hours": 56.94
+  },
+  {
+    "id": "ady",
+    "name": "Adyghe",
+    "iso": "ady",
+    "duration_hours": 32.6
+  },
+  {
+    "id": "aeb",
+    "name": "Tunisian Arabic",
+    "iso": "aeb",
+    "duration_hours": 21.63
+  },
+  {
+    "id": "aec",
+    "name": "Saidi Arabic",
+    "iso": "aec",
+    "duration_hours": 9.28
+  },
+  {
+    "id": "af",
+    "name": "Afrikaans",
+    "iso": "afr",
+    "duration_hours": 4.4
+  },
+  {
+    "id": "afb",
+    "name": "Gulf Arabic",
+    "iso": "afb",
+    "duration_hours": 98.55
+  },
+  {
+    "id": "afo",
+    "name": "Eloyi",
+    "iso": "afo",
+    "duration_hours": 11.21
+  },
+  {
+    "id": "ahl",
+    "name": "Igo",
+    "iso": "ahl",
+    "duration_hours": 9.22
+  },
+  {
+    "id": "ahs",
+    "name": "Ashe",
+    "iso": "ahs",
+    "duration_hours": 10.62
+  },
+  {
+    "id": "ajg",
+    "name": "Aja (Benin)",
+    "iso": "ajg",
+    "duration_hours": 5.63
+  },
+  {
+    "id": "aju",
+    "name": "Judeo-Moroccan Arabic",
+    "iso": "aju",
+    "duration_hours": 7.21
+  },
+  {
+    "id": "ala",
+    "name": "Alago",
+    "iso": "ala",
+    "duration_hours": 11.04
+  },
+  {
+    "id": "aln",
+    "name": "Gheg Albanian",
+    "iso": "aln",
+    "duration_hours": 3.92
+  },
+  {
+    "id": "alo",
+    "name": "Larike-Wakasihu",
+    "iso": "alo",
+    "duration_hours": 9.97
+  },
+  {
+    "id": "am",
+    "name": "Amharic",
+    "iso": "amh",
+    "duration_hours": 12.83
+  },
+  {
+    "id": "amu",
+    "name": "Guerrero Amuzgo",
+    "iso": "amu",
+    "duration_hours": 10.1
+  },
+  {
+    "id": "an",
+    "name": "Aragonese",
+    "iso": "arg",
+    "duration_hours": 16.4
+  },
+  {
+    "id": "anc",
+    "name": "Ngas",
+    "iso": "anc",
+    "duration_hours": 10.14
+  },
+  {
+    "id": "ank",
+    "name": "Goemai",
+    "iso": "ank",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "anp",
+    "name": "Angika",
+    "iso": "anp",
+    "duration_hours": 10.65
+  },
+  {
+    "id": "anw",
+    "name": "Anaang",
+    "iso": "anw",
+    "duration_hours": 9.65
+  },
+  {
+    "id": "aom",
+    "name": "\u00d6mie",
+    "iso": "aom",
+    "duration_hours": 8.19
+  },
+  {
+    "id": "apc",
+    "name": "Levantine Arabic",
+    "iso": "apc",
+    "duration_hours": 15.65
+  },
+  {
+    "id": "apd",
+    "name": "Sudanese Arabic",
+    "iso": "apd",
+    "duration_hours": 9.93
+  },
+  {
+    "id": "arb",
+    "name": "Standard Arabic",
+    "iso": "arb",
+    "duration_hours": 1483.53
+  },
+  {
+    "id": "arq",
+    "name": "Algerian Arabic",
+    "iso": "arq",
+    "duration_hours": 9.64
+  },
+  {
+    "id": "ars",
+    "name": "Najdi Arabic",
+    "iso": "ars",
+    "duration_hours": 203.54
+  },
+  {
+    "id": "ary",
+    "name": "Moroccan Arabic",
+    "iso": "ary",
+    "duration_hours": 104.67
+  },
+  {
+    "id": "arz",
+    "name": "Egyptian Arabic",
+    "iso": "arz",
+    "duration_hours": 23.23
+  },
+  {
+    "id": "as",
+    "name": "Assamese",
+    "iso": "asm",
+    "duration_hours": 270.85
+  },
+  {
+    "id": "ast",
+    "name": "Asturian",
+    "iso": "ast",
+    "duration_hours": 8.48
+  },
+  {
+    "id": "avl",
+    "name": "Eastern Egyptian Bedawi Arabic",
+    "iso": "avl",
+    "duration_hours": 1.86
+  },
+  {
+    "id": "awo",
+    "name": "Awak",
+    "iso": "awo",
+    "duration_hours": 10.22
+  },
+  {
+    "id": "ayl",
+    "name": "Libyan Arabic",
+    "iso": "ayl",
+    "duration_hours": 20.13
+  },
+  {
+    "id": "ayp",
+    "name": "North Mesopotamian Arabic",
+    "iso": "ayp",
+    "duration_hours": 10.92
+  },
+  {
+    "id": "az",
+    "name": "Azerbaijani",
+    "iso": "aze",
+    "duration_hours": 9.84
+  },
+  {
+    "id": "ba",
+    "name": "Bashkir",
+    "iso": "bak",
+    "duration_hours": 249.1
+  },
+  {
+    "id": "bag",
+    "name": "Tuki",
+    "iso": "bag",
+    "duration_hours": 10.97
+  },
+  {
+    "id": "bas",
+    "name": "Basa (Cameroon)",
+    "iso": "bas",
+    "duration_hours": 10.66
+  },
+  {
+    "id": "bax",
+    "name": "Bamun",
+    "iso": "bax",
+    "duration_hours": 10.24
+  },
+  {
+    "id": "bba",
+    "name": "Baatonum",
+    "iso": "bba",
+    "duration_hours": 10.53
+  },
+  {
+    "id": "bbj",
+    "name": "Ghom\u00e1l\u00e1'",
+    "iso": "bbj",
+    "duration_hours": 7.32
+  },
+  {
+    "id": "bbl",
+    "name": "Bats",
+    "iso": "bbl",
+    "duration_hours": 11.22
+  },
+  {
+    "id": "bbu",
+    "name": "Kulung (Nigeria)",
+    "iso": "bbu",
+    "duration_hours": 10.39
+  },
+  {
+    "id": "bce",
+    "name": "Bamenyam",
+    "iso": "bce",
+    "duration_hours": 9.9
+  },
+  {
+    "id": "bci",
+    "name": "Baoul\u00e9",
+    "iso": "bci",
+    "duration_hours": 10.21
+  },
+  {
+    "id": "bcs",
+    "name": "Kohumono",
+    "iso": "bcs",
+    "duration_hours": 10.45
+  },
+  {
+    "id": "bcy",
+    "name": "Bacama",
+    "iso": "bcy",
+    "duration_hours": 9.94
+  },
+  {
+    "id": "bda",
+    "name": "Bayot",
+    "iso": "bda",
+    "duration_hours": 9.47
+  },
+  {
+    "id": "bde",
+    "name": "Bade",
+    "iso": "bde",
+    "duration_hours": 9.89
+  },
+  {
+    "id": "bdm",
+    "name": "Buduma",
+    "iso": "bdm",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "be",
+    "name": "Belarusian",
+    "iso": "bel",
+    "duration_hours": 1809.43
+  },
+  {
+    "id": "beb",
+    "name": "Bebele",
+    "iso": "beb",
+    "duration_hours": 7.52
+  },
+  {
+    "id": "bew",
+    "name": "Betawi",
+    "iso": "bew",
+    "duration_hours": 11.15
+  },
+  {
+    "id": "bfd",
+    "name": "Bafut",
+    "iso": "bfd",
+    "duration_hours": 9.03
+  },
+  {
+    "id": "bft",
+    "name": "Balti",
+    "iso": "bft",
+    "duration_hours": 16.28
+  },
+  {
+    "id": "bg",
+    "name": "Bulgarian",
+    "iso": "bul",
+    "duration_hours": 2190.76
+  },
+  {
+    "id": "bgp",
+    "name": "Eastern Balochi",
+    "iso": "bgp",
+    "duration_hours": 10.98
+  },
+  {
+    "id": "bhb",
+    "name": "Bhili",
+    "iso": "bhb",
+    "duration_hours": 9.98
+  },
+  {
+    "id": "bhh",
+    "name": "Bukharic",
+    "iso": "bhh",
+    "duration_hours": 11.38
+  },
+  {
+    "id": "bho",
+    "name": "Bhojpuri",
+    "iso": "bho",
+    "duration_hours": 10.05
+  },
+  {
+    "id": "bhp",
+    "name": "Bima",
+    "iso": "bhp",
+    "duration_hours": 10.67
+  },
+  {
+    "id": "bhr",
+    "name": "Bara Malagasy",
+    "iso": "bhr",
+    "duration_hours": 12.14
+  },
+  {
+    "id": "bjj",
+    "name": "Kanauji",
+    "iso": "bjj",
+    "duration_hours": 11.01
+  },
+  {
+    "id": "bjk",
+    "name": "Barok",
+    "iso": "bjk",
+    "duration_hours": 10.16
+  },
+  {
+    "id": "bjn",
+    "name": "Banjar",
+    "iso": "bjn",
+    "duration_hours": 11.68
+  },
+  {
+    "id": "bjt",
+    "name": "Balanta-Ganja",
+    "iso": "bjt",
+    "duration_hours": 9.41
+  },
+  {
+    "id": "bkh",
+    "name": "Bakoko",
+    "iso": "bkh",
+    "duration_hours": 6.0
+  },
+  {
+    "id": "bkm",
+    "name": "Kom (Cameroon)",
+    "iso": "bkm",
+    "duration_hours": 10.76
+  },
+  {
+    "id": "bky",
+    "name": "Bokyi",
+    "iso": "bky",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "bmm",
+    "name": "Northern Betsimisaraka Malagasy",
+    "iso": "bmm",
+    "duration_hours": 19.12
+  },
+  {
+    "id": "bmq",
+    "name": "Bomu",
+    "iso": "bmq",
+    "duration_hours": 10.68
+  },
+  {
+    "id": "bn",
+    "name": "Bengali",
+    "iso": "ben",
+    "duration_hours": 271.76
+  },
+  {
+    "id": "bnm",
+    "name": "Batanga",
+    "iso": "bnm",
+    "duration_hours": 15.01
+  },
+  {
+    "id": "bnn",
+    "name": "Bunun",
+    "iso": "bnn",
+    "duration_hours": 9.26
+  },
+  {
+    "id": "bns",
+    "name": "Bundeli",
+    "iso": "bns",
+    "duration_hours": 10.88
+  },
+  {
+    "id": "bo",
+    "name": "Tibetan",
+    "iso": "bod",
+    "duration_hours": 82.27
+  },
+  {
+    "id": "bou",
+    "name": "Bondei",
+    "iso": "bou",
+    "duration_hours": 9.98
+  },
+  {
+    "id": "bqg",
+    "name": "Bago-Kusuntu",
+    "iso": "bqg",
+    "duration_hours": 8.86
+  },
+  {
+    "id": "br",
+    "name": "Breton",
+    "iso": "bre",
+    "duration_hours": 25.48
+  },
+  {
+    "id": "bra",
+    "name": "Braj",
+    "iso": "bra",
+    "duration_hours": 10.68
+  },
+  {
+    "id": "brh",
+    "name": "Brahui",
+    "iso": "brh",
+    "duration_hours": 19.89
+  },
+  {
+    "id": "bri",
+    "name": "Mokpwe",
+    "iso": "bri",
+    "duration_hours": 7.53
+  },
+  {
+    "id": "brx",
+    "name": "Bodo",
+    "iso": "brx",
+    "duration_hours": 231.57
+  },
+  {
+    "id": "bs",
+    "name": "Bosnian",
+    "iso": "bos",
+    "duration_hours": 690.73
+  },
+  {
+    "id": "bsh",
+    "name": "Kati",
+    "iso": "bsh",
+    "duration_hours": 8.77
+  },
+  {
+    "id": "bsj",
+    "name": "Bangwinji",
+    "iso": "bsj",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "bsk",
+    "name": "Burushaski",
+    "iso": "bsk",
+    "duration_hours": 9.14
+  },
+  {
+    "id": "btm",
+    "name": "Batak Mandailing",
+    "iso": "btm",
+    "duration_hours": 11.09
+  },
+  {
+    "id": "btv",
+    "name": "Bateri",
+    "iso": "btv",
+    "duration_hours": 9.8
+  },
+  {
+    "id": "bug",
+    "name": "Buginese",
+    "iso": "bug",
+    "duration_hours": 11.09
+  },
+  {
+    "id": "bum",
+    "name": "Bulu (Cameroon)",
+    "iso": "bum",
+    "duration_hours": 9.06
+  },
+  {
+    "id": "buo",
+    "name": "Terei",
+    "iso": "buo",
+    "duration_hours": 9.48
+  },
+  {
+    "id": "bux",
+    "name": "Boghom",
+    "iso": "bux",
+    "duration_hours": 10.48
+  },
+  {
+    "id": "bwr",
+    "name": "Bura-Pabir",
+    "iso": "bwr",
+    "duration_hours": 10.4
+  },
+  {
+    "id": "bxf",
+    "name": "Bilur",
+    "iso": "bxf",
+    "duration_hours": 10.84
+  },
+  {
+    "id": "byc",
+    "name": "Ubaghara",
+    "iso": "byc",
+    "duration_hours": 11.11
+  },
+  {
+    "id": "bys",
+    "name": "Burak",
+    "iso": "bys",
+    "duration_hours": 9.92
+  },
+  {
+    "id": "byv",
+    "name": "Medumba",
+    "iso": "byv",
+    "duration_hours": 10.95
+  },
+  {
+    "id": "byx",
+    "name": "Qaqet",
+    "iso": "byx",
+    "duration_hours": 9.79
+  },
+  {
+    "id": "bzc",
+    "name": "Southern Betsimisaraka Malagasy",
+    "iso": "bzc",
+    "duration_hours": 17.45
+  },
+  {
+    "id": "bzw",
+    "name": "Basa (Nigeria)",
+    "iso": "bzw",
+    "duration_hours": 10.27
+  },
+  {
+    "id": "ca",
+    "name": "Catalan",
+    "iso": "cat",
+    "duration_hours": 3358.6
+  },
+  {
+    "id": "ccg",
+    "name": "Samba Daka",
+    "iso": "ccg",
+    "duration_hours": 10.11
+  },
+  {
+    "id": "ceb",
+    "name": "Cebuano",
+    "iso": "ceb",
+    "duration_hours": 12.17
+  },
+  {
+    "id": "cen",
+    "name": "Cen",
+    "iso": "cen",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "cfa",
+    "name": "Dijim-Bwilim",
+    "iso": "cfa",
+    "duration_hours": 10.32
+  },
+  {
+    "id": "cgg",
+    "name": "Chiga",
+    "iso": "cgg",
+    "duration_hours": 10.84
+  },
+  {
+    "id": "chq",
+    "name": "Quiotepec Chinantec",
+    "iso": "chq",
+    "duration_hours": 9.76
+  },
+  {
+    "id": "cjk",
+    "name": "Chokwe",
+    "iso": "cjk",
+    "duration_hours": 11.01
+  },
+  {
+    "id": "ckb",
+    "name": "Central Kurdish",
+    "iso": "ckb",
+    "duration_hours": 137.52
+  },
+  {
+    "id": "ckl",
+    "name": "Cibak",
+    "iso": "ckl",
+    "duration_hours": 10.91
+  },
+  {
+    "id": "ckr",
+    "name": "Kairak",
+    "iso": "ckr",
+    "duration_hours": 10.51
+  },
+  {
+    "id": "cky",
+    "name": "Cakfem-Mushere",
+    "iso": "cky",
+    "duration_hours": 8.96
+  },
+  {
+    "id": "cnh",
+    "name": "Hakha Chin",
+    "iso": "cnh",
+    "duration_hours": 2.24
+  },
+  {
+    "id": "cpy",
+    "name": "South Ucayali Ash\u00e9ninka",
+    "iso": "cpy",
+    "duration_hours": 9.15
+  },
+  {
+    "id": "cs",
+    "name": "Czech",
+    "iso": "ces",
+    "duration_hours": 148.13
+  },
+  {
+    "id": "cte",
+    "name": "Tepinapa Chinantec",
+    "iso": "cte",
+    "duration_hours": 9.54
+  },
+  {
+    "id": "ctl",
+    "name": "Tlacoatzintepec Chinantec",
+    "iso": "ctl",
+    "duration_hours": 10.04
+  },
+  {
+    "id": "cut",
+    "name": "Teutila Cuicatec",
+    "iso": "cut",
+    "duration_hours": 8.04
+  },
+  {
+    "id": "cux",
+    "name": "Tepeuxila Cuicatec",
+    "iso": "cux",
+    "duration_hours": 7.83
+  },
+  {
+    "id": "cv",
+    "name": "Chuvash",
+    "iso": "chv",
+    "duration_hours": 23.96
+  },
+  {
+    "id": "cy",
+    "name": "Welsh",
+    "iso": "cym",
+    "duration_hours": 131.21
+  },
+  {
+    "id": "da",
+    "name": "Danish",
+    "iso": "dan",
+    "duration_hours": 1665.98
+  },
+  {
+    "id": "dag",
+    "name": "Dagbani",
+    "iso": "dag",
+    "duration_hours": 10.14
+  },
+  {
+    "id": "dar",
+    "name": "Dargwa",
+    "iso": "dar",
+    "duration_hours": 1.22
+  },
+  {
+    "id": "dav",
+    "name": "Taita",
+    "iso": "dav",
+    "duration_hours": 9.12
+  },
+  {
+    "id": "dbd",
+    "name": "Dadiya",
+    "iso": "dbd",
+    "duration_hours": 9.61
+  },
+  {
+    "id": "dcc",
+    "name": "Deccan",
+    "iso": "dcc",
+    "duration_hours": 10.38
+  },
+  {
+    "id": "de",
+    "name": "German",
+    "iso": "deu",
+    "duration_hours": 21927.13
+  },
+  {
+    "id": "deg",
+    "name": "Degema",
+    "iso": "deg",
+    "duration_hours": 11.07
+  },
+  {
+    "id": "dgh",
+    "name": "Dghwede",
+    "iso": "dgh",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "dgo",
+    "name": "Dogri",
+    "iso": "dgo",
+    "duration_hours": 117.04
+  },
+  {
+    "id": "dje",
+    "name": "Zarma",
+    "iso": "dje",
+    "duration_hours": 10.72
+  },
+  {
+    "id": "dmk",
+    "name": "Domaaki",
+    "iso": "dmk",
+    "duration_hours": 6.38
+  },
+  {
+    "id": "dml",
+    "name": "Dameli",
+    "iso": "dml",
+    "duration_hours": 9.18
+  },
+  {
+    "id": "dru",
+    "name": "Rukai",
+    "iso": "dru",
+    "duration_hours": 9.26
+  },
+  {
+    "id": "dty",
+    "name": "Dotyali",
+    "iso": "dty",
+    "duration_hours": 10.85
+  },
+  {
+    "id": "dua",
+    "name": "Duala",
+    "iso": "dua",
+    "duration_hours": 12.13
+  },
+  {
+    "id": "dv",
+    "name": "Dhivehi",
+    "iso": "div",
+    "duration_hours": 38.61
+  },
+  {
+    "id": "dyu",
+    "name": "Dyula",
+    "iso": "dyu",
+    "duration_hours": 0.34
+  },
+  {
+    "id": "dzg",
+    "name": "Dazaga",
+    "iso": "dzg",
+    "duration_hours": 9.96
+  },
+  {
+    "id": "ebr",
+    "name": "Ebri\u00e9",
+    "iso": "ebr",
+    "duration_hours": 1.5
+  },
+  {
+    "id": "ebu",
+    "name": "Embu",
+    "iso": "ebu",
+    "duration_hours": 9.81
+  },
+  {
+    "id": "ego",
+    "name": "Eggon",
+    "iso": "ego",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "eiv",
+    "name": "Askopan",
+    "iso": "eiv",
+    "duration_hours": 10.44
+  },
+  {
+    "id": "eko",
+    "name": "Koti",
+    "iso": "eko",
+    "duration_hours": 8.15
+  },
+  {
+    "id": "ekr",
+    "name": "Yace",
+    "iso": "ekr",
+    "duration_hours": 10.76
+  },
+  {
+    "id": "el",
+    "name": "Greek",
+    "iso": "ell",
+    "duration_hours": 2412.54
+  },
+  {
+    "id": "elm",
+    "name": "Eleme",
+    "iso": "elm",
+    "duration_hours": 11.27
+  },
+  {
+    "id": "en",
+    "name": "English",
+    "iso": "eng",
+    "duration_hours": 206061.1
+  },
+  {
+    "id": "eo",
+    "name": "Esperanto",
+    "iso": "epo",
+    "duration_hours": 1396.64
+  },
+  {
+    "id": "es",
+    "name": "Spanish",
+    "iso": "spa",
+    "duration_hours": 27559.74
+  },
+  {
+    "id": "esu",
+    "name": "Central Yupik",
+    "iso": "esu",
+    "duration_hours": 2.18
+  },
+  {
+    "id": "et",
+    "name": "Estonian",
+    "iso": "est",
+    "duration_hours": 960.37
+  },
+  {
+    "id": "eto",
+    "name": "Eton (Cameroon)",
+    "iso": "eto",
+    "duration_hours": 7.43
+  },
+  {
+    "id": "ets",
+    "name": "Yekhee",
+    "iso": "ets",
+    "duration_hours": 10.11
+  },
+  {
+    "id": "etu",
+    "name": "Ejagham",
+    "iso": "etu",
+    "duration_hours": 10.3
+  },
+  {
+    "id": "eu",
+    "name": "Basque",
+    "iso": "eus",
+    "duration_hours": 479.86
+  },
+  {
+    "id": "ewo",
+    "name": "Ewondo",
+    "iso": "ewo",
+    "duration_hours": 12.71
+  },
+  {
+    "id": "ext",
+    "name": "Extremaduran",
+    "iso": "ext",
+    "duration_hours": 13.59
+  },
+  {
+    "id": "eyo",
+    "name": "Keiyo",
+    "iso": "eyo",
+    "duration_hours": 9.24
+  },
+  {
+    "id": "fa",
+    "name": "Persian",
+    "iso": "fas",
+    "duration_hours": 366.07
+  },
+  {
+    "id": "fan",
+    "name": "Fang (Equatorial Guinea)",
+    "iso": "fan",
+    "duration_hours": 3.51
+  },
+  {
+    "id": "fat",
+    "name": "Fanti",
+    "iso": "fat",
+    "duration_hours": 11.38
+  },
+  {
+    "id": "ff",
+    "name": "Fulah",
+    "iso": "ful",
+    "duration_hours": 13.84
+  },
+  {
+    "id": "ffm",
+    "name": "Maasina Fulfulde",
+    "iso": "ffm",
+    "duration_hours": 10.46
+  },
+  {
+    "id": "fi",
+    "name": "Finnish",
+    "iso": "fin",
+    "duration_hours": 468.62
+  },
+  {
+    "id": "fia",
+    "name": "Nobiin",
+    "iso": "fia",
+    "duration_hours": 9.96
+  },
+  {
+    "id": "fil",
+    "name": "Filipino",
+    "iso": "fil",
+    "duration_hours": 7.71
+  },
+  {
+    "id": "fip",
+    "name": "Fipa",
+    "iso": "fip",
+    "duration_hours": 10.55
+  },
+  {
+    "id": "fkk",
+    "name": "Kirya-Konz\u0259l",
+    "iso": "fkk",
+    "duration_hours": 9.98
+  },
+  {
+    "id": "fmp",
+    "name": "Fe'fe'",
+    "iso": "fmp",
+    "duration_hours": 9.86
+  },
+  {
+    "id": "fr",
+    "name": "French",
+    "iso": "fra",
+    "duration_hours": 23675.32
+  },
+  {
+    "id": "fub",
+    "name": "Adamawa Fulfulde",
+    "iso": "fub",
+    "duration_hours": 13.12
+  },
+  {
+    "id": "fuc",
+    "name": "Pulaar",
+    "iso": "fuc",
+    "duration_hours": 14.77
+  },
+  {
+    "id": "fue",
+    "name": "Borgu Fulfulde",
+    "iso": "fue",
+    "duration_hours": 20.1
+  },
+  {
+    "id": "fuf",
+    "name": "Pular",
+    "iso": "fuf",
+    "duration_hours": 13.77
+  },
+  {
+    "id": "fuh",
+    "name": "Western Niger Fulfulde",
+    "iso": "fuh",
+    "duration_hours": 9.69
+  },
+  {
+    "id": "fui",
+    "name": "Bagirmi Fulfulde",
+    "iso": "fui",
+    "duration_hours": 15.04
+  },
+  {
+    "id": "fuq",
+    "name": "Central-Eastern Niger Fulfulde",
+    "iso": "fuq",
+    "duration_hours": 9.28
+  },
+  {
+    "id": "fuv",
+    "name": "Nigerian Fulfulde",
+    "iso": "fuv",
+    "duration_hours": 9.97
+  },
+  {
+    "id": "fy",
+    "name": "Western Frisian",
+    "iso": "fry",
+    "duration_hours": 70.41
+  },
+  {
+    "id": "ga",
+    "name": "Irish",
+    "iso": "gle",
+    "duration_hours": 21.4
+  },
+  {
+    "id": "gbm",
+    "name": "Garhwali",
+    "iso": "gbm",
+    "duration_hours": 19.14
+  },
+  {
+    "id": "gbr",
+    "name": "Gbagyi",
+    "iso": "gbr",
+    "duration_hours": 12.12
+  },
+  {
+    "id": "gby",
+    "name": "Gbari",
+    "iso": "gby",
+    "duration_hours": 12.59
+  },
+  {
+    "id": "gcc",
+    "name": "Mali",
+    "iso": "gcc",
+    "duration_hours": 9.87
+  },
+  {
+    "id": "gdf",
+    "name": "Guduf-Gava",
+    "iso": "gdf",
+    "duration_hours": 12.21
+  },
+  {
+    "id": "gej",
+    "name": "Gen",
+    "iso": "gej",
+    "duration_hours": 5.39
+  },
+  {
+    "id": "ges",
+    "name": "Geser-Gorom",
+    "iso": "ges",
+    "duration_hours": 10.08
+  },
+  {
+    "id": "ggg",
+    "name": "Gurgula",
+    "iso": "ggg",
+    "duration_hours": 7.12
+  },
+  {
+    "id": "gid",
+    "name": "Gidar",
+    "iso": "gid",
+    "duration_hours": 10.06
+  },
+  {
+    "id": "gig",
+    "name": "Goaria",
+    "iso": "gig",
+    "duration_hours": 9.41
+  },
+  {
+    "id": "giz",
+    "name": "South Giziga",
+    "iso": "giz",
+    "duration_hours": 10.03
+  },
+  {
+    "id": "gjk",
+    "name": "Kachi Koli",
+    "iso": "gjk",
+    "duration_hours": 20.83
+  },
+  {
+    "id": "gju",
+    "name": "Gujari",
+    "iso": "gju",
+    "duration_hours": 8.66
+  },
+  {
+    "id": "gl",
+    "name": "Galician",
+    "iso": "glg",
+    "duration_hours": 208.81
+  },
+  {
+    "id": "glw",
+    "name": "Glavda",
+    "iso": "glw",
+    "duration_hours": 10.51
+  },
+  {
+    "id": "gn",
+    "name": "Guarani",
+    "iso": "grn",
+    "duration_hours": 4.06
+  },
+  {
+    "id": "gol",
+    "name": "Gola",
+    "iso": "gol",
+    "duration_hours": 9.26
+  },
+  {
+    "id": "gom",
+    "name": "Goan Konkani",
+    "iso": "gom",
+    "duration_hours": 9.82
+  },
+  {
+    "id": "gsl",
+    "name": "Gusilay",
+    "iso": "gsl",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "gu",
+    "name": "Gujarati",
+    "iso": "guj",
+    "duration_hours": 91.18
+  },
+  {
+    "id": "gui",
+    "name": "Eastern Bolivian Guaran\u00ed",
+    "iso": "gui",
+    "duration_hours": 22.72
+  },
+  {
+    "id": "gur",
+    "name": "Farefare",
+    "iso": "gur",
+    "duration_hours": 9.24
+  },
+  {
+    "id": "guz",
+    "name": "Gusii",
+    "iso": "guz",
+    "duration_hours": 9.5
+  },
+  {
+    "id": "gv",
+    "name": "Manx",
+    "iso": "glv",
+    "duration_hours": 10.07
+  },
+  {
+    "id": "gwc",
+    "name": "Gawri",
+    "iso": "gwc",
+    "duration_hours": 10.83
+  },
+  {
+    "id": "gwe",
+    "name": "Gweno",
+    "iso": "gwe",
+    "duration_hours": 8.87
+  },
+  {
+    "id": "gwt",
+    "name": "Gawar-Bati",
+    "iso": "gwt",
+    "duration_hours": 12.16
+  },
+  {
+    "id": "gya",
+    "name": "Northwest Gbaya",
+    "iso": "gya",
+    "duration_hours": 8.45
+  },
+  {
+    "id": "gyz",
+    "name": "Geji",
+    "iso": "gyz",
+    "duration_hours": 10.49
+  },
+  {
+    "id": "ha",
+    "name": "Hausa",
+    "iso": "hau",
+    "duration_hours": 17.75
+  },
+  {
+    "id": "hah",
+    "name": "Hahon",
+    "iso": "hah",
+    "duration_hours": 9.64
+  },
+  {
+    "id": "hao",
+    "name": "Hak\u00f6",
+    "iso": "hao",
+    "duration_hours": 8.56
+  },
+  {
+    "id": "haw",
+    "name": "Hawaiian",
+    "iso": "haw",
+    "duration_hours": 11.79
+  },
+  {
+    "id": "haz",
+    "name": "Hazaragi",
+    "iso": "haz",
+    "duration_hours": 9.69
+  },
+  {
+    "id": "hbb",
+    "name": "Huba",
+    "iso": "hbb",
+    "duration_hours": 10.7
+  },
+  {
+    "id": "he",
+    "name": "Hebrew",
+    "iso": "heb",
+    "duration_hours": 13.4
+  },
+  {
+    "id": "hem",
+    "name": "Hemba",
+    "iso": "hem",
+    "duration_hours": 9.53
+  },
+  {
+    "id": "hi",
+    "name": "Hindi",
+    "iso": "hin",
+    "duration_hours": 117.17
+  },
+  {
+    "id": "hia",
+    "name": "Lamang",
+    "iso": "hia",
+    "duration_hours": 11.07
+  },
+  {
+    "id": "hkk",
+    "name": "Hunjara-Kaina Ke",
+    "iso": "hkk",
+    "duration_hours": 8.69
+  },
+  {
+    "id": "hla",
+    "name": "Halia",
+    "iso": "hla",
+    "duration_hours": 9.86
+  },
+  {
+    "id": "hno",
+    "name": "Northern Hindko",
+    "iso": "hno",
+    "duration_hours": 20.04
+  },
+  {
+    "id": "hoj",
+    "name": "Hadothi",
+    "iso": "hoj",
+    "duration_hours": 10.08
+  },
+  {
+    "id": "hr",
+    "name": "Croatian",
+    "iso": "hrv",
+    "duration_hours": 2795.31
+  },
+  {
+    "id": "hsb",
+    "name": "Upper Sorbian",
+    "iso": "hsb",
+    "duration_hours": 2.71
+  },
+  {
+    "id": "ht",
+    "name": "Haitian",
+    "iso": "hat",
+    "duration_hours": 0.04
+  },
+  {
+    "id": "hu",
+    "name": "Hungarian",
+    "iso": "hun",
+    "duration_hours": 255.83
+  },
+  {
+    "id": "hue",
+    "name": "San Francisco Del Mar Huave",
+    "iso": "hue",
+    "duration_hours": 9.45
+  },
+  {
+    "id": "hul",
+    "name": "Hula",
+    "iso": "hul",
+    "duration_hours": 10.33
+  },
+  {
+    "id": "hux",
+    "name": "N\u00fcpode Huitoto",
+    "iso": "hux",
+    "duration_hours": 9.04
+  },
+  {
+    "id": "hwo",
+    "name": "Hwana",
+    "iso": "hwo",
+    "duration_hours": 11.23
+  },
+  {
+    "id": "hy",
+    "name": "Armenian",
+    "iso": "hye",
+    "duration_hours": 42.15
+  },
+  {
+    "id": "hz",
+    "name": "Herero",
+    "iso": "her",
+    "duration_hours": 9.59
+  },
+  {
+    "id": "ia",
+    "name": "Interlingua (International Auxiliary Language Association)",
+    "iso": "ina",
+    "duration_hours": 13.48
+  },
+  {
+    "id": "ibb",
+    "name": "Ibibio",
+    "iso": "ibb",
+    "duration_hours": 7.38
+  },
+  {
+    "id": "id",
+    "name": "Indonesian",
+    "iso": "ind",
+    "duration_hours": 6327.87
+  },
+  {
+    "id": "ida",
+    "name": "Idakho-Isukha-Tiriki",
+    "iso": "ida",
+    "duration_hours": 9.31
+  },
+  {
+    "id": "idu",
+    "name": "Idoma",
+    "iso": "idu",
+    "duration_hours": 11.16
+  },
+  {
+    "id": "ig",
+    "name": "Igbo",
+    "iso": "ibo",
+    "duration_hours": 13.69
+  },
+  {
+    "id": "ijc",
+    "name": "Izon",
+    "iso": "ijc",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "ijn",
+    "name": "Kalabari",
+    "iso": "ijn",
+    "duration_hours": 11.04
+  },
+  {
+    "id": "ik",
+    "name": "Inupiaq",
+    "iso": "ipk",
+    "duration_hours": 2.11
+  },
+  {
+    "id": "ikw",
+    "name": "Ikwere",
+    "iso": "ikw",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "is",
+    "name": "Icelandic",
+    "iso": "isl",
+    "duration_hours": 647.29
+  },
+  {
+    "id": "ish",
+    "name": "Esan",
+    "iso": "ish",
+    "duration_hours": 10.05
+  },
+  {
+    "id": "iso",
+    "name": "Isoko",
+    "iso": "iso",
+    "duration_hours": 10.33
+  },
+  {
+    "id": "it",
+    "name": "Italian",
+    "iso": "ita",
+    "duration_hours": 9402.46
+  },
+  {
+    "id": "its",
+    "name": "Isekiri",
+    "iso": "its",
+    "duration_hours": 11.85
+  },
+  {
+    "id": "itw",
+    "name": "Ito",
+    "iso": "itw",
+    "duration_hours": 9.19
+  },
+  {
+    "id": "itz",
+    "name": "Itz\u00e1",
+    "iso": "itz",
+    "duration_hours": 7.08
+  },
+  {
+    "id": "ja",
+    "name": "Japanese",
+    "iso": "jpn",
+    "duration_hours": 36914.4
+  },
+  {
+    "id": "jal",
+    "name": "Yalahatan",
+    "iso": "jal",
+    "duration_hours": 11.18
+  },
+  {
+    "id": "jax",
+    "name": "Jambi Malay",
+    "iso": "jax",
+    "duration_hours": 10.29
+  },
+  {
+    "id": "jgo",
+    "name": "Ngomba",
+    "iso": "jgo",
+    "duration_hours": 10.15
+  },
+  {
+    "id": "jmx",
+    "name": "Western Juxtlahuaca Mixtec",
+    "iso": "jmx",
+    "duration_hours": 10.01
+  },
+  {
+    "id": "jns",
+    "name": "Jaunsari",
+    "iso": "jns",
+    "duration_hours": 11.25
+  },
+  {
+    "id": "jqr",
+    "name": "Jaqaru",
+    "iso": "jqr",
+    "duration_hours": 9.32
+  },
+  {
+    "id": "juk",
+    "name": "Wapan",
+    "iso": "juk",
+    "duration_hours": 10.22
+  },
+  {
+    "id": "juo",
+    "name": "Jiba",
+    "iso": "juo",
+    "duration_hours": 10.43
+  },
+  {
+    "id": "jv",
+    "name": "Javanese",
+    "iso": "jav",
+    "duration_hours": 11.19
+  },
+  {
+    "id": "ka",
+    "name": "Georgian",
+    "iso": "kat",
+    "duration_hours": 156.96
+  },
+  {
+    "id": "kab",
+    "name": "Kabyle",
+    "iso": "kab",
+    "duration_hours": 529.52
+  },
+  {
+    "id": "kai",
+    "name": "Karekare",
+    "iso": "kai",
+    "duration_hours": 10.52
+  },
+  {
+    "id": "kaj",
+    "name": "Jju",
+    "iso": "kaj",
+    "duration_hours": 10.16
+  },
+  {
+    "id": "kam",
+    "name": "Kamba",
+    "iso": "kam",
+    "duration_hours": 14.72
+  },
+  {
+    "id": "kbd",
+    "name": "Kabardian",
+    "iso": "kbd",
+    "duration_hours": 108.35
+  },
+  {
+    "id": "kbl",
+    "name": "Kanembu",
+    "iso": "kbl",
+    "duration_hours": 10.19
+  },
+  {
+    "id": "kbt",
+    "name": "Abadi",
+    "iso": "kbt",
+    "duration_hours": 9.73
+  },
+  {
+    "id": "kcq",
+    "name": "Kamo",
+    "iso": "kcq",
+    "duration_hours": 10.49
+  },
+  {
+    "id": "kdh",
+    "name": "Tem",
+    "iso": "kdh",
+    "duration_hours": 4.07
+  },
+  {
+    "id": "kea",
+    "name": "Kabuverdianu",
+    "iso": "kea",
+    "duration_hours": 10.51
+  },
+  {
+    "id": "keu",
+    "name": "Akebu",
+    "iso": "keu",
+    "duration_hours": 9.1
+  },
+  {
+    "id": "kfe",
+    "name": "Kota (India)",
+    "iso": "kfe",
+    "duration_hours": 10.25
+  },
+  {
+    "id": "kfk",
+    "name": "Kinnauri",
+    "iso": "kfk",
+    "duration_hours": 10.32
+  },
+  {
+    "id": "kfp",
+    "name": "Korwa",
+    "iso": "kfp",
+    "duration_hours": 11.87
+  },
+  {
+    "id": "khg",
+    "name": "Khams Tibetan",
+    "iso": "khg",
+    "duration_hours": 6.38
+  },
+  {
+    "id": "khw",
+    "name": "Khowar",
+    "iso": "khw",
+    "duration_hours": 15.55
+  },
+  {
+    "id": "kj",
+    "name": "Kuanyama",
+    "iso": "kua",
+    "duration_hours": 9.88
+  },
+  {
+    "id": "kjc",
+    "name": "Coastal Konjo",
+    "iso": "kjc",
+    "duration_hours": 10.18
+  },
+  {
+    "id": "kjk",
+    "name": "Highland Konjo",
+    "iso": "kjk",
+    "duration_hours": 10.21
+  },
+  {
+    "id": "kk",
+    "name": "Kazakh",
+    "iso": "kaz",
+    "duration_hours": 1537.29
+  },
+  {
+    "id": "kln",
+    "name": "Kalenjin",
+    "iso": "kln",
+    "duration_hours": 40.42
+  },
+  {
+    "id": "kls",
+    "name": "Kalasha",
+    "iso": "kls",
+    "duration_hours": 9.11
+  },
+  {
+    "id": "km",
+    "name": "Khmer",
+    "iso": "khm",
+    "duration_hours": 7.1
+  },
+  {
+    "id": "kmr",
+    "name": "Northern Kurdish",
+    "iso": "kmr",
+    "duration_hours": 69.59
+  },
+  {
+    "id": "kmy",
+    "name": "Koma",
+    "iso": "kmy",
+    "duration_hours": 10.28
+  },
+  {
+    "id": "kn",
+    "name": "Kannada",
+    "iso": "kan",
+    "duration_hours": 128.06
+  },
+  {
+    "id": "kna",
+    "name": "Dera (Nigeria)",
+    "iso": "kna",
+    "duration_hours": 11.91
+  },
+  {
+    "id": "knn",
+    "name": "Konkani",
+    "iso": "knn",
+    "duration_hours": 112.83
+  },
+  {
+    "id": "ko",
+    "name": "Korean",
+    "iso": "kor",
+    "duration_hours": 8609.28
+  },
+  {
+    "id": "kol",
+    "name": "Kol (Papua New Guinea)",
+    "iso": "kol",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "koo",
+    "name": "Konzo",
+    "iso": "koo",
+    "duration_hours": 13.23
+  },
+  {
+    "id": "kpo",
+    "name": "Ikposo",
+    "iso": "kpo",
+    "duration_hours": 7.83
+  },
+  {
+    "id": "kqo",
+    "name": "Eastern Krahn",
+    "iso": "kqo",
+    "duration_hours": 9.28
+  },
+  {
+    "id": "ks",
+    "name": "Kashmiri",
+    "iso": "kas",
+    "duration_hours": 110.42
+  },
+  {
+    "id": "ksd",
+    "name": "Kuanua",
+    "iso": "ksd",
+    "duration_hours": 9.91
+  },
+  {
+    "id": "ksf",
+    "name": "Bafia",
+    "iso": "ksf",
+    "duration_hours": 16.43
+  },
+  {
+    "id": "kto",
+    "name": "Kuot",
+    "iso": "kto",
+    "duration_hours": 9.77
+  },
+  {
+    "id": "kuh",
+    "name": "Kushi",
+    "iso": "kuh",
+    "duration_hours": 10.35
+  },
+  {
+    "id": "kvx",
+    "name": "Parkari Koli",
+    "iso": "kvx",
+    "duration_hours": 11.04
+  },
+  {
+    "id": "kw",
+    "name": "Cornish",
+    "iso": "cor",
+    "duration_hours": 12.15
+  },
+  {
+    "id": "kwm",
+    "name": "Kwambi",
+    "iso": "kwm",
+    "duration_hours": 9.9
+  },
+  {
+    "id": "kxp",
+    "name": "Wadiyara Koli",
+    "iso": "kxp",
+    "duration_hours": 20.0
+  },
+  {
+    "id": "ky",
+    "name": "Kirghiz",
+    "iso": "kir",
+    "duration_hours": 46.63
+  },
+  {
+    "id": "kyx",
+    "name": "Rapoisi",
+    "iso": "kyx",
+    "duration_hours": 9.17
+  },
+  {
+    "id": "lag",
+    "name": "Rangi",
+    "iso": "lag",
+    "duration_hours": 9.47
+  },
+  {
+    "id": "lb",
+    "name": "Luxembourgish",
+    "iso": "ltz",
+    "duration_hours": 8.46
+  },
+  {
+    "id": "lcm",
+    "name": "Tungag",
+    "iso": "lcm",
+    "duration_hours": 9.77
+  },
+  {
+    "id": "ldb",
+    "name": "Du\u0303ya",
+    "iso": "ldb",
+    "duration_hours": 11.31
+  },
+  {
+    "id": "lg",
+    "name": "Ganda",
+    "iso": "lug",
+    "duration_hours": 447.82
+  },
+  {
+    "id": "lij",
+    "name": "Ligurian",
+    "iso": "lij",
+    "duration_hours": 15.97
+  },
+  {
+    "id": "lir",
+    "name": "Liberian English",
+    "iso": "lir",
+    "duration_hours": 10.26
+  },
+  {
+    "id": "lkb",
+    "name": "Kabras",
+    "iso": "lkb",
+    "duration_hours": 9.99
+  },
+  {
+    "id": "lla",
+    "name": "Lala-Roba",
+    "iso": "lla",
+    "duration_hours": 10.38
+  },
+  {
+    "id": "ln",
+    "name": "Lingala",
+    "iso": "lin",
+    "duration_hours": 17.99
+  },
+  {
+    "id": "lnu",
+    "name": "Longuda",
+    "iso": "lnu",
+    "duration_hours": 10.46
+  },
+  {
+    "id": "lo",
+    "name": "Lao",
+    "iso": "lao",
+    "duration_hours": 7.63
+  },
+  {
+    "id": "loa",
+    "name": "Loloda",
+    "iso": "loa",
+    "duration_hours": 9.31
+  },
+  {
+    "id": "lrk",
+    "name": "Loarki",
+    "iso": "lrk",
+    "duration_hours": 10.5
+  },
+  {
+    "id": "lss",
+    "name": "Lasi",
+    "iso": "lss",
+    "duration_hours": 6.53
+  },
+  {
+    "id": "lt",
+    "name": "Lithuanian",
+    "iso": "lit",
+    "duration_hours": 2629.45
+  },
+  {
+    "id": "ltg",
+    "name": "Latgalian",
+    "iso": "ltg",
+    "duration_hours": 27.23
+  },
+  {
+    "id": "lto",
+    "name": "Tsotso",
+    "iso": "lto",
+    "duration_hours": 9.77
+  },
+  {
+    "id": "lua",
+    "name": "Luba-Lulua",
+    "iso": "lua",
+    "duration_hours": 8.47
+  },
+  {
+    "id": "luo",
+    "name": "Luo",
+    "iso": "luo",
+    "duration_hours": 36.17
+  },
+  {
+    "id": "lus",
+    "name": "Lushai",
+    "iso": "lus",
+    "duration_hours": 20.24
+  },
+  {
+    "id": "lv",
+    "name": "Latvian",
+    "iso": "lav",
+    "duration_hours": 1441.58
+  },
+  {
+    "id": "lwg",
+    "name": "Wanga",
+    "iso": "lwg",
+    "duration_hours": 9.36
+  },
+  {
+    "id": "mab",
+    "name": "Yutanduchi Mixtec",
+    "iso": "mab",
+    "duration_hours": 9.26
+  },
+  {
+    "id": "maf",
+    "name": "Mafa",
+    "iso": "maf",
+    "duration_hours": 9.97
+  },
+  {
+    "id": "mai",
+    "name": "Maithili",
+    "iso": "mai",
+    "duration_hours": 131.37
+  },
+  {
+    "id": "mau",
+    "name": "Huautla Mazatec",
+    "iso": "mau",
+    "duration_hours": 6.39
+  },
+  {
+    "id": "max",
+    "name": "North Moluccan Malay",
+    "iso": "max",
+    "duration_hours": 9.43
+  },
+  {
+    "id": "mbo",
+    "name": "Mbo (Cameroon)",
+    "iso": "mbo",
+    "duration_hours": 9.51
+  },
+  {
+    "id": "mcf",
+    "name": "Mats\u00e9s",
+    "iso": "mcf",
+    "duration_hours": 9.61
+  },
+  {
+    "id": "mcn",
+    "name": "Masana",
+    "iso": "mcn",
+    "duration_hours": 10.09
+  },
+  {
+    "id": "mcx",
+    "name": "Mpiemo",
+    "iso": "mcx",
+    "duration_hours": 9.88
+  },
+  {
+    "id": "mdd",
+    "name": "Mbum",
+    "iso": "mdd",
+    "duration_hours": 9.82
+  },
+  {
+    "id": "mde",
+    "name": "Maba (Chad)",
+    "iso": "mde",
+    "duration_hours": 9.5
+  },
+  {
+    "id": "mdf",
+    "name": "Moksha",
+    "iso": "mdf",
+    "duration_hours": 0.47
+  },
+  {
+    "id": "mek",
+    "name": "Mekeo",
+    "iso": "mek",
+    "duration_hours": 9.18
+  },
+  {
+    "id": "mer",
+    "name": "Meru",
+    "iso": "mer",
+    "duration_hours": 9.89
+  },
+  {
+    "id": "meu",
+    "name": "Motu",
+    "iso": "meu",
+    "duration_hours": 9.88
+  },
+  {
+    "id": "mfm",
+    "name": "Marghi South",
+    "iso": "mfm",
+    "duration_hours": 10.05
+  },
+  {
+    "id": "mfn",
+    "name": "Cross River Mbembe",
+    "iso": "mfn",
+    "duration_hours": 10.03
+  },
+  {
+    "id": "mfo",
+    "name": "Mbe",
+    "iso": "mfo",
+    "duration_hours": 10.24
+  },
+  {
+    "id": "mfv",
+    "name": "Mandjak",
+    "iso": "mfv",
+    "duration_hours": 9.55
+  },
+  {
+    "id": "mgg",
+    "name": "Mpumpong",
+    "iso": "mgg",
+    "duration_hours": 4.94
+  },
+  {
+    "id": "mgi",
+    "name": "Lijili",
+    "iso": "mgi",
+    "duration_hours": 10.89
+  },
+  {
+    "id": "mhk",
+    "name": "Mungaka",
+    "iso": "mhk",
+    "duration_hours": 7.53
+  },
+  {
+    "id": "mhr",
+    "name": "Eastern Mari",
+    "iso": "mhr",
+    "duration_hours": 272.31
+  },
+  {
+    "id": "mi",
+    "name": "Maori",
+    "iso": "mri",
+    "duration_hours": 18.02
+  },
+  {
+    "id": "mig",
+    "name": "San Miguel El Grande Mixtec",
+    "iso": "mig",
+    "duration_hours": 9.66
+  },
+  {
+    "id": "miu",
+    "name": "Cacaloxtepec Mixtec",
+    "iso": "miu",
+    "duration_hours": 9.18
+  },
+  {
+    "id": "mk",
+    "name": "Macedonian",
+    "iso": "mkd",
+    "duration_hours": 27.21
+  },
+  {
+    "id": "mkf",
+    "name": "Miya",
+    "iso": "mkf",
+    "duration_hours": 10.16
+  },
+  {
+    "id": "mki",
+    "name": "Dhatki",
+    "iso": "mki",
+    "duration_hours": 8.83
+  },
+  {
+    "id": "ml",
+    "name": "Malayalam",
+    "iso": "mal",
+    "duration_hours": 166.57
+  },
+  {
+    "id": "mlq",
+    "name": "Western Maninkakan",
+    "iso": "mlq",
+    "duration_hours": 9.83
+  },
+  {
+    "id": "mn",
+    "name": "Mongolian",
+    "iso": "mon",
+    "duration_hours": 269.08
+  },
+  {
+    "id": "mne",
+    "name": "Naba",
+    "iso": "mne",
+    "duration_hours": 10.37
+  },
+  {
+    "id": "mni",
+    "name": "Manipuri",
+    "iso": "mni",
+    "duration_hours": 44.46
+  },
+  {
+    "id": "mqy",
+    "name": "Manggarai",
+    "iso": "mqy",
+    "duration_hours": 10.5
+  },
+  {
+    "id": "mr",
+    "name": "Marathi",
+    "iso": "mar",
+    "duration_hours": 156.71
+  },
+  {
+    "id": "mrj",
+    "name": "Western Mari",
+    "iso": "mrj",
+    "duration_hours": 32.26
+  },
+  {
+    "id": "mrr",
+    "name": "Maria (India)",
+    "iso": "mrr",
+    "duration_hours": 11.0
+  },
+  {
+    "id": "mrt",
+    "name": "Marghi Central",
+    "iso": "mrt",
+    "duration_hours": 10.36
+  },
+  {
+    "id": "ms",
+    "name": "Malay",
+    "iso": "msa",
+    "duration_hours": 9.57
+  },
+  {
+    "id": "mse",
+    "name": "Musey",
+    "iso": "mse",
+    "duration_hours": 7.21
+  },
+  {
+    "id": "msh",
+    "name": "Masikoro Malagasy",
+    "iso": "msh",
+    "duration_hours": 14.16
+  },
+  {
+    "id": "msw",
+    "name": "Mansoanka",
+    "iso": "msw",
+    "duration_hours": 9.32
+  },
+  {
+    "id": "mt",
+    "name": "Maltese",
+    "iso": "mlt",
+    "duration_hours": 630.29
+  },
+  {
+    "id": "mtr",
+    "name": "Mewari",
+    "iso": "mtr",
+    "duration_hours": 10.58
+  },
+  {
+    "id": "mtu",
+    "name": "Tututepec Mixtec",
+    "iso": "mtu",
+    "duration_hours": 10.13
+  },
+  {
+    "id": "mtx",
+    "name": "Tida\u00e1 Mixtec",
+    "iso": "mtx",
+    "duration_hours": 9.09
+  },
+  {
+    "id": "mua",
+    "name": "Mundang",
+    "iso": "mua",
+    "duration_hours": 9.2
+  },
+  {
+    "id": "mug",
+    "name": "Musgu",
+    "iso": "mug",
+    "duration_hours": 4.74
+  },
+  {
+    "id": "mui",
+    "name": "Musi",
+    "iso": "mui",
+    "duration_hours": 10.52
+  },
+  {
+    "id": "mve",
+    "name": "Marwari (Pakistan)",
+    "iso": "mve",
+    "duration_hours": 9.96
+  },
+  {
+    "id": "mvy",
+    "name": "Indus Kohistani",
+    "iso": "mvy",
+    "duration_hours": 21.64
+  },
+  {
+    "id": "mxs",
+    "name": "Huitepec Mixtec",
+    "iso": "mxs",
+    "duration_hours": 9.64
+  },
+  {
+    "id": "mxu",
+    "name": "Mada (Cameroon)",
+    "iso": "mxu",
+    "duration_hours": 12.0
+  },
+  {
+    "id": "mxy",
+    "name": "Southeastern Nochixtl\u00e1n Mixtec",
+    "iso": "mxy",
+    "duration_hours": 9.48
+  },
+  {
+    "id": "my",
+    "name": "Burmese",
+    "iso": "mya",
+    "duration_hours": 12.14
+  },
+  {
+    "id": "myv",
+    "name": "Erzya",
+    "iso": "myv",
+    "duration_hours": 3.1
+  },
+  {
+    "id": "mzl",
+    "name": "Mazatl\u00e1n Mixe",
+    "iso": "mzl",
+    "duration_hours": 10.05
+  },
+  {
+    "id": "nal",
+    "name": "Nalik",
+    "iso": "nal",
+    "duration_hours": 10.33
+  },
+  {
+    "id": "nan",
+    "name": "Min Nan Chinese",
+    "iso": "nan",
+    "duration_hours": 17.55
+  },
+  {
+    "id": "nap",
+    "name": "Neapolitan",
+    "iso": "nap",
+    "duration_hours": 9.97
+  },
+  {
+    "id": "nb",
+    "name": "Norwegian Bokm\u00e5l",
+    "iso": "nob",
+    "duration_hours": 12.7
+  },
+  {
+    "id": "nbh",
+    "name": "Ngamo",
+    "iso": "nbh",
+    "duration_hours": 10.04
+  },
+  {
+    "id": "ncf",
+    "name": "Notsi",
+    "iso": "ncf",
+    "duration_hours": 9.84
+  },
+  {
+    "id": "nco",
+    "name": "Sibe",
+    "iso": "nco",
+    "duration_hours": 9.96
+  },
+  {
+    "id": "ncx",
+    "name": "Central Puebla Nahuatl",
+    "iso": "ncx",
+    "duration_hours": 9.86
+  },
+  {
+    "id": "ndi",
+    "name": "Samba Leko",
+    "iso": "ndi",
+    "duration_hours": 11.27
+  },
+  {
+    "id": "ng",
+    "name": "Ndonga",
+    "iso": "ndo",
+    "duration_hours": 9.08
+  },
+  {
+    "id": "ngi",
+    "name": "Ngizim",
+    "iso": "ngi",
+    "duration_hours": 10.06
+  },
+  {
+    "id": "nhg",
+    "name": "Tetelcingo Nahuatl",
+    "iso": "nhg",
+    "duration_hours": 8.92
+  },
+  {
+    "id": "nhi",
+    "name": "Zacatl\u00e1n-Ahuacatl\u00e1n-Tepetzintla Nahuatl",
+    "iso": "nhi",
+    "duration_hours": 0.05
+  },
+  {
+    "id": "nhn",
+    "name": "Central Nahuatl",
+    "iso": "nhn",
+    "duration_hours": 9.51
+  },
+  {
+    "id": "nhq",
+    "name": "Huaxcaleca Nahuatl",
+    "iso": "nhq",
+    "duration_hours": 5.07
+  },
+  {
+    "id": "nja",
+    "name": "Nzanyi",
+    "iso": "nja",
+    "duration_hours": 10.02
+  },
+  {
+    "id": "nl",
+    "name": "Dutch",
+    "iso": "nld",
+    "duration_hours": 2264.13
+  },
+  {
+    "id": "nla",
+    "name": "Ngombale",
+    "iso": "nla",
+    "duration_hours": 8.79
+  },
+  {
+    "id": "nlv",
+    "name": "Orizaba Nahuatl",
+    "iso": "nlv",
+    "duration_hours": 11.42
+  },
+  {
+    "id": "nmg",
+    "name": "Kwasio",
+    "iso": "nmg",
+    "duration_hours": 10.39
+  },
+  {
+    "id": "nmz",
+    "name": "Nawdm",
+    "iso": "nmz",
+    "duration_hours": 6.3
+  },
+  {
+    "id": "nn",
+    "name": "Norwegian Nynorsk",
+    "iso": "nno",
+    "duration_hours": 1.54
+  },
+  {
+    "id": "nnh",
+    "name": "Ngiemboon",
+    "iso": "nnh",
+    "duration_hours": 16.15
+  },
+  {
+    "id": "no",
+    "name": "Norwegian",
+    "iso": "nor",
+    "duration_hours": 3849.8
+  },
+  {
+    "id": "noe",
+    "name": "Nimadi",
+    "iso": "noe",
+    "duration_hours": 11.12
+  },
+  {
+    "id": "npi",
+    "name": "Nepali",
+    "iso": "npi",
+    "duration_hours": 171.5
+  },
+  {
+    "id": "nso",
+    "name": "Pedi",
+    "iso": "nso",
+    "duration_hours": 12.64
+  },
+  {
+    "id": "ny",
+    "name": "Chichewa",
+    "iso": "nya",
+    "duration_hours": 10.8
+  },
+  {
+    "id": "nyu",
+    "name": "Nyungwe",
+    "iso": "nyu",
+    "duration_hours": 8.98
+  },
+  {
+    "id": "oc",
+    "name": "Occitan",
+    "iso": "oci",
+    "duration_hours": 16.8
+  },
+  {
+    "id": "odk",
+    "name": "Od",
+    "iso": "odk",
+    "duration_hours": 20.26
+  },
+  {
+    "id": "odu",
+    "name": "Odual",
+    "iso": "odu",
+    "duration_hours": 10.57
+  },
+  {
+    "id": "ogo",
+    "name": "Khana",
+    "iso": "ogo",
+    "duration_hours": 10.51
+  },
+  {
+    "id": "om",
+    "name": "Oromo",
+    "iso": "orm",
+    "duration_hours": 6.6
+  },
+  {
+    "id": "orc",
+    "name": "Orma",
+    "iso": "orc",
+    "duration_hours": 22.01
+  },
+  {
+    "id": "oru",
+    "name": "Ormuri",
+    "iso": "oru",
+    "duration_hours": 16.74
+  },
+  {
+    "id": "ory",
+    "name": "Odia",
+    "iso": "ory",
+    "duration_hours": 144.81
+  },
+  {
+    "id": "os",
+    "name": "Iron Ossetic",
+    "iso": "oss",
+    "duration_hours": 1.38
+  },
+  {
+    "id": "pa",
+    "name": "Panjabi",
+    "iso": "pan",
+    "duration_hours": 147.37
+  },
+  {
+    "id": "pbs",
+    "name": "Central Pame",
+    "iso": "pbs",
+    "duration_hours": 9.69
+  },
+  {
+    "id": "pbt",
+    "name": "Southern Pashto",
+    "iso": "pbt",
+    "duration_hours": 11.6
+  },
+  {
+    "id": "pbu",
+    "name": "Northern Pashto",
+    "iso": "pbu",
+    "duration_hours": 11.03
+  },
+  {
+    "id": "pcm",
+    "name": "Nigerian Pidgin",
+    "iso": "pcm",
+    "duration_hours": 11.04
+  },
+  {
+    "id": "pex",
+    "name": "Petats",
+    "iso": "pex",
+    "duration_hours": 10.2
+  },
+  {
+    "id": "phl",
+    "name": "Phalura",
+    "iso": "phl",
+    "duration_hours": 20.69
+  },
+  {
+    "id": "phr",
+    "name": "Pahari-Potwari",
+    "iso": "phr",
+    "duration_hours": 24.03
+  },
+  {
+    "id": "pip",
+    "name": "Pero",
+    "iso": "pip",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "piy",
+    "name": "Piya-Kwonci",
+    "iso": "piy",
+    "duration_hours": 10.38
+  },
+  {
+    "id": "pko",
+    "name": "P\u00f6koot",
+    "iso": "pko",
+    "duration_hours": 10.4
+  },
+  {
+    "id": "pl",
+    "name": "Polish",
+    "iso": "pol",
+    "duration_hours": 911.68
+  },
+  {
+    "id": "plk",
+    "name": "Kohistani Shina",
+    "iso": "plk",
+    "duration_hours": 12.75
+  },
+  {
+    "id": "plt",
+    "name": "Plateau Malagasy",
+    "iso": "plt",
+    "duration_hours": 19.39
+  },
+  {
+    "id": "pmq",
+    "name": "Northern Pame",
+    "iso": "pmq",
+    "duration_hours": 10.24
+  },
+  {
+    "id": "pms",
+    "name": "Piemontese",
+    "iso": "pms",
+    "duration_hours": 16.01
+  },
+  {
+    "id": "pmy",
+    "name": "Papuan Malay",
+    "iso": "pmy",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "pnb",
+    "name": "Western Panjabi",
+    "iso": "pnb",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "poc",
+    "name": "Poqomam",
+    "iso": "poc",
+    "duration_hours": 9.63
+  },
+  {
+    "id": "poe",
+    "name": "San Juan Atzingo Popoloca",
+    "iso": "poe",
+    "duration_hours": 10.01
+  },
+  {
+    "id": "pow",
+    "name": "San Felipe Otlaltepec Popoloca",
+    "iso": "pow",
+    "duration_hours": 8.84
+  },
+  {
+    "id": "prq",
+    "name": "Ash\u00e9ninka Peren\u00e9",
+    "iso": "prq",
+    "duration_hours": 7.16
+  },
+  {
+    "id": "ps",
+    "name": "Pushto",
+    "iso": "pus",
+    "duration_hours": 88.62
+  },
+  {
+    "id": "pst",
+    "name": "Central Pashto",
+    "iso": "pst",
+    "duration_hours": 11.4
+  },
+  {
+    "id": "pt",
+    "name": "Portuguese",
+    "iso": "por",
+    "duration_hours": 16855.05
+  },
+  {
+    "id": "pua",
+    "name": "Western Highland Purepecha",
+    "iso": "pua",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "pwn",
+    "name": "Paiwan",
+    "iso": "pwn",
+    "duration_hours": 13.76
+  },
+  {
+    "id": "qug",
+    "name": "Chimborazo Highland Quichua",
+    "iso": "qug",
+    "duration_hours": 10.12
+  },
+  {
+    "id": "qum",
+    "name": "Sipacapense",
+    "iso": "qum",
+    "duration_hours": 9.37
+  },
+  {
+    "id": "qup",
+    "name": "Southern Pastaza Quechua",
+    "iso": "qup",
+    "duration_hours": 11.13
+  },
+  {
+    "id": "qur",
+    "name": "Yanahuanca Pasco Quechua",
+    "iso": "qur",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "qus",
+    "name": "Santiago del Estero Quichua",
+    "iso": "qus",
+    "duration_hours": 9.55
+  },
+  {
+    "id": "quv",
+    "name": "Sacapulteco",
+    "iso": "quv",
+    "duration_hours": 8.9
+  },
+  {
+    "id": "qux",
+    "name": "Yauyos Quechua",
+    "iso": "qux",
+    "duration_hours": 9.35
+  },
+  {
+    "id": "quy",
+    "name": "Ayacucho Quechua",
+    "iso": "quy",
+    "duration_hours": 0.05
+  },
+  {
+    "id": "qva",
+    "name": "Ambo-Pasco Quechua",
+    "iso": "qva",
+    "duration_hours": 9.59
+  },
+  {
+    "id": "qvi",
+    "name": "Imbabura Highland Quichua",
+    "iso": "qvi",
+    "duration_hours": 11.0
+  },
+  {
+    "id": "qvj",
+    "name": "Loja Highland Quichua",
+    "iso": "qvj",
+    "duration_hours": 10.59
+  },
+  {
+    "id": "qvl",
+    "name": "Cajatambo North Lima Quechua",
+    "iso": "qvl",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "qwa",
+    "name": "Corongo Ancash Quechua",
+    "iso": "qwa",
+    "duration_hours": 9.72
+  },
+  {
+    "id": "qws",
+    "name": "Sihuas Ancash Quechua",
+    "iso": "qws",
+    "duration_hours": 10.18
+  },
+  {
+    "id": "qxa",
+    "name": "Chiqui\u00e1n Ancash Quechua",
+    "iso": "qxa",
+    "duration_hours": 9.99
+  },
+  {
+    "id": "qxp",
+    "name": "Puno Quechua",
+    "iso": "qxp",
+    "duration_hours": 9.81
+  },
+  {
+    "id": "qxt",
+    "name": "Santa Ana de Tusi Pasco Quechua",
+    "iso": "qxt",
+    "duration_hours": 10.05
+  },
+  {
+    "id": "qxu",
+    "name": "Arequipa-La Uni\u00f3n Quechua",
+    "iso": "qxu",
+    "duration_hours": 10.12
+  },
+  {
+    "id": "qxw",
+    "name": "Jauja Wanca Quechua",
+    "iso": "qxw",
+    "duration_hours": 11.42
+  },
+  {
+    "id": "rag",
+    "name": "Logooli",
+    "iso": "rag",
+    "duration_hours": 9.39
+  },
+  {
+    "id": "rm",
+    "name": "Romansh",
+    "iso": "roh",
+    "duration_hours": 9.21
+  },
+  {
+    "id": "ro",
+    "name": "Romanian",
+    "iso": "ron",
+    "duration_hours": 70.23
+  },
+  {
+    "id": "rob",
+    "name": "Tae'",
+    "iso": "rob",
+    "duration_hours": 9.02
+  },
+  {
+    "id": "rof",
+    "name": "Rombo",
+    "iso": "rof",
+    "duration_hours": 18.9
+  },
+  {
+    "id": "roo",
+    "name": "Rotokas",
+    "iso": "roo",
+    "duration_hours": 9.07
+  },
+  {
+    "id": "rth",
+    "name": "Ratahan",
+    "iso": "rth",
+    "duration_hours": 9.34
+  },
+  {
+    "id": "ru",
+    "name": "Russian",
+    "iso": "rus",
+    "duration_hours": 20338.5
+  },
+  {
+    "id": "rup",
+    "name": "Macedo-Romanian",
+    "iso": "rup",
+    "duration_hours": 0.02
+  },
+  {
+    "id": "rw",
+    "name": "Kinyarwanda",
+    "iso": "kin",
+    "duration_hours": 2021.66
+  },
+  {
+    "id": "sa",
+    "name": "Sanskrit",
+    "iso": "san",
+    "duration_hours": 84.44
+  },
+  {
+    "id": "sah",
+    "name": "Yakut",
+    "iso": "sah",
+    "duration_hours": 16.08
+  },
+  {
+    "id": "sat",
+    "name": "Santali",
+    "iso": "sat",
+    "duration_hours": 98.37
+  },
+  {
+    "id": "sau",
+    "name": "Saleman",
+    "iso": "sau",
+    "duration_hours": 10.53
+  },
+  {
+    "id": "say",
+    "name": "Saya",
+    "iso": "say",
+    "duration_hours": 10.02
+  },
+  {
+    "id": "sbn",
+    "name": "Sindhi Bhil",
+    "iso": "sbn",
+    "duration_hours": 10.53
+  },
+  {
+    "id": "sc",
+    "name": "Sardinian",
+    "iso": "srd",
+    "duration_hours": 2.77
+  },
+  {
+    "id": "scl",
+    "name": "Shina",
+    "iso": "scl",
+    "duration_hours": 9.84
+  },
+  {
+    "id": "scn",
+    "name": "Sicilian",
+    "iso": "scn",
+    "duration_hours": 13.35
+  },
+  {
+    "id": "sd",
+    "name": "Sindhi",
+    "iso": "snd",
+    "duration_hours": 46.27
+  },
+  {
+    "id": "sei",
+    "name": "Seri",
+    "iso": "sei",
+    "duration_hours": 9.81
+  },
+  {
+    "id": "shu",
+    "name": "Chadian Arabic",
+    "iso": "shu",
+    "duration_hours": 2.29
+  },
+  {
+    "id": "si",
+    "name": "Sinhala",
+    "iso": "sin",
+    "duration_hours": 11.98
+  },
+  {
+    "id": "sip",
+    "name": "Sikkimese",
+    "iso": "sip",
+    "duration_hours": 10.07
+  },
+  {
+    "id": "siw",
+    "name": "Siwai",
+    "iso": "siw",
+    "duration_hours": 10.47
+  },
+  {
+    "id": "sjr",
+    "name": "Siar-Lak",
+    "iso": "sjr",
+    "duration_hours": 9.87
+  },
+  {
+    "id": "sk",
+    "name": "Slovak",
+    "iso": "slk",
+    "duration_hours": 2478.46
+  },
+  {
+    "id": "skg",
+    "name": "Sakalava Malagasy",
+    "iso": "skg",
+    "duration_hours": 9.02
+  },
+  {
+    "id": "skr",
+    "name": "Saraiki",
+    "iso": "skr",
+    "duration_hours": 4.13
+  },
+  {
+    "id": "sl",
+    "name": "Slovenian",
+    "iso": "slv",
+    "duration_hours": 1172.61
+  },
+  {
+    "id": "sn",
+    "name": "Shona",
+    "iso": "sna",
+    "duration_hours": 9.96
+  },
+  {
+    "id": "snc",
+    "name": "Sinaugoro",
+    "iso": "snc",
+    "duration_hours": 10.38
+  },
+  {
+    "id": "snk",
+    "name": "Soninke",
+    "iso": "snk",
+    "duration_hours": 10.04
+  },
+  {
+    "id": "so",
+    "name": "Somali",
+    "iso": "som",
+    "duration_hours": 13.22
+  },
+  {
+    "id": "sol",
+    "name": "Solos",
+    "iso": "sol",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "sps",
+    "name": "Saposa",
+    "iso": "sps",
+    "duration_hours": 9.81
+  },
+  {
+    "id": "sq",
+    "name": "Albanian",
+    "iso": "sqi",
+    "duration_hours": 8.59
+  },
+  {
+    "id": "sr",
+    "name": "Serbian",
+    "iso": "srp",
+    "duration_hours": 1855.33
+  },
+  {
+    "id": "src",
+    "name": "Logudorese Sardinian",
+    "iso": "src",
+    "duration_hours": 10.67
+  },
+  {
+    "id": "sro",
+    "name": "Campidanese Sardinian",
+    "iso": "sro",
+    "duration_hours": 10.16
+  },
+  {
+    "id": "ssi",
+    "name": "Sansi",
+    "iso": "ssi",
+    "duration_hours": 10.47
+  },
+  {
+    "id": "ste",
+    "name": "Liana-Seti",
+    "iso": "ste",
+    "duration_hours": 10.43
+  },
+  {
+    "id": "sua",
+    "name": "Sulka",
+    "iso": "sua",
+    "duration_hours": 10.12
+  },
+  {
+    "id": "sv",
+    "name": "Swedish",
+    "iso": "swe",
+    "duration_hours": 2453.14
+  },
+  {
+    "id": "sva",
+    "name": "Svan",
+    "iso": "sva",
+    "duration_hours": 15.11
+  },
+  {
+    "id": "sw",
+    "name": "Swahili",
+    "iso": "swa",
+    "duration_hours": 418.41
+  },
+  {
+    "id": "szy",
+    "name": "Sakizaya",
+    "iso": "szy",
+    "duration_hours": 11.47
+  },
+  {
+    "id": "ta",
+    "name": "Tamil",
+    "iso": "tam",
+    "duration_hours": 423.09
+  },
+  {
+    "id": "tan",
+    "name": "Tangale",
+    "iso": "tan",
+    "duration_hours": 10.14
+  },
+  {
+    "id": "tar",
+    "name": "Central Tarahumara",
+    "iso": "tar",
+    "duration_hours": 9.73
+  },
+  {
+    "id": "tay",
+    "name": "Atayal",
+    "iso": "tay",
+    "duration_hours": 7.02
+  },
+  {
+    "id": "tbf",
+    "name": "Mandara",
+    "iso": "tbf",
+    "duration_hours": 10.01
+  },
+  {
+    "id": "tcf",
+    "name": "Malinaltepec Me'phaa",
+    "iso": "tcf",
+    "duration_hours": 9.04
+  },
+  {
+    "id": "tcy",
+    "name": "Tulu",
+    "iso": "tcy",
+    "duration_hours": 11.72
+  },
+  {
+    "id": "tdn",
+    "name": "Tondano",
+    "iso": "tdn",
+    "duration_hours": 9.14
+  },
+  {
+    "id": "tdx",
+    "name": "Tandroy-Mahafaly Malagasy",
+    "iso": "tdx",
+    "duration_hours": 3.81
+  },
+  {
+    "id": "te",
+    "name": "Telugu",
+    "iso": "tel",
+    "duration_hours": 230.21
+  },
+  {
+    "id": "tg",
+    "name": "Tajik",
+    "iso": "tgk",
+    "duration_hours": 9.23
+  },
+  {
+    "id": "tgc",
+    "name": "Tigak",
+    "iso": "tgc",
+    "duration_hours": 9.71
+  },
+  {
+    "id": "th",
+    "name": "Thai",
+    "iso": "tha",
+    "duration_hours": 10499.77
+  },
+  {
+    "id": "the",
+    "name": "Chitwania Tharu",
+    "iso": "the",
+    "duration_hours": 10.06
+  },
+  {
+    "id": "thq",
+    "name": "Kochila Tharu",
+    "iso": "thq",
+    "duration_hours": 10.28
+  },
+  {
+    "id": "thr",
+    "name": "Rana Tharu",
+    "iso": "thr",
+    "duration_hours": 9.99
+  },
+  {
+    "id": "thv",
+    "name": "Tahaggart Tamahaq",
+    "iso": "thv",
+    "duration_hours": 4.25
+  },
+  {
+    "id": "ti",
+    "name": "Tigrinya",
+    "iso": "tir",
+    "duration_hours": 0.08
+  },
+  {
+    "id": "tig",
+    "name": "Tigre",
+    "iso": "tig",
+    "duration_hours": 7.49
+  },
+  {
+    "id": "tio",
+    "name": "Teop",
+    "iso": "tio",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "tk",
+    "name": "Turkmen",
+    "iso": "tuk",
+    "duration_hours": 2.86
+  },
+  {
+    "id": "tkg",
+    "name": "Tesaka Malagasy",
+    "iso": "tkg",
+    "duration_hours": 17.86
+  },
+  {
+    "id": "tkt",
+    "name": "Kathoriya Tharu",
+    "iso": "tkt",
+    "duration_hours": 10.64
+  },
+  {
+    "id": "tli",
+    "name": "Tlingit",
+    "iso": "tli",
+    "duration_hours": 0.41
+  },
+  {
+    "id": "tlp",
+    "name": "Filomena Mata-Coahuitl\u00e1n Totonac",
+    "iso": "tlp",
+    "duration_hours": 11.35
+  },
+  {
+    "id": "tn",
+    "name": "Tswana",
+    "iso": "tsn",
+    "duration_hours": 4.24
+  },
+  {
+    "id": "tok",
+    "name": "Toki Pona",
+    "iso": "tok",
+    "duration_hours": 13.51
+  },
+  {
+    "id": "tpl",
+    "name": "Tlacoapa Me'phaa",
+    "iso": "tpl",
+    "duration_hours": 9.28
+  },
+  {
+    "id": "tpz",
+    "name": "Tinputz",
+    "iso": "tpz",
+    "duration_hours": 9.33
+  },
+  {
+    "id": "tqp",
+    "name": "Tomoip",
+    "iso": "tqp",
+    "duration_hours": 10.1
+  },
+  {
+    "id": "tr",
+    "name": "Turkish",
+    "iso": "tur",
+    "duration_hours": 125.36
+  },
+  {
+    "id": "trp",
+    "name": "Kok Borok",
+    "iso": "trp",
+    "duration_hours": 10.74
+  },
+  {
+    "id": "trq",
+    "name": "San Mart\u00edn Itunyoso Triqui",
+    "iso": "trq",
+    "duration_hours": 8.29
+  },
+  {
+    "id": "trv",
+    "name": "Sediq",
+    "iso": "trv",
+    "duration_hours": 7.77
+  },
+  {
+    "id": "trw",
+    "name": "Torwali",
+    "iso": "trw",
+    "duration_hours": 14.98
+  },
+  {
+    "id": "tt",
+    "name": "Tatar",
+    "iso": "tat",
+    "duration_hours": 30.03
+  },
+  {
+    "id": "ttj",
+    "name": "Tooro",
+    "iso": "ttj",
+    "duration_hours": 10.31
+  },
+  {
+    "id": "ttr",
+    "name": "Tera",
+    "iso": "ttr",
+    "duration_hours": 9.89
+  },
+  {
+    "id": "ttu",
+    "name": "Torau",
+    "iso": "ttu",
+    "duration_hours": 9.87
+  },
+  {
+    "id": "tui",
+    "name": "Tupuri",
+    "iso": "tui",
+    "duration_hours": 9.26
+  },
+  {
+    "id": "tul",
+    "name": "Tula",
+    "iso": "tul",
+    "duration_hours": 9.79
+  },
+  {
+    "id": "tuq",
+    "name": "Tedaga",
+    "iso": "tuq",
+    "duration_hours": 10.0
+  },
+  {
+    "id": "tuv",
+    "name": "Turkana",
+    "iso": "tuv",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "tuy",
+    "name": "Tugen",
+    "iso": "tuy",
+    "duration_hours": 8.79
+  },
+  {
+    "id": "tvo",
+    "name": "Tidore",
+    "iso": "tvo",
+    "duration_hours": 10.31
+  },
+  {
+    "id": "tvu",
+    "name": "Tunen",
+    "iso": "tvu",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "tw",
+    "name": "Twi",
+    "iso": "twi",
+    "duration_hours": 0.25
+  },
+  {
+    "id": "twu",
+    "name": "Termanu",
+    "iso": "twu",
+    "duration_hours": 11.45
+  },
+  {
+    "id": "txs",
+    "name": "Tonsea",
+    "iso": "txs",
+    "duration_hours": 9.32
+  },
+  {
+    "id": "txy",
+    "name": "Tanosy Malagasy",
+    "iso": "txy",
+    "duration_hours": 12.07
+  },
+  {
+    "id": "udl",
+    "name": "Wuzlam",
+    "iso": "udl",
+    "duration_hours": 9.23
+  },
+  {
+    "id": "ug",
+    "name": "Uighur",
+    "iso": "uig",
+    "duration_hours": 428.77
+  },
+  {
+    "id": "uk",
+    "name": "Ukrainian",
+    "iso": "ukr",
+    "duration_hours": 1851.97
+  },
+  {
+    "id": "uki",
+    "name": "Kui (India)",
+    "iso": "uki",
+    "duration_hours": 10.77
+  },
+  {
+    "id": "umb",
+    "name": "Umbundu",
+    "iso": "umb",
+    "duration_hours": 10.59
+  },
+  {
+    "id": "ur",
+    "name": "Urdu",
+    "iso": "urd",
+    "duration_hours": 211.27
+  },
+  {
+    "id": "ush",
+    "name": "Ushojo",
+    "iso": "ush",
+    "duration_hours": 6.36
+  },
+  {
+    "id": "uz",
+    "name": "Uzbek",
+    "iso": "uzb",
+    "duration_hours": 115.28
+  },
+  {
+    "id": "uzn",
+    "name": "Northern Uzbek",
+    "iso": "uzn",
+    "duration_hours": 15.23
+  },
+  {
+    "id": "vai",
+    "name": "Vai",
+    "iso": "vai",
+    "duration_hours": 8.76
+  },
+  {
+    "id": "var",
+    "name": "Huarijio",
+    "iso": "var",
+    "duration_hours": 9.28
+  },
+  {
+    "id": "ver",
+    "name": "Mom Jango",
+    "iso": "ver",
+    "duration_hours": 10.93
+  },
+  {
+    "id": "vi",
+    "name": "Vietnamese",
+    "iso": "vie",
+    "duration_hours": 8481.98
+  },
+  {
+    "id": "vmc",
+    "name": "Juxtlahuaca Mixtec",
+    "iso": "vmc",
+    "duration_hours": 9.43
+  },
+  {
+    "id": "vmj",
+    "name": "Ixtayutla Mixtec",
+    "iso": "vmj",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "vmm",
+    "name": "Mitlatongo Mixtec",
+    "iso": "vmm",
+    "duration_hours": 9.95
+  },
+  {
+    "id": "vmp",
+    "name": "Soyaltepec Mazatec",
+    "iso": "vmp",
+    "duration_hours": 10.17
+  },
+  {
+    "id": "vmz",
+    "name": "Mazatl\u00e1n Mazatec",
+    "iso": "vmz",
+    "duration_hours": 9.82
+  },
+  {
+    "id": "vot",
+    "name": "Votic",
+    "iso": "vot",
+    "duration_hours": 0.1
+  },
+  {
+    "id": "vro",
+    "name": "V\u00f5ro",
+    "iso": "vro",
+    "duration_hours": 15.66
+  },
+  {
+    "id": "wbl",
+    "name": "Wakhi",
+    "iso": "wbl",
+    "duration_hours": 11.67
+  },
+  {
+    "id": "wci",
+    "name": "Waci Gbe",
+    "iso": "wci",
+    "duration_hours": 8.02
+  },
+  {
+    "id": "weo",
+    "name": "Wemale",
+    "iso": "weo",
+    "duration_hours": 9.09
+  },
+  {
+    "id": "wes",
+    "name": "Cameroon Pidgin",
+    "iso": "wes",
+    "duration_hours": 10.06
+  },
+  {
+    "id": "wja",
+    "name": "Waja",
+    "iso": "wja",
+    "duration_hours": 10.22
+  },
+  {
+    "id": "wji",
+    "name": "Warji",
+    "iso": "wji",
+    "duration_hours": 11.39
+  },
+  {
+    "id": "wo",
+    "name": "Wolof",
+    "iso": "wol",
+    "duration_hours": 8.71
+  },
+  {
+    "id": "wof",
+    "name": "Gambian Wolof",
+    "iso": "wof",
+    "duration_hours": 9.46
+  },
+  {
+    "id": "xh",
+    "name": "Xhosa",
+    "iso": "xho",
+    "duration_hours": 13.35
+  },
+  {
+    "id": "xhe",
+    "name": "Khetrani",
+    "iso": "xhe",
+    "duration_hours": 9.4
+  },
+  {
+    "id": "xka",
+    "name": "Kalkoti",
+    "iso": "xka",
+    "duration_hours": 8.0
+  },
+  {
+    "id": "xmf",
+    "name": "Mingrelian",
+    "iso": "xmf",
+    "duration_hours": 11.47
+  },
+  {
+    "id": "xmv",
+    "name": "Antankarana Malagasy",
+    "iso": "xmv",
+    "duration_hours": 17.9
+  },
+  {
+    "id": "xmw",
+    "name": "Tsimihety Malagasy",
+    "iso": "xmw",
+    "duration_hours": 11.53
+  },
+  {
+    "id": "xpe",
+    "name": "Liberia Kpelle",
+    "iso": "xpe",
+    "duration_hours": 9.5
+  },
+  {
+    "id": "xti",
+    "name": "Sinicahua Mixtec",
+    "iso": "xti",
+    "duration_hours": 9.5
+  },
+  {
+    "id": "xtu",
+    "name": "Cuyamecalco Mixtec",
+    "iso": "xtu",
+    "duration_hours": 9.4
+  },
+  {
+    "id": "yaq",
+    "name": "Yaqui",
+    "iso": "yaq",
+    "duration_hours": 9.93
+  },
+  {
+    "id": "yav",
+    "name": "Yangben",
+    "iso": "yav",
+    "duration_hours": 8.7
+  },
+  {
+    "id": "yay",
+    "name": "Agwagwune",
+    "iso": "yay",
+    "duration_hours": 8.26
+  },
+  {
+    "id": "ydd",
+    "name": "Eastern Yiddish",
+    "iso": "ydd",
+    "duration_hours": 18.43
+  },
+  {
+    "id": "ydg",
+    "name": "Yidgha",
+    "iso": "ydg",
+    "duration_hours": 9.89
+  },
+  {
+    "id": "yer",
+    "name": "Tarok",
+    "iso": "yer",
+    "duration_hours": 10.08
+  },
+  {
+    "id": "yes",
+    "name": "Nyankpa",
+    "iso": "yes",
+    "duration_hours": 10.26
+  },
+  {
+    "id": "yi",
+    "name": "Yiddish",
+    "iso": "yid",
+    "duration_hours": 1.81
+  },
+  {
+    "id": "yo",
+    "name": "Yoruba",
+    "iso": "yor",
+    "duration_hours": 15.66
+  },
+  {
+    "id": "yue",
+    "name": "Cantonese",
+    "iso": "yue",
+    "duration_hours": 13302.38
+  },
+  {
+    "id": "zga",
+    "name": "Kinga",
+    "iso": "zga",
+    "duration_hours": 9.5
+  },
+  {
+    "id": "zgh",
+    "name": "Standard Moroccan Tamazight",
+    "iso": "zgh",
+    "duration_hours": 1.19
+  },
+  {
+    "id": "zh",
+    "name": "Chinese",
+    "iso": "cmn",
+    "duration_hours": 111343.3
+  },
+  {
+    "id": "zoc",
+    "name": "Copainal\u00e1 Zoque",
+    "iso": "zoc",
+    "duration_hours": 10.07
+  },
+  {
+    "id": "zoh",
+    "name": "Chimalapa Zoque",
+    "iso": "zoh",
+    "duration_hours": 9.35
+  },
+  {
+    "id": "zor",
+    "name": "Ray\u00f3n Zoque",
+    "iso": "zor",
+    "duration_hours": 9.04
+  },
+  {
+    "id": "zpv",
+    "name": "Chichicapan Zapotec",
+    "iso": "zpv",
+    "duration_hours": 9.85
+  },
+  {
+    "id": "zpy",
+    "name": "Mazaltepec Zapotec",
+    "iso": "zpy",
+    "duration_hours": 9.47
+  },
+  {
+    "id": "ztg",
+    "name": "Xanagu\u00eda Zapotec",
+    "iso": "ztg",
+    "duration_hours": 9.86
+  },
+  {
+    "id": "ztn",
+    "name": "Santa Catarina Albarradas Zapotec",
+    "iso": "ztn",
+    "duration_hours": 10.02
+  },
+  {
+    "id": "ztp",
+    "name": "Loxicha Zapotec",
+    "iso": "ztp",
+    "duration_hours": 9.62
+  },
+  {
+    "id": "zts",
+    "name": "Tilquiapan Zapotec",
+    "iso": "zts",
+    "duration_hours": 9.33
+  },
+  {
+    "id": "ztu",
+    "name": "G\u00fcil\u00e1 Zapotec",
+    "iso": "ztu",
+    "duration_hours": 9.17
+  },
+  {
+    "id": "zu",
+    "name": "Zulu",
+    "iso": "zul",
+    "duration_hours": 14.83
+  },
+  {
+    "id": "zza",
+    "name": "Zaza",
+    "iso": "zza",
+    "duration_hours": 1.52
+  }
+]
