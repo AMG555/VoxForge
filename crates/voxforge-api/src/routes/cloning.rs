@@ -14,6 +14,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use voxforge_audio::AudioAnalyzer;
 use voxforge_core::error::ProblemDetails;
 use voxforge_core::models::{CloneVoiceRequest, VoiceProfile};
@@ -885,6 +886,206 @@ pub async fn compare_profiles(
     }))
 }
 
+/// Request payload to blend two voice profiles into a new hybrid profile.
+#[derive(Debug, Deserialize)]
+pub struct BlendProfilesRequest {
+    pub name: String,
+    pub profile_id_a: String,
+    pub profile_id_b: String,
+    /// Blend weight for profile B (0.0 to 1.0).
+    /// 0.0 = 100% profile A, 1.0 = 100% profile B, 0.5 = 50/50 balanced blend.
+    #[serde(default = "default_blend_weight")]
+    pub weight_b: f32,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+fn default_blend_weight() -> f32 {
+    0.5
+}
+
+#[derive(Debug, Serialize)]
+pub struct BlendProfilesResponse {
+    pub blended_profile: VoiceProfile,
+    pub interpolation_weight_b: f32,
+    pub cosine_similarity_to_a: f32,
+    pub cosine_similarity_to_b: f32,
+}
+
+/// `POST /v1/voices/profiles/blend` — interpolate two stored voice profiles into a new hybrid persona.
+pub async fn blend_profiles(
+    State(state): State<AppState>,
+    Json(body): Json<BlendProfilesRequest>,
+) -> Result<Json<BlendProfilesResponse>, (StatusCode, Json<ProblemDetails>)> {
+    if body.name.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-parameter".to_string(),
+                title: "Missing Voice Name".to_string(),
+                status: 400,
+                detail: "The 'name' field cannot be empty".to_string(),
+                instance: "/v1/voices/profiles/blend".to_string(),
+            }),
+        ));
+    }
+
+    if body.name.len() > 128 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-parameter".to_string(),
+                title: "Voice Name Too Long".to_string(),
+                status: 400,
+                detail: "The 'name' field cannot exceed 128 characters".to_string(),
+                instance: "/v1/voices/profiles/blend".to_string(),
+            }),
+        ));
+    }
+
+    let w_b = if body.weight_b.is_finite() {
+        body.weight_b.clamp(0.0, 1.0)
+    } else {
+        0.5
+    };
+    let w_a = 1.0 - w_b;
+
+    let profile_a = state.voice_profiles.get(&body.profile_id_a).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Profile A Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{}' not found", body.profile_id_a),
+                instance: "/v1/voices/profiles/blend".to_string(),
+            }),
+        )
+    })?;
+
+    let profile_b = state.voice_profiles.get(&body.profile_id_b).await.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                title: "Profile B Not Found".to_string(),
+                status: 404,
+                detail: format!("Voice profile '{}' not found", body.profile_id_b),
+                instance: "/v1/voices/profiles/blend".to_string(),
+            }),
+        )
+    })?;
+
+    let emb_a = profile_a.embedding.as_deref().unwrap_or(&[]);
+    let emb_b = profile_b.embedding.as_deref().unwrap_or(&[]);
+
+    if emb_a.is_empty() || emb_b.is_empty() || emb_a.len() != emb_b.len() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/missing-embedding".to_string(),
+                title: "Incompatible Speaker Embeddings".to_string(),
+                status: 422,
+                detail: "Both profiles must contain non-empty, matching-dimension speaker embeddings".to_string(),
+                instance: "/v1/voices/profiles/blend".to_string(),
+            }),
+        ));
+    }
+
+    // Spherical linear / normalized linear interpolation of speaker embeddings
+    let mut blended_emb = Vec::with_capacity(emb_a.len());
+    let mut sum_sq = 0.0f32;
+    for i in 0..emb_a.len() {
+        let val = w_a * emb_a[i] + w_b * emb_b[i];
+        blended_emb.push(val);
+        sum_sq += val * val;
+    }
+    let norm = sum_sq.sqrt().max(1e-12);
+    for val in &mut blended_emb {
+        *val /= norm;
+    }
+
+    let cosine_similarity_to_a =
+        voxforge_engine::Qwen3TtsEngine::compute_cosine_similarity(&blended_emb, emb_a);
+    let cosine_similarity_to_b =
+        voxforge_engine::Qwen3TtsEngine::compute_cosine_similarity(&blended_emb, emb_b);
+
+    // Interpolate acoustic metadata (F0, formants, syllable rate, jitter, shimmer)
+    let mut metadata = HashMap::new();
+    metadata.insert("engine".to_string(), "qwen3-tts".to_string());
+    metadata.insert("zero_shot".to_string(), "true".to_string());
+    metadata.insert("blended".to_string(), "true".to_string());
+    metadata.insert(
+        "blended_from".to_string(),
+        format!("{}:{:.2},{}:{:.2}", profile_a.id, w_a, profile_b.id, w_b),
+    );
+
+    let interp_num = |key: &str, def: f32, prec: usize| -> String {
+        let va = profile_a.metadata.get(key).and_then(|s| s.parse::<f32>().ok()).unwrap_or(def);
+        let vb = profile_b.metadata.get(key).and_then(|s| s.parse::<f32>().ok()).unwrap_or(def);
+        format!("{:.*}", prec, w_a * va + w_b * vb)
+    };
+
+    metadata.insert("f0_mean_hz".to_string(), interp_num("f0_mean_hz", 150.0, 1));
+    metadata.insert("f0_std_semitones".to_string(), interp_num("f0_std_semitones", 2.5, 2));
+    metadata.insert("formant_f1_hz".to_string(), interp_num("formant_f1_hz", 500.0, 1));
+    metadata.insert("formant_f2_hz".to_string(), interp_num("formant_f2_hz", 1500.0, 1));
+    metadata.insert("formant_f3_hz".to_string(), interp_num("formant_f3_hz", 2500.0, 1));
+    metadata.insert("syllable_rate".to_string(), interp_num("syllable_rate", 4.2, 2));
+    metadata.insert("spectral_tilt_db".to_string(), interp_num("spectral_tilt_db", -6.0, 2));
+    metadata.insert("voicing_ratio".to_string(), interp_num("voicing_ratio", 0.85, 3));
+    metadata.insert("hnr_db".to_string(), interp_num("hnr_db", 18.0, 2));
+
+    let blended_profile = VoiceProfile {
+        id: format!("qwen3-blended-{}", uuid::Uuid::new_v4()),
+        name: body.name.trim().to_string(),
+        engine_id: "qwen3-tts".to_string(),
+        language: if w_a >= 0.5 {
+            profile_a.language.clone()
+        } else {
+            profile_b.language.clone()
+        },
+        gender: if w_a >= 0.5 {
+            profile_a.gender
+        } else {
+            profile_b.gender
+        },
+        description: body.description.or_else(|| {
+            Some(format!(
+                "Acoustic blend of '{}' ({:.0}%) and '{}' ({:.0}%)",
+                profile_a.name,
+                w_a * 100.0,
+                profile_b.name,
+                w_b * 100.0
+            ))
+        }),
+        reference_audio_path: None,
+        reference_audio_base64: profile_a.reference_audio_base64.clone(),
+        reference_transcript: None,
+        embedding: Some(blended_emb),
+        clone_capabilities: Some(vec![
+            "cross_lingual".to_string(),
+            "zero_shot".to_string(),
+            "blended".to_string(),
+        ]),
+        similarity_score: Some(cosine_similarity_to_a.min(cosine_similarity_to_b)),
+        sample_count: (profile_a.sample_count + profile_b.sample_count).max(2),
+        version: 1,
+        metadata,
+        created_at: chrono::Utc::now(),
+        refined_at: None,
+    };
+
+    state.voice_profiles.insert(blended_profile.clone()).await;
+
+    Ok(Json(BlendProfilesResponse {
+        blended_profile,
+        interpolation_weight_b: w_b,
+        cosine_similarity_to_a,
+        cosine_similarity_to_b,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -989,5 +1190,86 @@ mod tests {
         assert_eq!(res.0.confidence_rating, "high");
         assert!(res.0.similarity_score > 0.95);
         assert!(res.0.overall_biometric_score > 90.0);
+    }
+
+    #[tokio::test]
+    async fn test_blend_profiles_endpoint() {
+        let state = test_state();
+        let mut meta_a = HashMap::new();
+        meta_a.insert("f0_mean_hz".to_string(), "130.0".to_string());
+        meta_a.insert("formant_f1_hz".to_string(), "480.0".to_string());
+        let profile_a = VoiceProfile {
+            id: "speaker-a".to_string(),
+            name: "Speaker A".to_string(),
+            engine_id: "qwen3-tts".to_string(),
+            language: "en-US".to_string(),
+            gender: Some(voxforge_core::models::Gender::Male),
+            description: None,
+            reference_audio_path: None,
+            reference_audio_base64: None,
+            reference_transcript: None,
+            embedding: Some(vec![1.0; 512]),
+            clone_capabilities: None,
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
+            metadata: meta_a,
+            created_at: chrono::Utc::now(),
+            refined_at: None,
+        };
+        state.voice_profiles.insert(profile_a.clone()).await;
+
+        let mut meta_b = HashMap::new();
+        meta_b.insert("f0_mean_hz".to_string(), "210.0".to_string());
+        meta_b.insert("formant_f1_hz".to_string(), "550.0".to_string());
+        let profile_b = VoiceProfile {
+            id: "speaker-b".to_string(),
+            name: "Speaker B".to_string(),
+            engine_id: "qwen3-tts".to_string(),
+            language: "en-US".to_string(),
+            gender: Some(voxforge_core::models::Gender::Female),
+            description: None,
+            reference_audio_path: None,
+            reference_audio_base64: None,
+            reference_transcript: None,
+            embedding: Some(vec![0.8; 512]),
+            clone_capabilities: None,
+            similarity_score: None,
+            sample_count: 1,
+            version: 1,
+            metadata: meta_b,
+            created_at: chrono::Utc::now(),
+            refined_at: None,
+        };
+        state.voice_profiles.insert(profile_b.clone()).await;
+
+        let blend_req = BlendProfilesRequest {
+            name: "Speaker A+B Blend".to_string(),
+            profile_id_a: profile_a.id.clone(),
+            profile_id_b: profile_b.id.clone(),
+            weight_b: 0.5,
+            description: Some("Hybrid test blend".to_string()),
+        };
+        let blend_res = blend_profiles(State(state.clone()), Json(blend_req))
+            .await
+            .unwrap()
+            .0;
+        assert_eq!(blend_res.blended_profile.name, "Speaker A+B Blend");
+        assert_eq!(blend_res.interpolation_weight_b, 0.5);
+        assert!(blend_res.cosine_similarity_to_a > 0.95);
+        assert!(blend_res.cosine_similarity_to_b > 0.95);
+        assert!(blend_res.blended_profile.embedding.is_some());
+        assert_eq!(
+            blend_res.blended_profile.metadata.get("blended").unwrap(),
+            "true"
+        );
+        let blended_f0: f32 = blend_res
+            .blended_profile
+            .metadata
+            .get("f0_mean_hz")
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((blended_f0 - 170.0).abs() < 1.0);
     }
 }

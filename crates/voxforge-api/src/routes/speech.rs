@@ -40,6 +40,12 @@ pub struct OpenAiSpeechRequest {
     /// Optional natural language instruction / delivery style steering (e.g. "whisper", "urgent", "cheerful").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instruct: Option<String>,
+    /// Optional diffusion / flow-matching refinement steps (e.g. 16 = preview, 32 = studio quality, 64 = ultra).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub num_step: Option<u32>,
+    /// Optional bit depth precision (16 = standard PCM, 24 = studio master, 32 = 32-bit float).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u16>,
     /// Optional crossfade duration in ms when synthesizing multi-sentence long text. Default: 30ms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crossfade_ms: Option<u32>,
@@ -101,6 +107,32 @@ fn validate_speech_request(
                 detail:
                     "The 'pitch' parameter must be a finite number between -50.0 and 50.0 semitones"
                         .to_string(),
+                instance: "/v1/audio/speech".to_string(),
+            };
+            return Err((StatusCode::BAD_REQUEST, Json(err)));
+        }
+    }
+
+    if let Some(steps) = payload.num_step {
+        if !(4..=128).contains(&steps) {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-parameter".to_string(),
+                title: "Invalid num_step Parameter".to_string(),
+                status: StatusCode::BAD_REQUEST.as_u16(),
+                detail: "The 'num_step' parameter must be between 4 and 128".to_string(),
+                instance: "/v1/audio/speech".to_string(),
+            };
+            return Err((StatusCode::BAD_REQUEST, Json(err)));
+        }
+    }
+
+    if let Some(prec) = payload.precision {
+        if prec != 16 && prec != 24 && prec != 32 {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-parameter".to_string(),
+                title: "Invalid precision Parameter".to_string(),
+                status: StatusCode::BAD_REQUEST.as_u16(),
+                detail: "The 'precision' parameter must be 16, 24, or 32".to_string(),
                 instance: "/v1/audio/speech".to_string(),
             };
             return Err((StatusCode::BAD_REQUEST, Json(err)));
@@ -205,6 +237,7 @@ async fn resolve_engine_and_voice(
 fn encode_chunk_to_response(
     audio_chunk: voxforge_core::models::AudioChunk,
     format: AudioContainerFormat,
+    precision: Option<u16>,
 ) -> Result<Response, (StatusCode, Json<ProblemDetails>)> {
     let (audio_bytes, content_type) = match format {
         AudioContainerFormat::Pcm => {
@@ -216,11 +249,20 @@ fn encode_chunk_to_response(
             (bytes, "audio/pcm")
         }
         AudioContainerFormat::Wav => {
-            let wav_bytes = WavEncoder::encode_pcm16_to_wav(
-                &audio_chunk.pcm_data,
-                audio_chunk.sample_rate,
-                audio_chunk.channels,
-            )
+            let wav_bytes = if let Some(prec) = precision {
+                WavEncoder::encode_pcm_to_wav_with_precision(
+                    &audio_chunk.pcm_data,
+                    audio_chunk.sample_rate,
+                    audio_chunk.channels,
+                    prec,
+                )
+            } else {
+                WavEncoder::encode_pcm16_to_wav(
+                    &audio_chunk.pcm_data,
+                    audio_chunk.sample_rate,
+                    audio_chunk.channels,
+                )
+            }
             .map_err(|e| {
                 let err = ProblemDetails {
                     problem_type: "https://voxforge.org/errors/encoding-failure".to_string(),
@@ -391,9 +433,20 @@ pub async fn synthesize_speech(
                 let mut channels = 1;
 
                 for chunk_text in chunks {
+                    let mut cloned_profile = profile.clone();
+                    if let Some(ref inst) = payload.instruct {
+                        cloned_profile.metadata.insert("instruct".to_string(), inst.clone());
+                    }
+                    if let Some(steps) = payload.num_step {
+                        cloned_profile.metadata.insert("num_step".to_string(), steps.to_string());
+                    }
+                    if let Some(prec) = payload.precision {
+                        cloned_profile.metadata.insert("precision".to_string(), prec.to_string());
+                    }
+
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
                         text: state.pronunciation.process(&chunk_text),
-                        profile: profile.clone(),
+                        profile: cloned_profile,
                         speed: payload.speed,
                         pitch: payload.pitch.unwrap_or(0.0),
                         format: payload.response_format,
@@ -431,7 +484,7 @@ pub async fn synthesize_speech(
                     channels,
                     is_final: true,
                 };
-                return encode_chunk_to_response(audio_chunk, payload.response_format);
+                return encode_chunk_to_response(audio_chunk, payload.response_format, payload.precision);
             }
         }
     }
@@ -548,7 +601,7 @@ pub async fn synthesize_speech(
         channels,
         is_final: true,
     };
-    encode_chunk_to_response(audio_chunk, payload.response_format)
+    encode_chunk_to_response(audio_chunk, payload.response_format, payload.precision)
 }
 
 fn split_text_into_chunks(text: &str, max_chunk_chars: usize) -> Vec<String> {
