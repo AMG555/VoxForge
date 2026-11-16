@@ -228,8 +228,19 @@ impl ProsodyMirror {
             0.0
         };
 
+        // Use median F0 (more robust than mean — rejects octave errors and pitch halving)
+        // Studio uses similar robust pitch estimation for the speaker encoder conditioning.
         let f0_mean_hz = if !f0_estimates.is_empty() {
-            f0_estimates.iter().sum::<f32>() / f0_estimates.len() as f32
+            let mut sorted = f0_estimates.clone();
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            // Trimmed mean: drop bottom/top 10% to remove octave errors at boundaries
+            let trim = sorted.len() / 10;
+            let trimmed = &sorted[trim..sorted.len().saturating_sub(trim)];
+            if trimmed.is_empty() {
+                sorted[sorted.len() / 2]
+            } else {
+                trimmed.iter().sum::<f32>() / trimmed.len() as f32
+            }
         } else {
             140.0
         };
