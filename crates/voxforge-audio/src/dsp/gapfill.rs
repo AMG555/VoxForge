@@ -84,7 +84,11 @@ impl RoomToneGapFill {
                 }
             }
             avg.iter()
-                .map(|&v| (v / quiet_frames.len() as f32).round().clamp(-32768.0, 32767.0) as i16)
+                .map(|&v| {
+                    (v / quiet_frames.len() as f32)
+                        .round()
+                        .clamp(-32768.0, 32767.0) as i16
+                })
                 .collect()
         };
 
@@ -139,8 +143,7 @@ impl RoomToneGapFill {
                     1.0
                 };
 
-                samples[i] =
-                    (tone_sample * edge_gain).round().clamp(-32768.0, 32767.0) as i16;
+                samples[i] = (tone_sample * edge_gain).round().clamp(-32768.0, 32767.0) as i16;
             }
         }
     }
@@ -165,7 +168,9 @@ impl RoomToneGapFill {
         let mut out = Vec::with_capacity(len);
         for _ in 0..len {
             // 64-bit LCG
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             let raw = (state >> 33) as i32;
             let noise = (raw as f32 / i32::MAX as f32) * level;
             // Simple first-order HP to shape noise spectrum (reduce DC)
@@ -225,7 +230,10 @@ mod tests {
         // The gap region should now have some non-zero content
         let gap_region = &samples[gap_start + 100..gap_end - 100]; // avoid edge fades
         let any_nonzero = gap_region.iter().any(|&s| s != 0);
-        assert!(any_nonzero, "Gap should be filled with room tone, not digital zeros");
+        assert!(
+            any_nonzero,
+            "Gap should be filled with room tone, not digital zeros"
+        );
     }
 
     #[test]

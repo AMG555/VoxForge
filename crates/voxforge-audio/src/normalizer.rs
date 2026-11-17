@@ -1,6 +1,6 @@
 /// EBU R128 / LUFS loudness normalization target constants.
-pub const LUFS_TARGET_VOICE: f32 = -16.0;    // Podcast / voice content (-16 LUFS)
-pub const LUFS_TARGET_YOUTUBE: f32 = -14.0;  // YouTube / streaming (-14 LUFS)
+pub const LUFS_TARGET_VOICE: f32 = -16.0; // Podcast / voice content (-16 LUFS)
+pub const LUFS_TARGET_YOUTUBE: f32 = -14.0; // YouTube / streaming (-14 LUFS)
 pub const LUFS_TARGET_BROADCAST: f32 = -23.0; // EBU R128 broadcast (-23 LUFS)
 
 /// Duration threshold above which the two-pass LUFS algorithm is used.
@@ -145,7 +145,7 @@ impl AudioNormalizer {
     fn lufs_normalize_two_pass(samples: &mut [i16], sample_rate: u32, target_lufs: f32) {
         let sr = sample_rate.max(1) as f32;
         let block_len = (sr * 0.4) as usize; // 400ms block
-        let hop_len = (sr * 0.1) as usize;   // 100ms hop (75% overlap)
+        let hop_len = (sr * 0.1) as usize; // 100ms hop (75% overlap)
 
         // ── Compute K-weighted signal once ──
         let kw = Self::k_weight(samples, sample_rate);
@@ -155,11 +155,8 @@ impl AudioNormalizer {
         let mut block_ms: Vec<f64> = Vec::new();
         let mut pos = 0;
         while pos + block_len <= kw.len() {
-            let ms = kw[pos..pos + block_len]
-                .iter()
-                .map(|&x| x * x)
-                .sum::<f64>()
-                / block_len as f64;
+            let ms =
+                kw[pos..pos + block_len].iter().map(|&x| x * x).sum::<f64>() / block_len as f64;
             if ms > abs_gate_ms {
                 block_ms.push(ms);
             }
@@ -178,7 +175,10 @@ impl AudioNormalizer {
 
         // Relative gate: -10 LU below preliminary
         let rel_gate_ms = 10.0f64.powf(((prelim_lufs - 10.0) as f64 + 0.691) / 10.0);
-        let gated_ms: Vec<f64> = block_ms.into_iter().filter(|&ms| ms > rel_gate_ms).collect();
+        let gated_ms: Vec<f64> = block_ms
+            .into_iter()
+            .filter(|&ms| ms > rel_gate_ms)
+            .collect();
 
         if gated_ms.is_empty() {
             Self::lufs_normalize(samples, sample_rate, target_lufs);
@@ -238,21 +238,33 @@ impl AudioNormalizer {
         let rlb_a1 = (-2.0 * cos_rlb) / a0_rlb;
         let rlb_a2 = (1.0 - alpha_rlb) / a0_rlb;
 
-        let mut x1 = 0.0f64; let mut x2 = 0.0f64;
-        let mut y1 = 0.0f64; let mut y2 = 0.0f64;
-        let mut rx1 = 0.0f64; let mut rx2 = 0.0f64;
-        let mut ry1 = 0.0f64; let mut ry2 = 0.0f64;
+        let mut x1 = 0.0f64;
+        let mut x2 = 0.0f64;
+        let mut y1 = 0.0f64;
+        let mut y2 = 0.0f64;
+        let mut rx1 = 0.0f64;
+        let mut rx2 = 0.0f64;
+        let mut ry1 = 0.0f64;
+        let mut ry2 = 0.0f64;
         let mut out = Vec::with_capacity(samples.len());
 
         for &s in samples {
             let input = s as f64 / 32768.0;
             let pf = pf_b0 as f64 * input + pf_b1 as f64 * x1 + pf_b2 as f64 * x2
-                - pf_a1 as f64 * y1 - pf_a2 as f64 * y2;
-            x2 = x1; x1 = input; y2 = y1; y1 = if pf.is_finite() { pf } else { 0.0 };
+                - pf_a1 as f64 * y1
+                - pf_a2 as f64 * y2;
+            x2 = x1;
+            x1 = input;
+            y2 = y1;
+            y1 = if pf.is_finite() { pf } else { 0.0 };
 
             let rlb = rlb_b0 as f64 * y1 + rlb_b1 as f64 * rx1 + rlb_b2 as f64 * rx2
-                - rlb_a1 as f64 * ry1 - rlb_a2 as f64 * ry2;
-            rx2 = rx1; rx1 = y1; ry2 = ry1; ry1 = if rlb.is_finite() { rlb } else { 0.0 };
+                - rlb_a1 as f64 * ry1
+                - rlb_a2 as f64 * ry2;
+            rx2 = rx1;
+            rx1 = y1;
+            ry2 = ry1;
+            ry1 = if rlb.is_finite() { rlb } else { 0.0 };
             out.push(ry1);
         }
         out

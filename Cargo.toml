@@ -41,6 +41,7 @@ hound = "3.5"
 sysinfo = "0.30"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "fs", "compression-gzip"] }
 http-body-util = "0.1"
 subtle = "2.5"

@@ -65,8 +65,8 @@ impl SilenceTrimmer {
         let on_amp = 32767.0f32 * 10.0f32.powf(safe_threshold_dbfs / 20.0);
         let off_amp = on_amp * std::f32::consts::FRAC_1_SQRT_2; // 3 dB below on_threshold
 
-        let padding_samples = ((sr * padding_ms.min(2000) as f32 / 1000.0) as usize)
-            .min(samples.len() / 2);
+        let padding_samples =
+            ((sr * padding_ms.min(2000) as f32 / 1000.0) as usize).min(samples.len() / 2);
 
         // Short-time energy envelope with ~8ms smoothing
         let alpha_attack = (-1.0f32 / (sr * 0.008)).exp(); // fast attack
@@ -119,7 +119,10 @@ impl SilenceTrimmer {
         let min_voiced_samples = (sr * 0.5) as usize; // 500ms minimum
         let speech_amp = 32767.0f32 * 10.0f32.powf(-50.0 / 20.0);
 
-        let voiced_count = samples.iter().filter(|&&s| (s as f32).abs() >= speech_amp).count();
+        let voiced_count = samples
+            .iter()
+            .filter(|&&s| (s as f32).abs() >= speech_amp)
+            .count();
         voiced_count >= min_voiced_samples
     }
 
@@ -141,7 +144,10 @@ impl SilenceTrimmer {
         let speech_amp = 32767.0f32 * 10.0f32.powf(-50.0 / 20.0);
 
         // 1. Voiced fraction
-        let voiced = samples.iter().filter(|&&s| (s as f32).abs() >= speech_amp).count();
+        let voiced = samples
+            .iter()
+            .filter(|&&s| (s as f32).abs() >= speech_amp)
+            .count();
         let voiced_frac = voiced as f32 / samples.len() as f32;
         if voiced_frac < 0.05 {
             return 0.0; // Mostly silence
@@ -150,15 +156,26 @@ impl SilenceTrimmer {
         // 2. RMS and peak
         let sum_sq: f64 = samples.iter().map(|&s| (s as f64).powi(2)).sum();
         let rms = (sum_sq / samples.len() as f64).sqrt() as f32;
-        let peak = samples.iter().map(|&s| (s as f32).abs()).fold(0.0f32, f32::max);
+        let peak = samples
+            .iter()
+            .map(|&s| (s as f32).abs())
+            .fold(0.0f32, f32::max);
 
         if rms < 10.0 {
             return 0.0; // Too quiet
         }
 
         // Crest factor: 8–20 dB is healthy speech (high values → impulsive noise)
-        let crest_db = if rms > 0.1 { 20.0 * (peak / rms).log10() } else { 0.0 };
-        let crest_score = if crest_db < 4.0 || crest_db > 30.0 { 0.5 } else { 1.0 };
+        let crest_db = if rms > 0.1 {
+            20.0 * (peak / rms).log10()
+        } else {
+            0.0
+        };
+        let crest_score = if crest_db < 4.0 || crest_db > 30.0 {
+            0.5
+        } else {
+            1.0
+        };
 
         // 3. Zero crossing rate — healthy speech: ~0.03–0.15
         let zcr = {
@@ -281,13 +298,8 @@ impl SilenceTrimmer {
         let min_pause_len = ((sr * min_pause_ms.min(1000) as f32 / 1000.0) as usize).max(1);
 
         // Find leading pause: search forward from offset 0 up to search_len
-        let new_start = Self::find_pause_boundary_forward(
-            samples,
-            0,
-            search_len,
-            min_pause_len,
-            silent_amp,
-        );
+        let new_start =
+            Self::find_pause_boundary_forward(samples, 0, search_len, min_pause_len, silent_amp);
 
         // Find trailing pause: search backward from end, up to search_len from end
         let new_end = Self::find_pause_boundary_backward(
@@ -464,8 +476,7 @@ mod tests {
         let sr = 24_000u32;
         // Constant loud signal — no pause boundaries
         let samples: Vec<i16> = vec![10000i16; sr as usize];
-        let result =
-            SilenceTrimmer::trim_passage_to_pauses(&samples, sr, 1500, 50, -55.0);
+        let result = SilenceTrimmer::trim_passage_to_pauses(&samples, sr, 1500, 50, -55.0);
         // No pause found → return unchanged
         assert_eq!(result.len(), samples.len());
     }

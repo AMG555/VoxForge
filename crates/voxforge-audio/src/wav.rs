@@ -28,12 +28,18 @@ impl WavEncoder {
                     sample_format: hound::SampleFormat::Int,
                 };
                 let mut writer = hound::WavWriter::new(&mut cursor, spec).map_err(|e| {
-                    VoxForgeError::AudioProcessing(format!("Failed to init 24-bit WAV writer: {}", e))
+                    VoxForgeError::AudioProcessing(format!(
+                        "Failed to init 24-bit WAV writer: {}",
+                        e
+                    ))
                 })?;
                 for &sample in pcm_samples {
                     let s24 = (sample as i32) << 8;
                     writer.write_sample(s24).map_err(|e| {
-                        VoxForgeError::AudioProcessing(format!("Failed to write 24-bit sample: {}", e))
+                        VoxForgeError::AudioProcessing(format!(
+                            "Failed to write 24-bit sample: {}",
+                            e
+                        ))
                     })?;
                 }
                 writer.finalize().map_err(|e| {
@@ -48,16 +54,25 @@ impl WavEncoder {
                     sample_format: hound::SampleFormat::Float,
                 };
                 let mut writer = hound::WavWriter::new(&mut cursor, spec).map_err(|e| {
-                    VoxForgeError::AudioProcessing(format!("Failed to init 32-bit float WAV writer: {}", e))
+                    VoxForgeError::AudioProcessing(format!(
+                        "Failed to init 32-bit float WAV writer: {}",
+                        e
+                    ))
                 })?;
                 for &sample in pcm_samples {
                     let f = (sample as f32) / 32768.0;
                     writer.write_sample(f).map_err(|e| {
-                        VoxForgeError::AudioProcessing(format!("Failed to write 32-bit float sample: {}", e))
+                        VoxForgeError::AudioProcessing(format!(
+                            "Failed to write 32-bit float sample: {}",
+                            e
+                        ))
                     })?;
                 }
                 writer.finalize().map_err(|e| {
-                    VoxForgeError::AudioProcessing(format!("Failed to finalize 32-bit float WAV: {}", e))
+                    VoxForgeError::AudioProcessing(format!(
+                        "Failed to finalize 32-bit float WAV: {}",
+                        e
+                    ))
                 })?;
             }
             _ => {

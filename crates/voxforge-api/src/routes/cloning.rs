@@ -802,7 +802,6 @@ pub async fn export_profile_as_bundle(
     Ok(Json(voxforge_engine::PersonaBundle::from_profile(profile)))
 }
 
-
 /// `POST /v1/voices/profiles/compare` — compute embedding cosine similarity between two profiles.
 #[derive(Debug, Deserialize)]
 pub struct CompareProfilesRequest {
@@ -824,31 +823,39 @@ pub async fn compare_profiles(
     State(state): State<AppState>,
     Json(body): Json<CompareProfilesRequest>,
 ) -> Result<Json<ProfileComparisonResponse>, (StatusCode, Json<ProblemDetails>)> {
-    let profile_a = state.voice_profiles.get(&body.profile_id_a).await.ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ProblemDetails {
-                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
-                title: "Profile A Not Found".to_string(),
-                status: 404,
-                detail: format!("Voice profile '{}' not found", body.profile_id_a),
-                instance: "/v1/voices/profiles/compare".to_string(),
-            }),
-        )
-    })?;
+    let profile_a = state
+        .voice_profiles
+        .get(&body.profile_id_a)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                    title: "Profile A Not Found".to_string(),
+                    status: 404,
+                    detail: format!("Voice profile '{}' not found", body.profile_id_a),
+                    instance: "/v1/voices/profiles/compare".to_string(),
+                }),
+            )
+        })?;
 
-    let profile_b = state.voice_profiles.get(&body.profile_id_b).await.ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ProblemDetails {
-                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
-                title: "Profile B Not Found".to_string(),
-                status: 404,
-                detail: format!("Voice profile '{}' not found", body.profile_id_b),
-                instance: "/v1/voices/profiles/compare".to_string(),
-            }),
-        )
-    })?;
+    let profile_b = state
+        .voice_profiles
+        .get(&body.profile_id_b)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                    title: "Profile B Not Found".to_string(),
+                    status: 404,
+                    detail: format!("Voice profile '{}' not found", body.profile_id_b),
+                    instance: "/v1/voices/profiles/compare".to_string(),
+                }),
+            )
+        })?;
 
     let emb_a = profile_a.embedding.as_deref().unwrap_or(&[]);
     let emb_b = profile_b.embedding.as_deref().unwrap_or(&[]);
@@ -950,31 +957,39 @@ pub async fn blend_profiles(
     };
     let w_a = 1.0 - w_b;
 
-    let profile_a = state.voice_profiles.get(&body.profile_id_a).await.ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ProblemDetails {
-                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
-                title: "Profile A Not Found".to_string(),
-                status: 404,
-                detail: format!("Voice profile '{}' not found", body.profile_id_a),
-                instance: "/v1/voices/profiles/blend".to_string(),
-            }),
-        )
-    })?;
+    let profile_a = state
+        .voice_profiles
+        .get(&body.profile_id_a)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                    title: "Profile A Not Found".to_string(),
+                    status: 404,
+                    detail: format!("Voice profile '{}' not found", body.profile_id_a),
+                    instance: "/v1/voices/profiles/blend".to_string(),
+                }),
+            )
+        })?;
 
-    let profile_b = state.voice_profiles.get(&body.profile_id_b).await.ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ProblemDetails {
-                problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
-                title: "Profile B Not Found".to_string(),
-                status: 404,
-                detail: format!("Voice profile '{}' not found", body.profile_id_b),
-                instance: "/v1/voices/profiles/blend".to_string(),
-            }),
-        )
-    })?;
+    let profile_b = state
+        .voice_profiles
+        .get(&body.profile_id_b)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/profile-not-found".to_string(),
+                    title: "Profile B Not Found".to_string(),
+                    status: 404,
+                    detail: format!("Voice profile '{}' not found", body.profile_id_b),
+                    instance: "/v1/voices/profiles/blend".to_string(),
+                }),
+            )
+        })?;
 
     let emb_a = profile_a.embedding.as_deref().unwrap_or(&[]);
     let emb_b = profile_b.embedding.as_deref().unwrap_or(&[]);
@@ -986,7 +1001,9 @@ pub async fn blend_profiles(
                 problem_type: "https://voxforge.org/errors/missing-embedding".to_string(),
                 title: "Incompatible Speaker Embeddings".to_string(),
                 status: 422,
-                detail: "Both profiles must contain non-empty, matching-dimension speaker embeddings".to_string(),
+                detail:
+                    "Both profiles must contain non-empty, matching-dimension speaker embeddings"
+                        .to_string(),
                 instance: "/v1/voices/profiles/blend".to_string(),
             }),
         ));
@@ -1021,19 +1038,48 @@ pub async fn blend_profiles(
     );
 
     let interp_num = |key: &str, def: f32, prec: usize| -> String {
-        let va = profile_a.metadata.get(key).and_then(|s| s.parse::<f32>().ok()).unwrap_or(def);
-        let vb = profile_b.metadata.get(key).and_then(|s| s.parse::<f32>().ok()).unwrap_or(def);
+        let va = profile_a
+            .metadata
+            .get(key)
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(def);
+        let vb = profile_b
+            .metadata
+            .get(key)
+            .and_then(|s| s.parse::<f32>().ok())
+            .unwrap_or(def);
         format!("{:.*}", prec, w_a * va + w_b * vb)
     };
 
     metadata.insert("f0_mean_hz".to_string(), interp_num("f0_mean_hz", 150.0, 1));
-    metadata.insert("f0_std_semitones".to_string(), interp_num("f0_std_semitones", 2.5, 2));
-    metadata.insert("formant_f1_hz".to_string(), interp_num("formant_f1_hz", 500.0, 1));
-    metadata.insert("formant_f2_hz".to_string(), interp_num("formant_f2_hz", 1500.0, 1));
-    metadata.insert("formant_f3_hz".to_string(), interp_num("formant_f3_hz", 2500.0, 1));
-    metadata.insert("syllable_rate".to_string(), interp_num("syllable_rate", 4.2, 2));
-    metadata.insert("spectral_tilt_db".to_string(), interp_num("spectral_tilt_db", -6.0, 2));
-    metadata.insert("voicing_ratio".to_string(), interp_num("voicing_ratio", 0.85, 3));
+    metadata.insert(
+        "f0_std_semitones".to_string(),
+        interp_num("f0_std_semitones", 2.5, 2),
+    );
+    metadata.insert(
+        "formant_f1_hz".to_string(),
+        interp_num("formant_f1_hz", 500.0, 1),
+    );
+    metadata.insert(
+        "formant_f2_hz".to_string(),
+        interp_num("formant_f2_hz", 1500.0, 1),
+    );
+    metadata.insert(
+        "formant_f3_hz".to_string(),
+        interp_num("formant_f3_hz", 2500.0, 1),
+    );
+    metadata.insert(
+        "syllable_rate".to_string(),
+        interp_num("syllable_rate", 4.2, 2),
+    );
+    metadata.insert(
+        "spectral_tilt_db".to_string(),
+        interp_num("spectral_tilt_db", -6.0, 2),
+    );
+    metadata.insert(
+        "voicing_ratio".to_string(),
+        interp_num("voicing_ratio", 0.85, 3),
+    );
     metadata.insert("hnr_db".to_string(), interp_num("hnr_db", 18.0, 2));
 
     let blended_profile = VoiceProfile {

@@ -16,7 +16,9 @@ pub use dsp::{
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;
 pub use metrics::{AudioAnalyzer, AudioQualityMetrics};
-pub use normalizer::{AudioNormalizer, LUFS_TARGET_BROADCAST, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE};
+pub use normalizer::{
+    AudioNormalizer, LUFS_TARGET_BROADCAST, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE,
+};
 pub use paralinguistics::{
     has_paralinguistic_tags, parse_paralinguistic_text, ParalinguisticSegment,
     ParalinguisticSynthesizer, ParalinguisticTag,
@@ -190,7 +192,10 @@ mod tests {
         // Limit to -6 dBFS (~16422 peak amplitude)
         BrickwallLimiter::process_sr(&mut samples, -6.0, sr);
         let ceiling_linear = 10.0f32.powf(-6.0_f32 / 20.0);
-        let peak_linear = samples.iter().map(|&s| (s as f32).abs() / 32768.0).fold(0.0f32, f32::max);
+        let peak_linear = samples
+            .iter()
+            .map(|&s| (s as f32).abs() / 32768.0)
+            .fold(0.0f32, f32::max);
         assert!(
             peak_linear <= ceiling_linear + 1e-4,
             "Ceiling violated: peak_linear={:.4} > ceiling={:.4}",

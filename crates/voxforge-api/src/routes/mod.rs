@@ -115,10 +115,7 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/voices/profiles/compare",
             post(cloning::compare_profiles),
         )
-        .route(
-            "/v1/voices/profiles/blend",
-            post(cloning::blend_profiles),
-        )
+        .route("/v1/voices/profiles/blend", post(cloning::blend_profiles))
         // Engine benchmarking
         .route("/v1/benchmark/results", get(benchmark::list_results))
         .route("/v1/benchmark/run", post(benchmark::trigger_run))

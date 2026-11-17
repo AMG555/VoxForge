@@ -69,7 +69,7 @@ impl DynamicCompressor {
         let knee_half_db = 4.0f32;
 
         // Smooth gain state in dB domain (logarithmic attack/release)
-        let mut rms_sq = 0.0f32;    // smoothed squared amplitude
+        let mut rms_sq = 0.0f32; // smoothed squared amplitude
         let mut gain_db_smooth = 0.0f32; // current gain reduction state in dB
 
         for sample in samples.iter_mut() {
@@ -125,7 +125,7 @@ fn soft_knee_gain_reduction(level_db: f32, thresh_db: f32, ratio: f32, knee_half
         // Quadratic interpolation inside the knee
         let knee_width = 2.0 * knee_half_db;
         let t = (level_db - knee_start) / knee_width; // 0.0 .. 1.0
-        // Smooth blend: starts at 0, reaches full slope at knee end
+                                                      // Smooth blend: starts at 0, reaches full slope at knee end
         let blend = t * t; // quadratic: 0 at start, 1 at end of knee
         let full_gr = (thresh_db - level_db) * slope;
         full_gr * blend

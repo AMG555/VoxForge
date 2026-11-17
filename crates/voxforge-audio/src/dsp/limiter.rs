@@ -98,7 +98,11 @@ impl BrickwallLimiter {
             // Advance window: add element at i + lookahead_len (the new future sample)
             let next = i + lookahead_len;
             if next < n {
-                while deque.back().map(|&k| abs_f[k] <= abs_f[next]).unwrap_or(false) {
+                while deque
+                    .back()
+                    .map(|&k| abs_f[k] <= abs_f[next])
+                    .unwrap_or(false)
+                {
                     deque.pop_back();
                 }
                 deque.push_back(next);
@@ -125,7 +129,8 @@ impl BrickwallLimiter {
                 smoothed_gain = required_gain;
             } else {
                 // Release: slow exponential recovery toward unity (40ms TC)
-                smoothed_gain = release_alpha * smoothed_gain + (1.0 - release_alpha) * required_gain;
+                smoothed_gain =
+                    release_alpha * smoothed_gain + (1.0 - release_alpha) * required_gain;
             }
 
             *gs = smoothed_gain;
@@ -190,7 +195,11 @@ mod tests {
             .map(|(&a, &b)| (a as i32 - b as i32).unsigned_abs())
             .max()
             .unwrap_or(0);
-        assert!(max_diff <= 2, "Quiet signal changed by {} LSBs unexpectedly", max_diff);
+        assert!(
+            max_diff <= 2,
+            "Quiet signal changed by {} LSBs unexpectedly",
+            max_diff
+        );
     }
 
     #[test]
@@ -202,8 +211,10 @@ mod tests {
                 .map(|i| ((i as i32 % 500 - 250) * 100).clamp(-32768, 32767) as i16)
                 .collect();
             BrickwallLimiter::process_sr(&mut samples, ceiling, sr);
-            let peak_linear =
-                samples.iter().map(|&s| (s as f32).abs() / 32768.0).fold(0.0f32, f32::max);
+            let peak_linear = samples
+                .iter()
+                .map(|&s| (s as f32).abs() / 32768.0)
+                .fold(0.0f32, f32::max);
             assert!(
                 peak_linear <= ceiling_linear + 1e-4,
                 "ceiling {} dBFS violated: peak linear = {}",

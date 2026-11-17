@@ -435,13 +435,19 @@ pub async fn synthesize_speech(
                 for chunk_text in chunks {
                     let mut cloned_profile = profile.clone();
                     if let Some(ref inst) = payload.instruct {
-                        cloned_profile.metadata.insert("instruct".to_string(), inst.clone());
+                        cloned_profile
+                            .metadata
+                            .insert("instruct".to_string(), inst.clone());
                     }
                     if let Some(steps) = payload.num_step {
-                        cloned_profile.metadata.insert("num_step".to_string(), steps.to_string());
+                        cloned_profile
+                            .metadata
+                            .insert("num_step".to_string(), steps.to_string());
                     }
                     if let Some(prec) = payload.precision {
-                        cloned_profile.metadata.insert("precision".to_string(), prec.to_string());
+                        cloned_profile
+                            .metadata
+                            .insert("precision".to_string(), prec.to_string());
                     }
 
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
@@ -484,7 +490,11 @@ pub async fn synthesize_speech(
                     channels,
                     is_final: true,
                 };
-                return encode_chunk_to_response(audio_chunk, payload.response_format, payload.precision);
+                return encode_chunk_to_response(
+                    audio_chunk,
+                    payload.response_format,
+                    payload.precision,
+                );
             }
         }
     }

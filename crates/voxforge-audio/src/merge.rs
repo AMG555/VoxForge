@@ -208,8 +208,8 @@ impl AudioMerger {
         let fade_len = ((sr * fade_ms.min(1000) as f32 / 1000.0) as usize).max(1);
         let gap_len = (sr * gap_ms.min(10_000) as f32 / 1000.0) as usize;
 
-        let total_len: usize = chunks.iter().map(|c| c.len()).sum::<usize>()
-            + (chunks.len() - 1) * gap_len;
+        let total_len: usize =
+            chunks.iter().map(|c| c.len()).sum::<usize>() + (chunks.len() - 1) * gap_len;
         let mut out = Vec::with_capacity(total_len);
 
         for (idx, &seg) in chunks.iter().enumerate() {

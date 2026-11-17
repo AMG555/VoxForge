@@ -231,7 +231,10 @@ mod tests {
         let out = Resampler::resample(&samples, sr_in, sr_out);
         // A 1 kHz tone should still have significant energy after resampling
         let energy: f64 = out.iter().map(|&s| (s as f64).powi(2)).sum();
-        assert!(energy > 1e9, "1kHz tone energy must survive 48→24 resampling");
+        assert!(
+            energy > 1e9,
+            "1kHz tone energy must survive 48→24 resampling"
+        );
     }
 
     #[test]
@@ -246,7 +249,11 @@ mod tests {
         let samples: Vec<i16> = vec![1000; 1600];
         let out = Resampler::to_24k(&samples, 16000);
         // Expected ~2400 samples
-        assert!(out.len() >= 2300 && out.len() <= 2500, "16k→24k len={}", out.len());
+        assert!(
+            out.len() >= 2300 && out.len() <= 2500,
+            "16k→24k len={}",
+            out.len()
+        );
 
         // 44100 → 24000 (should produce output)
         let samples44: Vec<i16> = vec![500; 4410];
