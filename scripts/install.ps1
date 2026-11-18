@@ -49,9 +49,11 @@ try {
 }
 
 $LocalCandidates = @(
+    "$PSScriptRoot\..\target\release-small\voxforge.exe",
     "$PSScriptRoot\..\target\release\voxforge.exe",
     "$PSScriptRoot\..\dist\voxforge.exe",
     "$PSScriptRoot\voxforge.exe",
+    ".\target\release-small\voxforge.exe",
     ".\target\release\voxforge.exe"
 )
 

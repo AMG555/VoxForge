@@ -374,7 +374,7 @@ flowchart TD
    - Routes not matching API prefixes (`/v1/`, `/health`, `/metrics`, `/docs`, `/api-docs`) return `index.html` with HTTP 200, enabling clean client-side routing across Webstation tabs (`/studio`, `/voices`, `/cloning`, `/transcribe`, `/pipeline`, `/catalog`, `/benchmarks`, `/settings`).
 
 3. **Multi-Channel Distribution**:
-   - **`npx voxforge`**: Zero-install runner downloading architecture-specific binaries directly to cache.
+   - **`npx github:AMG555/VoxForge`**: Zero-install runner downloading architecture-specific binaries directly to cache.
    - **`curl | sh` / `irm | iex`**: Automated shell installers detecting host OS and architecture.
    - **Single-Container Docker**: Multi-stage Docker image packaging native binary and embedded frontend in a self-contained container.
 

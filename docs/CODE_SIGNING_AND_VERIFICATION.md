@@ -56,7 +56,7 @@ winget install VoxForge
    ```
 2. Submit the latest release installer:
    ```powershell
-   wingetcreate new https://github.com/AMG555/VoxForge/releases/download/v0.1.0/VoxForge-Setup-v0.1.0-windows-x64.exe
+   wingetcreate new https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe
    ```
 3. `wingetcreate` will automatically download the binary, calculate the SHA-256 hash, generate the YAML manifests, and submit a Pull Request to `microsoft/winget-pkgs`.
 

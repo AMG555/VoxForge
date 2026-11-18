@@ -14,7 +14,7 @@ Download zero-install executables directly from GitHub Releases:
 
 | Platform | Asset Name | Format | Instructions |
 | :--- | :--- | :--- | :--- |
-| **Windows 10/11** | [`VoxForge-Setup-v0.1.0-windows-x64.exe`](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Setup-v0.1.0-windows-x64.exe) | Setup Wizard | Double click setup wizard to install with desktop icons |
+| **Windows 10/11** | [`VoxForge_Setup_x64.exe`](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard | Double click setup wizard to install with desktop icons |
 | **Windows 10/11** | [`VoxForge-Windows-x64.zip`](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle | Extract zip, double-click `VoxForge-Start.bat` |
 | **Windows 10/11** | [`voxforge-windows-x86_64.exe`](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-windows-x86_64.exe) | Standalone .exe | Zero-install standalone binary |
 | **macOS** (Universal) | [`voxforge-macos-universal`](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal) | Mach-O FAT Binary | `chmod +x voxforge-macos-universal && ./voxforge-macos-universal` |
@@ -27,7 +27,7 @@ Download zero-install executables directly from GitHub Releases:
 Launch the unified workstation and local engine server immediately:
 
 ```bash
-npx voxforge
+npx github:AMG555/VoxForge
 ```
 
 What this does:
@@ -39,7 +39,7 @@ What this does:
 
 ---
 
-### 1.2 One-Line Terminal Installers
+### 1.3 One-Line Terminal Installers
 
 Install the standalone `voxforge` executable permanently into your system `PATH`:
 
@@ -90,16 +90,12 @@ curl -fsSL https://raw.githubusercontent.com/AMG555/VoxForge/main/scripts/uninst
 
 ---
 
-### 1.3 Single Docker Container (All-in-One)
+### 1.4 Docker Container (All-in-One)
 
-Launch the self-contained workstation (daemon + embedded visual UI) in a single lightweight container:
+Build and launch the self-contained workstation (daemon + embedded visual UI) from a cloned repository:
 
 ```bash
-docker run -d \
-  -p 8080:8080 \
-  -v voxforge_data:/app/data \
-  --name voxforge \
-  ghcr.io/amg555/voxforge:latest
+docker compose up -d
 ```
 
 Open `http://localhost:8080` in your web browser.

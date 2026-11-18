@@ -7,7 +7,7 @@ Unified hardware-adaptive speech synthesis workstation, voice cloning studio, an
 Run the entire visual workstation and API server instantly via `npx`:
 
 ```bash
-npx voxforge
+npx github:AMG555/VoxForge
 ```
 
 This automatically:
@@ -22,19 +22,19 @@ Forward any VoxForge CLI command directly through the runner:
 
 ```bash
 # Direct speech synthesis to WAV file
-npx voxforge synth "Acoustic neural synthesis operational." -o hello.wav
+npx github:AMG555/VoxForge synth "Acoustic neural synthesis operational." -o hello.wav
 
 # System compute & hardware acceleration probe
-npx voxforge hardware
+npx github:AMG555/VoxForge hardware
 
 # Speech-to-text transcription with subtitle generation
-npx voxforge transcribe lecture.wav --format srt --out subtitles.srt
+npx github:AMG555/VoxForge transcribe lecture.wav --format srt --out subtitles.srt
 
 # Zero-shot voice cloning
-npx voxforge clone --name "Nova" --audio sample.wav --out nova.json
+npx github:AMG555/VoxForge clone --name "Nova" --audio sample.wav --out nova.json
 
 # Local model inventory
-npx voxforge models list
+npx github:AMG555/VoxForge models list
 ```
 
 ## License

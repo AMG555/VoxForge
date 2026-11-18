@@ -1,5 +1,5 @@
 ; VoxForge Inno Setup Installer Script
-; Produces: VoxForge-Setup-v0.3.0-windows-x64.exe
+; Produces: VoxForge_Setup_x64.exe
 ; Requires Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VoxForge"
@@ -45,7 +45,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1
 
 [Files]
 ; Binary is copied to dist/ by the packaging step before Inno Setup runs

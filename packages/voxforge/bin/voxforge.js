@@ -13,8 +13,7 @@ const https = require('https');
 const { spawn } = require('child_process');
 
 const REPO = 'AMG555/VoxForge';
-const pkg = require('../package.json');
-const DEFAULT_VERSION = process.env.VOXFORGE_VERSION || `v${pkg.version}`;
+const EXPLICIT_VERSION = process.env.VOXFORGE_VERSION || '';
 
 function getTargetInfo() {
   const platform = process.platform;
@@ -110,10 +109,12 @@ async function main() {
   const cacheDir = path.join(os.homedir(), '.voxforge', 'bin');
   const binaryPath = path.join(cacheDir, `voxforge${ext}`);
 
-  // 1. Check if running inside or near repository with local build (release or debug)
+  // 1. Check if running inside or near repository with local build (release-small, release, or debug)
   const localCandidates = [
+    path.resolve(__dirname, '../../../target/release-small', `voxforge${ext}`),
     path.resolve(__dirname, '../../../target/release', `voxforge${ext}`),
     path.resolve(__dirname, '../../../target/debug', `voxforge${ext}`),
+    path.resolve(process.cwd(), 'target/release-small', `voxforge${ext}`),
     path.resolve(process.cwd(), 'target/release', `voxforge${ext}`),
     path.resolve(process.cwd(), 'target/debug', `voxforge${ext}`),
   ];
@@ -133,12 +134,14 @@ async function main() {
     } else if (process.platform === 'linux') {
       candidateNames.push(binaryName, 'voxforge-linux-x86_64');
     } else {
-      candidateNames.push(binaryName);
+      candidateNames.push(binaryName, 'voxforge-windows-x86_64.exe', 'voxforge.exe');
     }
 
     let downloaded = false;
     for (const name of candidateNames) {
-      const downloadUrl = `https://github.com/${REPO}/releases/download/${DEFAULT_VERSION}/${name}`;
+      const downloadUrl = EXPLICIT_VERSION
+        ? `https://github.com/${REPO}/releases/download/${EXPLICIT_VERSION}/${name}`
+        : `https://github.com/${REPO}/releases/latest/download/${name}`;
       try {
         await downloadBinary(downloadUrl, binaryPath);
         if (process.platform !== 'win32') {

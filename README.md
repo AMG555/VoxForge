@@ -10,7 +10,7 @@
 [![Release](https://img.shields.io/badge/Release-v0.4.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
 [![Status](https://img.shields.io/badge/Status-Production_Ready_v0.4.0-brightgreen.svg)](docs/architecture.md)
-[![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
 [![API](https://img.shields.io/badge/API-OpenAI_TTS_Compatible-green.svg)](docs/api.md)
@@ -18,7 +18,7 @@
 
 *An open-source, private, self-hosted neural speech workstation. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
 
-[Download .exe](#direct-downloads-desktop--standalone) • [Features](#key-features) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
+[Download .exe](#-direct-downloads--instant-setup) • [Features](#-key-capabilities) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
 </div>
 
@@ -41,7 +41,7 @@
 Running an AI coding assistant? Copy-paste this single prompt to have your agent clone, build, launch, and verify VoxForge automatically:
 
 ```text
-Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the speech synthesis server and visual workstation (run `cargo run --bin voxforge` or use `./run.bat` on Windows / `./run.sh` on macOS/Linux; fallback to `npx voxforge` or `docker compose up -d` if no Rust compiler is installed), and verify that http://localhost:8080/health returns status ok.
+Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the speech synthesis server and visual workstation (run `cargo run --bin voxforge` or use `./run.bat` on Windows / `./run.sh` on macOS/Linux; fallback to `npx github:AMG555/VoxForge` or `docker compose up -d` if no Rust compiler is installed), and verify that http://localhost:8080/health returns status ok.
 ```
 
 ---
@@ -50,11 +50,11 @@ Clone https://github.com/AMG555/VoxForge.git, navigate into VoxForge, launch the
 
 | Method | Command | What It Does |
 | :--- | :--- | :--- |
-| **Instant (Zero Install)** | `npx voxforge` | Auto-detects OS, downloads pre-built binary, launches server & opens browser |
+| **Instant (Zero Install)** | `npx github:AMG555/VoxForge` | Auto-detects OS, downloads pre-built binary, launches server & opens browser |
 | **Clone & Run (Cargo)** | `git clone https://github.com/AMG555/VoxForge.git`<br>`cd VoxForge && cargo run --bin voxforge` | Builds Rust daemon + embedded React 19 UI, opens `http://localhost:8080` |
 | **Windows 1-Click** | Double-click `run.bat` | Auto-detects MSVC compiler, builds & opens workstation |
 | **Linux / macOS 1-Click** | `./run.sh` | Shell launcher for workstation daemon |
-| **Docker Container** | `docker run -d -p 8080:8080 -v voxforge-data:/app/data ghcr.io/amg555/voxforge` | Standalone container with backend & embedded UI |
+| **Docker Container** | `docker compose up -d` | Builds and launches container with backend, embedded UI & Postgres |
 
 ---
 
@@ -92,9 +92,9 @@ Pre-compiled, standalone release binaries with the embedded React 19 UI:
 
 | Platform | Download | Package Format | Details |
 | :--- | :--- | :--- | :--- |
-| **Windows 10 / 11 (Portable .exe)** | [**Download voxforge.exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge.exe) | Portable Executable (~7.2 MB) | Single zero-install binary with embedded studio UI |
+| **Windows 10 / 11 (Portable .exe)** | [**Download voxforge.exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge.exe) | Portable Executable (~7.0 MB) | Single zero-install binary with embedded studio UI |
 | **Windows 10 / 11 (Zip Bundle)** | [**Download VoxForge-Windows-x64.zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
-| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard (`.exe`) | Professional installer with desktop shortcut & uninstaller |
+| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard (`.exe`) | Professional installer with Start Menu, desktop shortcut & uninstaller |
 | **macOS (Universal)** | [**Download Universal (.tar.gz)**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal.tar.gz) | Standalone Binary | Universal binary with embedded studio UI (Apple Silicon & Intel) |
 | **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | Zero-dependency standalone executable |
 | **Integrity Checksums** | [**checksums.txt**](https://github.com/AMG555/VoxForge/releases/latest/download/checksums.txt) | SHA-256 Signatures | Verify asset integrity across all releases |
@@ -103,7 +103,7 @@ Pre-compiled, standalone release binaries with the embedded React 19 UI:
 > VoxForge is a 100% open-source utility built transparently on GitHub Actions. Because it does not carry an expensive ($400/yr) proprietary corporate Authenticode certificate, Windows Defender SmartScreen or Chromium browsers may show an "Unrecognized app" notice on new releases:
 > * **Browser Download Notice**: Click `...` next to download -> **Keep** -> **Keep anyway**.
 > * **SmartScreen Popup**: Click **More info** -> **Run anyway**.
-> * **Instant Unblock via PowerShell**: Run `Unblock-File .\voxforge.exe` or use the 1-line installer below.
+> * **Instant Unblock via PowerShell**: Run `Unblock-File .\voxforge.exe` or use the [1-line installer](#-system-install--clean-uninstall) above.
 
 ---
 
@@ -179,10 +179,10 @@ Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code direct
 
 ### 2. Docker Containers (All-in-One & Neural Stack)
 
-Launch the unified container (backend + embedded visual UI):
+Launch the unified container (backend + embedded visual UI) from a cloned repository:
 
 ```bash
-docker run -d -p 8080:8080 -v voxforge-data:/app/data ghcr.io/amg555/voxforge
+docker compose up -d
 ```
 Or start multi-service stack with persistent database and neural microservices:
 ```bash
