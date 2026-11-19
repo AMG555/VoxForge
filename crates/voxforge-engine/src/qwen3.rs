@@ -1168,6 +1168,11 @@ impl TtsEngine for Qwen3TtsEngine {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(32);
             let instruct = request.profile.metadata.get("instruct").cloned();
+            let seed: Option<u64> = request
+                .profile
+                .metadata
+                .get("seed")
+                .and_then(|s| s.parse().ok());
 
             let payload = serde_json::json!({
                 "text": request.text,
@@ -1179,6 +1184,7 @@ impl TtsEngine for Qwen3TtsEngine {
                 "pitch": request.pitch,
                 "num_step": num_step,
                 "instruct": instruct,
+                "seed": seed,
                 "mastering": true
             });
 

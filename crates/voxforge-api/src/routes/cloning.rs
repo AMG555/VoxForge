@@ -1132,6 +1132,60 @@ pub async fn blend_profiles(
     }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CheckAudioRequest {
+    pub audio_base64: String,
+}
+
+/// `POST /v1/audio/check` — scan audio for signal anomalies (clipping, silence gaps, volume jumps, DC offset).
+pub async fn check_audio_signal(
+    Json(body): Json<CheckAudioRequest>,
+) -> Result<Json<voxforge_audio::AudioSignalReport>, (StatusCode, Json<ProblemDetails>)> {
+    if body.audio_base64.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/empty-payload".to_string(),
+                title: "Missing Audio Payload".to_string(),
+                status: 400,
+                detail: "The 'audio_base64' field must not be empty".to_string(),
+                instance: "/v1/audio/check".to_string(),
+            }),
+        ));
+    }
+
+    if body.audio_base64.len() > 35 * 1024 * 1024 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Audio Payload Too Large".to_string(),
+                status: 400,
+                detail: "Audio payload exceeds maximum permitted size (35MB)".to_string(),
+                instance: "/v1/audio/check".to_string(),
+            }),
+        ));
+    }
+
+    let (samples, sample_rate, channels) =
+        decode_b64_to_pcm(&body.audio_base64).map_err(|detail| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/invalid-audio".to_string(),
+                    title: "Invalid Audio Input".to_string(),
+                    status: 400,
+                    detail,
+                    instance: "/v1/audio/check".to_string(),
+                }),
+            )
+        })?;
+
+    let report =
+        voxforge_audio::AudioAnalyzer::check_signal_anomalies(&samples, sample_rate, channels);
+    Ok(Json(report))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

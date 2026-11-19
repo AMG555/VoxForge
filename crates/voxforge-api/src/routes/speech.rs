@@ -46,6 +46,9 @@ pub struct OpenAiSpeechRequest {
     /// Optional bit depth precision (16 = standard PCM, 24 = studio master, 32 = 32-bit float).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub precision: Option<u16>,
+    /// Optional random seed for deterministic generation and take reproducibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
     /// Optional crossfade duration in ms when synthesizing multi-sentence long text. Default: 30ms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crossfade_ms: Option<u32>,
@@ -448,6 +451,11 @@ pub async fn synthesize_speech(
                         cloned_profile
                             .metadata
                             .insert("precision".to_string(), prec.to_string());
+                    }
+                    if let Some(seed) = payload.seed {
+                        cloned_profile
+                            .metadata
+                            .insert("seed".to_string(), seed.to_string());
                     }
 
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
