@@ -350,6 +350,23 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                 "properties": {}
             }),
         },
+        McpTool {
+            name: "check_audio".to_string(),
+            description: "Scan an audio recording or generated take for signal anomalies (clipping runs, extended silence holes >850ms, DC offset drift, or sudden volume jumps). Returns an anomaly report with timestamped warnings.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "audio_base64": {
+                        "type": "string",
+                        "description": "Base64 or hex-encoded WAV or PCM audio payload"
+                    },
+                    "audio_path": {
+                        "type": "string",
+                        "description": "Local filesystem path to WAV audio file"
+                    }
+                }
+            }),
+        },
     ]
 }
 

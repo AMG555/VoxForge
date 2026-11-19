@@ -1203,6 +1203,52 @@ impl McpServer {
                 }))
             }
 
+            "check_audio" => {
+                let audio_b64 = args.get("audio_base64").and_then(|b| b.as_str());
+                let audio_path = args.get("audio_path").and_then(|p| p.as_str());
+
+                let (pcm, sample_rate, channels) = if let Some(path_str) = audio_path {
+                    let safe_path = match validate_safe_input_path(path_str) {
+                        Ok(p) => p,
+                        Err(e) => return ToolCallResult::error(e),
+                    };
+                    let bytes = match std::fs::read(&safe_path) {
+                        Ok(b) => b,
+                        Err(e) => return ToolCallResult::error(format!("Read error: {e}")),
+                    };
+                    match WavEncoder::decode_wav_to_pcm16(&bytes) {
+                        Ok((samples, sr, ch)) => (samples, sr, ch),
+                        Err(e) => return ToolCallResult::error(format!("WAV decode error: {e}")),
+                    }
+                } else if let Some(b64) = audio_b64 {
+                    let bytes = match safe_decode_audio_bytes(b64) {
+                        Ok(b) => b,
+                        Err(e) => return ToolCallResult::error(e),
+                    };
+                    match WavEncoder::decode_wav_to_pcm16(&bytes) {
+                        Ok((samples, sr, ch)) => (samples, sr, ch),
+                        Err(_) => {
+                            let mut samples = Vec::with_capacity(bytes.len() / 2);
+                            for chunk in bytes.chunks_exact(2) {
+                                samples.push(i16::from_le_bytes([chunk[0], chunk[1]]));
+                            }
+                            (samples, 24000, 1)
+                        }
+                    }
+                } else {
+                    return ToolCallResult::error(
+                        "Either 'audio_path' or 'audio_base64' is required",
+                    );
+                };
+
+                let report = voxforge_audio::AudioAnalyzer::check_signal_anomalies(
+                    &pcm,
+                    sample_rate,
+                    channels,
+                );
+                ToolCallResult::json(&report)
+            }
+
             unknown => ToolCallResult::error(format!("Unknown tool: '{unknown}'")),
         }
     }
