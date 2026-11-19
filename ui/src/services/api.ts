@@ -63,6 +63,7 @@ export const api = {
     crossfade_ms?: number;
     num_step?: number;
     precision?: number;
+    seed?: number;
   }): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/audio/speech`, {
       method: 'POST',
@@ -86,6 +87,7 @@ export const api = {
         num_step: options.num_step,
         precision: options.precision,
         crossfade_ms: options.crossfade_ms,
+        seed: options.seed,
         response_format: 'wav',
       }),
     });
@@ -486,6 +488,44 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Voice verification failed' }));
       throw new Error(err.detail || 'Voice verification failed');
+    }
+    return res.json();
+  },
+
+  async checkAudioSignal(audioBase64: string): Promise<{
+    metrics: {
+      duration_seconds: number;
+      sample_rate: number;
+      channels: number;
+      total_samples: number;
+      peak_amplitude: number;
+      peak_dbfs: number;
+      rms_amplitude: number;
+      rms_dbfs: number;
+      clipping_samples_count: number;
+      is_silent: boolean;
+      snr_estimate_db: number;
+    };
+    is_clean: boolean;
+    warnings_count: number;
+    anomalies: Array<{
+      kind: 'Clipping' | 'LongSilence' | 'RelativeVolumeJump' | 'DcOffset' | 'EmptyAudio' | 'InvalidSample';
+      severity: 'Info' | 'Warning' | 'Critical';
+      timestamp_seconds: number;
+      duration_seconds?: number;
+      value: number;
+      message: string;
+    }>;
+    scan_bounded: boolean;
+  }> {
+    const res = await fetch(`${BASE_URL}/v1/audio/check`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ audio_base64: audioBase64 }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Audio signal check failed' }));
+      throw new Error(err.detail || 'Audio signal check failed');
     }
     return res.json();
   },

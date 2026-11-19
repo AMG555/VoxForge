@@ -30,6 +30,11 @@ import {
   ArrowRightLeft,
   BookA,
   History,
+  Lock,
+  Unlock,
+  Dice5,
+  ShieldCheck,
+  Gauge,
 } from 'lucide-react';
 import { Voice } from '../../types';
 import { api } from '../../services/api';
@@ -73,6 +78,10 @@ export interface VoiceTake {
   speed: number;
   pitch: number;
   instruct?: string;
+  seed?: number;
+  precision?: 16 | 24 | 32;
+  num_step?: number;
+  renderTimeMs?: number;
 }
 
 interface VoiceLabProps {
@@ -599,6 +608,43 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   // Studio parameters: Refinement Steps (Sampling Steps) and Export Precision
   const [refinementSteps, setRefinementSteps] = useState<number>(32); // 8-64 steps, 32 = Best Quality
   const [audioPrecision, setAudioPrecision] = useState<16 | 24 | 32>(16); // 16-bit, 24-bit, 32-bit float
+  // Deterministic seed management
+  const [pinnedSeed, setPinnedSeed] = useState<number | null>(null);
+  const [activeSeed, setActiveSeed] = useState<number>(() => Math.floor(Math.random() * 899999) + 100000);
+  // Audio diagnostic signal report
+  const [signalReport, setSignalReport] = useState<any | null>(null);
+  const [isScanningSignal, setIsScanningSignal] = useState<boolean>(false);
+  const [activeSignalTakeId, setActiveSignalTakeId] = useState<string | null>(null);
+  // Adaptive slow render heuristic suggestion
+  const [slowRenderNotice, setSlowRenderNotice] = useState<{
+    durationSec: number;
+    renderTimeSec: number;
+    currentSteps: number;
+  } | null>(null);
+
+  const handleCheckAudio = async (blob: Blob, takeId?: string) => {
+    setIsScanningSignal(true);
+    setActiveSignalTakeId(takeId || 'active');
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          resolve(res);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(blob);
+      const b64 = await base64Promise;
+      const report = await api.checkAudioSignal(b64);
+      setSignalReport(report);
+    } catch (err) {
+      console.error('Audio signal check failed:', err);
+    } finally {
+      setIsScanningSignal(false);
+    }
+  };
+
   const [languageSearchTerm, setLanguageSearchTerm] = useState<string>('');
   // Multi-sample additional reference audio for enhanced embedding accuracy
   const [additionalSamples, setAdditionalSamples] = useState<{ name: string; base64: string }[]>([]);
@@ -712,6 +758,9 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       }
 
       let blob: Blob;
+      const renderStartTime = performance.now();
+      const currentSeed = pinnedSeed ?? activeSeed;
+
       // Ensure target voice matches language family ONLY if autoMatchVoice is active AND user has not manually chosen a voice
       let voiceToSynthesize = selectedVoice.id;
       if (!manualVoiceOverrideRef.current && autoMatchVoice && detectedLang.suggestedVoiceId) {
@@ -737,6 +786,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           instruct: instruct.trim() || undefined,
           num_step: refinementSteps,
           precision: audioPrecision,
+          seed: currentSeed,
         });
       } catch (backendErr) {
         console.warn('Backend synthesis unreachable; falling back to studio reference synthesis sample:', backendErr);
@@ -752,6 +802,18 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         } catch (masteringErr) {
           console.warn('Studio mastering DSP error, using direct audio:', masteringErr);
         }
+      }
+
+      const renderTimeMs = Math.round(performance.now() - renderStartTime);
+      const renderTimeSec = renderTimeMs / 1000;
+      if (renderTimeSec >= 15 && refinementSteps > 16) {
+        setSlowRenderNotice({
+          durationSec: Math.max(1, Math.round(promptText.length / 15)),
+          renderTimeSec: Math.round(renderTimeSec),
+          currentSteps: refinementSteps,
+        });
+      } else {
+        setSlowRenderNotice(null);
       }
 
       const url = URL.createObjectURL(blob);
@@ -774,9 +836,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         speed,
         pitch,
         instruct: instruct.trim() || undefined,
+        seed: currentSeed,
+        precision: audioPrecision,
+        num_step: refinementSteps,
+        renderTimeMs,
       };
       setTakes((prev) => [newTake, ...prev]);
       setActiveTakeId(newTake.id);
+      if (!pinnedSeed) {
+        setActiveSeed(Math.floor(Math.random() * 899999) + 100000);
+      }
     } catch (err: any) {
       console.error('Synthesis error:', err);
     } finally {
@@ -1699,6 +1768,55 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   </strong>
                 </span>
               )}
+
+              {/* Seed Controller */}
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border border-[#242E3D] bg-[#0B0E14] text-xs font-mono">
+                <span className="text-[#64748B]">Seed:</span>
+                <span className="font-bold text-white">{pinnedSeed ?? activeSeed}</span>
+                <button
+                  type="button"
+                  onClick={() => setPinnedSeed(pinnedSeed ? null : activeSeed)}
+                  className={`p-1 rounded hover:bg-[#1A222D] transition-colors ${
+                    pinnedSeed ? 'text-amber-400' : 'text-[#64748B]'
+                  }`}
+                  title={pinnedSeed ? 'Seed pinned (locked across takes). Click to unpin.' : 'Pin this seed to make future takes deterministic'}
+                >
+                  {pinnedSeed ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                </button>
+                {!pinnedSeed && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveSeed(Math.floor(Math.random() * 899999) + 100000)}
+                    className="p-1 rounded text-[#64748B] hover:text-white hover:bg-[#1A222D] transition-colors"
+                    title="Roll new random seed"
+                  >
+                    <Dice5 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* WAV Precision Selector */}
+              <div className="flex items-center bg-[#0B0E14] p-0.5 rounded-lg border border-[#242E3D]">
+                {[
+                  { bits: 16, label: '16-bit' },
+                  { bits: 24, label: '24-bit' },
+                  { bits: 32, label: '32-bit Float' },
+                ].map((p) => (
+                  <button
+                    key={p.bits}
+                    type="button"
+                    onClick={() => setAudioPrecision(p.bits as 16 | 24 | 32)}
+                    className={`px-2 py-1 rounded text-[11px] font-mono transition-colors ${
+                      audioPrecision === p.bits
+                        ? 'bg-amber-500 text-black font-bold shadow'
+                        : 'text-[#94A3B8] hover:text-white'
+                    }`}
+                    title={p.bits === 32 ? '32-bit float lossless export' : `${p.bits}-bit PCM export`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
 
               {selectedVoice && getEngineBadge(selectedVoice.engine_id)}
             </div>
@@ -2877,6 +2995,36 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           )}
 
           <div className="space-y-4">
+            {slowRenderNotice && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-2.5 text-xs font-mono text-amber-300 animate-in fade-in duration-150">
+                <div className="flex items-center space-x-2">
+                  <Gauge className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    Previous take took <strong>{slowRenderNotice.renderTimeSec}s</strong> at {slowRenderNotice.currentSteps} refinement steps. Switch to 16 steps for ~2x faster rendering?
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefinementSteps(16);
+                      setSlowRenderNotice(null);
+                    }}
+                    className="px-2.5 py-1 rounded bg-amber-500 text-black font-semibold text-xs hover:bg-amber-400 transition-colors"
+                  >
+                    Use 16 Steps (Faster)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSlowRenderNotice(null)}
+                    className="px-2 py-1 rounded bg-[#1A222D] text-[#94A3B8] hover:text-white text-xs transition-colors"
+                  >
+                    Keep {slowRenderNotice.currentSteps}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {studioPlaygroundMode === 'tts' && (
               canGenerate ? (
                 <div className="flex items-center space-x-4">
@@ -2950,12 +3098,119 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     <span>{isVerifyingVoice ? 'Auditing...' : 'Audit Biometric Match'}</span>
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => lastSynthesizedBlob && handleCheckAudio(lastSynthesizedBlob, activeTakeId || 'active')}
+                  disabled={!lastSynthesizedBlob || isScanningSignal}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap disabled:opacity-50 border ${
+                    signalReport && activeSignalTakeId === (activeTakeId || 'active')
+                      ? signalReport.is_clean
+                        ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/40'
+                        : 'text-amber-300 bg-amber-500/15 border-amber-500/40'
+                      : 'text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/30'
+                  }`}
+                  title="Run acoustic signal diagnostics (clipping, silence, volume jumps, DC offset)"
+                >
+                  {isScanningSignal && activeSignalTakeId === (activeTakeId || 'active') ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                  ) : (
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  )}
+                  <span>Check Audio</span>
+                </button>
               </div>
 
               <AudioVisualizer
                 audioElement={audioRef.current}
                 isPlaying={isPlaying}
               />
+
+              {signalReport && activeSignalTakeId === (activeTakeId || 'active') && (
+                <div className="p-3.5 rounded-xl bg-[#0B0E14] border border-[#242E3D] space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheck className={`w-4 h-4 ${signalReport.is_clean ? 'text-emerald-400' : 'text-amber-400'}`} />
+                      <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                        Signal Health Diagnostic Report
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
+                        signalReport.is_clean
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {signalReport.is_clean ? '✓ CLEAN SIGNAL' : `⚠ ${signalReport.warnings_count} ANOMALIES`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSignalReport(null)}
+                        className="text-[#64748B] hover:text-white p-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-mono">
+                    <div className="bg-[#121820] p-2 rounded border border-[#1A222D]">
+                      <span className="text-[#64748B] block">Peak Level</span>
+                      <span className="text-white font-bold">{signalReport.metrics.peak_dbfs.toFixed(1)} dBFS</span>
+                    </div>
+                    <div className="bg-[#121820] p-2 rounded border border-[#1A222D]">
+                      <span className="text-[#64748B] block">RMS Energy</span>
+                      <span className="text-white font-bold">{signalReport.metrics.rms_dbfs.toFixed(1)} dBFS</span>
+                    </div>
+                    <div className="bg-[#121820] p-2 rounded border border-[#1A222D]">
+                      <span className="text-[#64748B] block">Est. SNR</span>
+                      <span className="text-white font-bold">{signalReport.metrics.snr_estimate_db.toFixed(1)} dB</span>
+                    </div>
+                    <div className="bg-[#121820] p-2 rounded border border-[#1A222D]">
+                      <span className="text-[#64748B] block">Duration / Rate</span>
+                      <span className="text-white font-bold">{signalReport.metrics.duration_seconds.toFixed(2)}s @ {signalReport.metrics.sample_rate / 1000}kHz</span>
+                    </div>
+                  </div>
+
+                  {signalReport.anomalies.length > 0 ? (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {signalReport.anomalies.map((anomaly: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded bg-[#121820] border border-[#242E3D] text-[11px]"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${
+                              anomaly.severity === 'Critical'
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-amber-500/20 text-amber-300'
+                            }`}>
+                              {anomaly.kind}
+                            </span>
+                            <span className="text-[#CBD5E1]">{anomaly.message}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (audioRef.current) {
+                                audioRef.current.currentTime = anomaly.timestamp_seconds;
+                                audioRef.current.play().catch(() => {});
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1A222D] hover:bg-amber-500 hover:text-black text-amber-400 font-semibold border border-amber-500/30 transition-colors"
+                          >
+                            Seek {anomaly.timestamp_seconds.toFixed(2)}s
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-emerald-400/90 font-mono">
+                      ✓ No clipping runs, no prolonged digital silence holes, no sudden dynamic jumps detected.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {verificationError && (
                 <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between animate-in fade-in duration-200">
@@ -3177,6 +3432,26 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                                 DSP MASTERED
                               </span>
                             )}
+                            {take.precision && (
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                {take.precision === 32 ? '32-bit Float' : `${take.precision}-bit`}
+                              </span>
+                            )}
+                            {take.num_step && (
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                {take.num_step} steps
+                              </span>
+                            )}
+                            {take.seed && (
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#1A222D] text-[#94A3B8] border border-[#242E3D]">
+                                Seed: {take.seed}
+                              </span>
+                            )}
+                            {take.renderTimeMs && (
+                              <span className="text-[9px] font-mono text-[#64748B]">
+                                {(take.renderTimeMs / 1000).toFixed(1)}s
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-[#CBD5E1] line-clamp-1 italic">
                             "{take.text}"
@@ -3189,6 +3464,27 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                         </div>
 
                         <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCheckAudio(take.blob, take.id)}
+                            disabled={isScanningSignal}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center space-x-1 border transition-colors ${
+                              activeSignalTakeId === take.id && signalReport
+                                ? signalReport.is_clean
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                  : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                : 'bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white border-[#242E3D]'
+                            }`}
+                            title="Run acoustic signal diagnostics"
+                          >
+                            {isScanningSignal && activeSignalTakeId === take.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                            ) : (
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                            )}
+                            <span>Check</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => {
