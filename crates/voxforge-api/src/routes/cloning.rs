@@ -391,6 +391,15 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
 
     if out.len() >= 12 && &out[0..4] == b"RIFF" && &out[8..12] == b"WAVE" {
         if let Ok((pcm, sr, ch)) = voxforge_audio::WavEncoder::decode_wav_to_pcm16(&out) {
+            if ch > 1 {
+                let channels = ch as usize;
+                let mut mono = Vec::with_capacity(pcm.len() / channels);
+                for frame in pcm.chunks_exact(channels) {
+                    let sum: i32 = frame.iter().map(|&s| s as i32).sum();
+                    mono.push((sum / channels as i32) as i16);
+                }
+                return Ok((mono, sr, 1));
+            }
             return Ok((pcm, sr, ch));
         }
     }
@@ -599,8 +608,8 @@ pub async fn verify_voice(
                     }
                 } else if let Some(ref path) = profile.reference_audio_path {
                     if let Ok(bytes) = std::fs::read(path) {
-                        if let Ok((samples, _, _)) =
-                            voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
+                        if let Ok((samples, _)) =
+                            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
                         {
                             return voxforge_engine::Qwen3TtsEngine::extract_speaker_embedding(
                                 &samples,

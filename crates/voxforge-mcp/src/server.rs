@@ -629,8 +629,8 @@ impl McpServer {
                             Ok(b) => b,
                             Err(e) => return ToolCallResult::error(format!("Read error: {e}")),
                         };
-                        match WavEncoder::decode_wav_to_pcm16(&bytes) {
-                            Ok((samples, sr, _)) => (samples, sr),
+                        match WavEncoder::decode_wav_to_mono_pcm16(&bytes) {
+                            Ok((samples, sr)) => (samples, sr),
                             Err(e) => {
                                 return ToolCallResult::error(format!("WAV decode error: {e}"))
                             }
@@ -641,8 +641,8 @@ impl McpServer {
                         Ok(b) => b,
                         Err(e) => return ToolCallResult::error(e),
                     };
-                    match WavEncoder::decode_wav_to_pcm16(&bytes) {
-                        Ok((samples, sr, _)) => (samples, sr),
+                    match WavEncoder::decode_wav_to_mono_pcm16(&bytes) {
+                        Ok((samples, sr)) => (samples, sr),
                         Err(_) => {
                             // Raw 16-bit PCM fallback
                             let mut samples = Vec::with_capacity(bytes.len() / 2);
@@ -727,8 +727,8 @@ impl McpServer {
                         Ok(b) => b,
                         Err(e) => return ToolCallResult::error(format!("Read error: {e}")),
                     };
-                    match WavEncoder::decode_wav_to_pcm16(&bytes) {
-                        Ok((samples, sr, _)) => (samples, sr),
+                    match WavEncoder::decode_wav_to_mono_pcm16(&bytes) {
+                        Ok((samples, sr)) => (samples, sr),
                         Err(e) => return ToolCallResult::error(format!("WAV decode error: {e}")),
                     }
                 } else if let Some(b64) = source_b64 {
@@ -736,8 +736,8 @@ impl McpServer {
                         Ok(b) => b,
                         Err(e) => return ToolCallResult::error(e),
                     };
-                    match WavEncoder::decode_wav_to_pcm16(&bytes) {
-                        Ok((samples, sr, _)) => (samples, sr),
+                    match WavEncoder::decode_wav_to_mono_pcm16(&bytes) {
+                        Ok((samples, sr)) => (samples, sr),
                         Err(e) => return ToolCallResult::error(format!("WAV decode error: {e}")),
                     }
                 } else {

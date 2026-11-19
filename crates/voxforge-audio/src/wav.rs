@@ -151,6 +151,26 @@ impl WavEncoder {
 
         Ok((pcm_samples, spec.sample_rate, spec.channels))
     }
+
+    /// Decode a WAV payload and guarantee clean mono output.
+    ///
+    /// Multi-channel and stereo WAV files (e.g. mobile/studio dual-capsule recordings)
+    /// are downmixed by averaging channels. This prevents pitch detection (YIN/autocorrelation),
+    /// formant tracking, and DSP chains from receiving phase-corrupted interleaved samples.
+    pub fn decode_wav_to_mono_pcm16(wav_bytes: &[u8]) -> Result<(Vec<i16>, u32)> {
+        let (samples, sr, channels) = Self::decode_wav_to_pcm16(wav_bytes)?;
+        if channels <= 1 {
+            Ok((samples, sr))
+        } else {
+            let ch = channels as usize;
+            let mut mono = Vec::with_capacity(samples.len() / ch);
+            for frame in samples.chunks_exact(ch) {
+                let sum: i32 = frame.iter().map(|&s| s as i32).sum();
+                mono.push((sum / ch as i32) as i16);
+            }
+            Ok((mono, sr))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -188,5 +208,17 @@ mod tests {
         for (a, b) in original.iter().zip(decoded.iter()) {
             assert!((a - b).abs() <= 1);
         }
+    }
+
+    #[test]
+    fn test_decode_wav_to_mono_pcm16_stereo_downmix() {
+        // Interleaved stereo samples: L=1000, R=3000 -> avg 2000; L=-4000, R=-2000 -> avg -3000
+        let stereo_samples: Vec<i16> = vec![1000, 3000, -4000, -2000];
+        let bytes = WavEncoder::encode_pcm_to_wav_with_precision(&stereo_samples, 24000, 2, 16).unwrap();
+        let (mono, sr) = WavEncoder::decode_wav_to_mono_pcm16(&bytes).unwrap();
+        assert_eq!(sr, 24000);
+        assert_eq!(mono.len(), 2);
+        assert_eq!(mono[0], 2000);
+        assert_eq!(mono[1], -3000);
     }
 }

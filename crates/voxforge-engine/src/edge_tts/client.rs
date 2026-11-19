@@ -347,5 +347,17 @@ pub fn decode_mp3_to_pcm(mp3_bytes: &[u8]) -> Result<(u32, u16, Vec<i16>)> {
         }
     }
 
+    // If decoded audio is multi-channel/stereo, downmix to clean mono for downstream DSP processing
+    if channels > 1 {
+        let ch = channels as usize;
+        let mut mono = Vec::with_capacity(pcm_samples.len() / ch);
+        for frame in pcm_samples.chunks_exact(ch) {
+            let sum: i32 = frame.iter().map(|&s| s as i32).sum();
+            mono.push((sum / ch as i32) as i16);
+        }
+        pcm_samples = mono;
+        channels = 1;
+    }
+
     Ok((sample_rate, channels, pcm_samples))
 }

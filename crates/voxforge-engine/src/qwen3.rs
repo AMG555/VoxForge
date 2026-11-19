@@ -698,8 +698,7 @@ impl TtsEngine for Qwen3TtsEngine {
         let (pcm, ref_features) = if let Some(ref b64) = request.reference_audio_base64 {
             let bytes = decode_audio_payload(b64);
             let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                    .map(|(samples, sr, _)| (samples, sr))
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
                     .unwrap_or_else(|_| {
                         (
                             bytes
@@ -771,8 +770,7 @@ impl TtsEngine for Qwen3TtsEngine {
                 VoxForgeError::Config(format!("Failed reading reference audio file: {e}"))
             })?;
             let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                    .map(|(samples, sr, _)| (samples, sr))
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
                     .unwrap_or_else(|_| {
                         (
                             bytes
@@ -846,8 +844,7 @@ impl TtsEngine for Qwen3TtsEngine {
             let extra_bytes = decode_audio_payload(extra_b64);
             let (extra_samples_raw, extra_sr): (Vec<i16>, u32) = if extra_bytes.starts_with(b"RIFF")
             {
-                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&extra_bytes)
-                    .map(|(s, sr, _)| (s, sr))
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&extra_bytes)
                     .unwrap_or_default()
             } else {
                 (
@@ -1070,8 +1067,7 @@ impl TtsEngine for Qwen3TtsEngine {
         // Decode and extract embedding from the new sample
         let bytes = decode_audio_payload(new_reference_audio_base64);
         let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-            voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                .map(|(s, sr, _)| (s, sr))
+            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
                 .unwrap_or_default()
         } else {
             (
@@ -1223,9 +1219,7 @@ impl TtsEngine for Qwen3TtsEngine {
         let ref_audio_opt = if let Some(ref b64) = request.profile.reference_audio_base64 {
             let bytes = decode_audio_payload(b64);
             if bytes.starts_with(b"RIFF") {
-                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                    .ok()
-                    .map(|(pcm, sr, _)| (pcm, sr))
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes).ok()
             } else {
                 let pcm: Vec<i16> = bytes
                     .chunks_exact(2)
@@ -1236,9 +1230,7 @@ impl TtsEngine for Qwen3TtsEngine {
         } else if let Some(ref path_str) = request.profile.reference_audio_path {
             if let Ok(bytes) = std::fs::read(path_str) {
                 if bytes.starts_with(b"RIFF") {
-                    voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                        .ok()
-                        .map(|(pcm, sr, _)| (pcm, sr))
+                    voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes).ok()
                 } else {
                     None
                 }
