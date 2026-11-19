@@ -48,6 +48,8 @@ voxforge.db
 *.pcm
 build.bat
 run_tests.bat
+.playwright-mcp/
+verify/
 run_clippy.bat
 build_release.bat
 clean.bat

@@ -289,13 +289,24 @@ mod tests {
 
     #[test]
     fn test_sec_ms_gec_token_calculation() {
-        use crate::edge_tts::generate_sec_ms_gec;
+        use crate::edge_tts::client::{generate_sec_ms_gec, generate_sec_ms_gec_at};
 
+        // Current time token format
         let token = generate_sec_ms_gec();
-        assert_eq!(token.len(), 64);
-        assert!(token
-            .chars()
-            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert_eq!(token.len(), 81);
+        let parts: Vec<&str> = token.split('-').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].len(), 16);
+        assert_eq!(parts[1].len(), 64);
+        assert!(parts[0].chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert!(parts[1].chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+
+        // Golden vector verification for deterministic timestamp 1700000000.0
+        let golden = generate_sec_ms_gec_at(1700000000.0);
+        assert_eq!(
+            golden,
+            "2CD23A2CA0B2595A-F3C846C370E05F9CC83ACC5F995C5F5D87A4D0F14CE8936A0F902E64099E38A2"
+        );
     }
 
     #[test]

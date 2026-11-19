@@ -1577,7 +1577,7 @@ impl TtsEngine for Qwen3TtsEngine {
         voxforge_audio::PhraseLeveler::process(&mut chunk.pcm_data, chunk.sample_rate);
 
         // 11b. Studio peak normalization & brickwall limiting (look-ahead, 5ms, 40ms release)
-        let max_amp = chunk.pcm_data.iter().map(|&s| s.abs()).max().unwrap_or(0) as f32;
+        let max_amp = chunk.pcm_data.iter().map(|&s| s.unsigned_abs() as u32).max().unwrap_or(0) as f32;
         if max_amp > 100.0 && max_amp < 28000.0 {
             let gain = (28000.0 / max_amp).min(1.6);
             for s in &mut chunk.pcm_data {
