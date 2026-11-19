@@ -46,6 +46,12 @@ pub struct DubRequest {
     /// Audio output format (wav / pcm). Default: wav.
     #[serde(default)]
     pub response_format: Option<AudioContainerFormat>,
+    /// Optional bit depth precision (16 = standard PCM, 24 = studio master, 32 = 32-bit float).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u16>,
+    /// Optional studio mastering pass (EQ + 3:1 broadcast compressor + de-esser + peak safety).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mastering: Option<bool>,
 }
 
 /// Per-line synthesis result returned alongside the mixed audio.
@@ -210,16 +216,36 @@ pub async fn dub_script(
         .max()
         .unwrap_or(0);
 
-    // Mix into a single flat buffer.
-    let mut mixed: Vec<i16> = vec![0i16; total_samples];
+    // Mix into a 32-bit float buffer to eliminate clipping and saturation distortion
+    // when multiple speakers overlap or cue timestamps coincide.
+    let mut mixed_f32: Vec<f32> = vec![0.0f32; total_samples];
     for seg in &segments {
         for (i, &sample) in seg.pcm.iter().enumerate() {
             let idx = seg.start_sample + i;
-            if idx < mixed.len() {
-                // Simple additive mixing with saturation to avoid wrapping artefacts.
-                mixed[idx] = mixed[idx].saturating_add(sample);
+            if idx < mixed_f32.len() {
+                mixed_f32[idx] += sample as f32;
             }
         }
+    }
+
+    // Peak-normalize headroom if cumulative amplitude exceeds 32000.0
+    let max_amp = mixed_f32.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+    let scale = if max_amp > 32000.0 {
+        32000.0 / max_amp
+    } else {
+        1.0
+    };
+    let mut mixed: Vec<i16> = mixed_f32
+        .iter()
+        .map(|&s| (s * scale).clamp(-32767.0, 32767.0) as i16)
+        .collect();
+
+    // Studio look-ahead brickwall limiter guarantees -0.5 dBFS true-peak safety
+    voxforge_audio::BrickwallLimiter::process_sr(&mut mixed, -0.5, sample_rate);
+
+    // Optional mastering profile pass (Broadcast EQ, 3:1 compressor, de-esser)
+    if body.mastering.unwrap_or(false) {
+        voxforge_audio::MasteringProfile::Broadcast.apply(&mut mixed, sample_rate);
     }
 
     // Build per-line result metadata.
@@ -233,25 +259,27 @@ pub async fn dub_script(
         .collect();
 
     let total_duration_seconds = total_samples as f64 / sample_rate as f64;
+    let precision = body.precision.unwrap_or(16);
 
-    // Encode to WAV / PCM and base64.
+    // Encode to WAV / PCM and base64 with requested bit depth precision (16/24/32-bit).
     let audio_bytes = match format {
         AudioContainerFormat::Pcm => mixed
             .iter()
             .flat_map(|s| s.to_le_bytes())
             .collect::<Vec<u8>>(),
-        _ => WavEncoder::encode_pcm16_to_wav(&mixed, sample_rate, 1).map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ProblemDetails {
-                    problem_type: "https://voxforge.org/errors/encoding-failure".to_string(),
-                    title: "Audio Encoding Error".to_string(),
-                    status: 500,
-                    detail: e.to_string(),
-                    instance: "/v1/audio/dub".to_string(),
-                }),
-            )
-        })?,
+        _ => WavEncoder::encode_pcm_to_wav_with_precision(&mixed, sample_rate, 1, precision)
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ProblemDetails {
+                        problem_type: "https://voxforge.org/errors/encoding-failure".to_string(),
+                        title: "Audio Encoding Error".to_string(),
+                        status: 500,
+                        detail: e.to_string(),
+                        instance: "/v1/audio/dub".to_string(),
+                    }),
+                )
+            })?,
     };
 
     let audio_base64 = base64_encode(&audio_bytes);
@@ -415,5 +443,14 @@ mod tests {
         assert!(line.start_seconds.is_none());
         assert!(line.speed.is_none());
         assert!(line.pitch.is_none());
+    }
+
+    #[test]
+    fn test_dub_request_precision_and_mastering() {
+        let json = r#"{"script":[{"speaker":"bob","text":"Testing mastering and 24-bit audio."}],"precision":24,"mastering":true}"#;
+        let req: DubRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.precision, Some(24));
+        assert_eq!(req.mastering, Some(true));
+        assert_eq!(req.script.len(), 1);
     }
 }
