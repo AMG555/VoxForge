@@ -112,6 +112,19 @@ pub async fn create_checkpoint_handler(
     State(_state): State<AppState>,
     Json(body): Json<CreateJobRequest>,
 ) -> Result<(StatusCode, Json<JobCheckpointManifest>), (StatusCode, Json<ProblemDetails>)> {
+    if body.chapters.len() > 5000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/too-many-chapters".to_string(),
+                title: "Too Many Chapters".to_string(),
+                status: 400,
+                detail: "Exceeded maximum allowed chapters per job (5,000)".to_string(),
+                instance: "/v1/jobs/checkpoint".to_string(),
+            }),
+        ));
+    }
+
     let work_dir = get_work_dir(&body.job_id);
 
     let mut manifest = JobCheckpointManifest::new(body.job_id, body.job_type, body.title);
@@ -191,6 +204,19 @@ pub async fn parse_manuscript_handler(
                 title: "Missing Manuscript Text".to_string(),
                 status: 400,
                 detail: "The 'manuscript_text' field cannot be empty".to_string(),
+                instance: "/v1/jobs/parse-manuscript".to_string(),
+            }),
+        ));
+    }
+
+    if body.manuscript_text.len() > 10 * 1024 * 1024 {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
+                title: "Manuscript Payload Too Large".to_string(),
+                status: 413,
+                detail: "Manuscript payload exceeds maximum permitted size of 10MB (~2,000,000 words)".to_string(),
                 instance: "/v1/jobs/parse-manuscript".to_string(),
             }),
         ));
