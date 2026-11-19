@@ -29,6 +29,7 @@ import {
   Languages,
   ArrowRightLeft,
   BookA,
+  BookOpen,
   History,
   Lock,
   Unlock,
@@ -41,6 +42,7 @@ import { api } from '../../services/api';
 import { AudioVisualizer } from '../common/AudioVisualizer';
 import { PronunciationModal } from './PronunciationModal';
 import { VoiceTipsModal } from './VoiceTipsModal';
+import { ManuscriptModal } from './ManuscriptModal';
 import {
   AudioProcessor,
   AudioQualityAssessment,
@@ -183,6 +185,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   // Voice Design Studio State
   const [showDesignModal, setShowDesignModal] = useState<boolean>(false);
   const [showPronunciationModal, setShowPronunciationModal] = useState<boolean>(false);
+  const [showManuscriptModal, setShowManuscriptModal] = useState<boolean>(false);
   const [showTipsModal, setShowTipsModal] = useState<boolean>(false);
   const [designPrompt, setDesignPrompt] = useState<string>('');
   const [designName, setDesignName] = useState<string>('');
@@ -1542,6 +1545,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           >
             <BookA className="w-3 h-3 text-amber-400" />
             <span>Pronunciation Lexicon</span>
+          </button>
+          <button
+            onClick={() => setShowManuscriptModal(true)}
+            className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded bg-[#161D26] hover:bg-[#1E2633] text-emerald-300 hover:text-white border border-[#242E3D] text-[11px] font-mono transition-colors"
+            title="Import audiobook markdown manuscript and split chapters with time estimates"
+          >
+            <BookOpen className="w-3 h-3 text-emerald-400" />
+            <span>Audiobook Manuscript</span>
           </button>
           <input
             ref={personaFileInputRef}
@@ -4696,6 +4707,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       <PronunciationModal
         isOpen={showPronunciationModal}
         onClose={() => setShowPronunciationModal(false)}
+      />
+
+      {/* Audiobook Manuscript Modal */}
+      <ManuscriptModal
+        isOpen={showManuscriptModal}
+        onClose={() => setShowManuscriptModal(false)}
+        onLoadChapter={(chapterText, _chapterTitle) => {
+          setText(chapterText);
+          setSpokenPrompt(chapterText);
+        }}
       />
 
       {/* Voice Optimization & Realism Tips Modal */}

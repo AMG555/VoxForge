@@ -529,4 +529,33 @@ export const api = {
     }
     return res.json();
   },
+
+  async parseManuscript(options: {
+    manuscript_text: string;
+    max_words_per_chapter?: number;
+  }): Promise<{
+    title: string;
+    total_chapters: number;
+    total_words: number;
+    estimated_duration_minutes: number;
+    chapters: Array<{
+      index: number;
+      title: string;
+      word_count: number;
+      estimated_duration_minutes: number;
+      text: string;
+      sha256_hash: string;
+    }>;
+  }> {
+    const res = await fetch(`${BASE_URL}/v1/jobs/parse-manuscript`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(options),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Manuscript parse failed' }));
+      throw new Error(err.detail || 'Manuscript parse failed');
+    }
+    return res.json();
+  },
 };
