@@ -163,6 +163,115 @@ impl JobCheckpointManifest {
 
         Ok(Some(manifest))
     }
+
+    /// Automatically parse a raw markdown manuscript or text document into structured chapters.
+    ///
+    /// Detects Markdown headings (`#`, `##`, `###`) and `Chapter <number>` lines.
+    /// If no chapter headings are detected, splits along paragraph boundaries into ~1,000-word sections.
+    pub fn parse_manuscript(
+        raw_text: &str,
+        default_voice: &str,
+        default_speed: f32,
+    ) -> Vec<ChapterTask> {
+        let mut chapters: Vec<ChapterTask> = Vec::new();
+        let lines: Vec<&str> = raw_text.lines().collect();
+
+        // Pass 1: detect if any chapter headings exist
+        let mut heading_indices: Vec<(usize, String)> = Vec::new();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("# ")
+                || trimmed.starts_with("## ")
+                || trimmed.starts_with("### ")
+            {
+                let title = trimmed.trim_start_matches('#').trim().to_string();
+                if !title.is_empty() {
+                    heading_indices.push((i, title));
+                }
+            } else if trimmed.to_lowercase().starts_with("chapter ") {
+                heading_indices.push((i, trimmed.to_string()));
+            }
+        }
+
+        if !heading_indices.is_empty() {
+            for (idx, (line_idx, title)) in heading_indices.iter().enumerate() {
+                let start_line = line_idx + 1;
+                let end_line = if idx + 1 < heading_indices.len() {
+                    heading_indices[idx + 1].0
+                } else {
+                    lines.len()
+                };
+
+                let chapter_lines = &lines[start_line..end_line];
+                let chapter_text = chapter_lines.join("\n").trim().to_string();
+
+                if !chapter_text.is_empty() {
+                    let index = chapters.len();
+                    let content_hash = Self::compute_hash(&chapter_text, default_voice, default_speed);
+                    chapters.push(ChapterTask {
+                        index,
+                        title: title.clone(),
+                        text: chapter_text,
+                        voice_id: default_voice.to_string(),
+                        speed: default_speed,
+                        content_hash,
+                        status: TaskStatus::Pending,
+                    });
+                }
+            }
+        } else {
+            // Split into ~1,000-word sections along paragraph boundaries
+            let paragraphs: Vec<&str> = raw_text.split("\n\n").collect();
+            let mut current_chunk = Vec::new();
+            let mut current_word_count = 0usize;
+
+            for p in paragraphs {
+                let trimmed = p.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                let words = trimmed.split_whitespace().count();
+                current_chunk.push(trimmed);
+                current_word_count += words;
+
+                if current_word_count >= 1000 {
+                    let text = current_chunk.join("\n\n");
+                    let index = chapters.len();
+                    let title = format!("Section {}", index + 1);
+                    let content_hash = Self::compute_hash(&text, default_voice, default_speed);
+                    chapters.push(ChapterTask {
+                        index,
+                        title,
+                        text,
+                        voice_id: default_voice.to_string(),
+                        speed: default_speed,
+                        content_hash,
+                        status: TaskStatus::Pending,
+                    });
+                    current_chunk.clear();
+                    current_word_count = 0;
+                }
+            }
+
+            if !current_chunk.is_empty() {
+                let text = current_chunk.join("\n\n");
+                let index = chapters.len();
+                let title = format!("Section {}", index + 1);
+                let content_hash = Self::compute_hash(&text, default_voice, default_speed);
+                chapters.push(ChapterTask {
+                    index,
+                    title,
+                    text,
+                    voice_id: default_voice.to_string(),
+                    speed: default_speed,
+                    content_hash,
+                    status: TaskStatus::Pending,
+                });
+            }
+        }
+
+        chapters
+    }
 }
 
 #[cfg(test)]
@@ -215,5 +324,32 @@ mod tests {
         assert_eq!(manifest.completed_chapters, 2);
         assert_eq!(manifest.get_remaining_indices(), Vec::<usize>::new());
         assert!(manifest.is_finished());
+    }
+
+    #[test]
+    fn test_parse_manuscript_markdown() {
+        let markdown = r#"
+# Chapter 1: The Call to Adventure
+It was a quiet morning in the valley. The wind whispered through ancient pines.
+
+# Chapter 2: The Crossing
+The journey across the mountain was perilous. Shadows danced upon the rock face.
+"#;
+        let chapters = JobCheckpointManifest::parse_manuscript(markdown, "mock-narrator", 1.0);
+        assert_eq!(chapters.len(), 2);
+        assert_eq!(chapters[0].title, "Chapter 1: The Call to Adventure");
+        assert!(chapters[0].text.contains("quiet morning in the valley"));
+        assert_eq!(chapters[0].voice_id, "mock-narrator");
+        assert_eq!(chapters[1].title, "Chapter 2: The Crossing");
+        assert!(chapters[1].text.contains("journey across the mountain"));
+    }
+
+    #[test]
+    fn test_parse_manuscript_unstructured() {
+        let text = "This is a single block of narrative text without any headings.\n\nIt continues for a second paragraph.";
+        let chapters = JobCheckpointManifest::parse_manuscript(text, "mock-narrator", 1.0);
+        assert_eq!(chapters.len(), 1);
+        assert_eq!(chapters[0].title, "Section 1");
+        assert!(chapters[0].text.contains("single block of narrative"));
     }
 }

@@ -38,6 +38,27 @@ pub struct ResumeJobResponse {
     pub is_finished: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ParseManuscriptRequest {
+    pub manuscript_text: String,
+    pub title: Option<String>,
+    pub default_voice: Option<String>,
+    pub default_speed: Option<f32>,
+    /// Optional job_id: if set, registers the checkpoint job immediately
+    pub job_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ParseManuscriptResponse {
+    pub title: String,
+    pub total_words: usize,
+    pub total_chapters: usize,
+    pub estimated_duration_minutes: f32,
+    pub chapters: Vec<voxforge_pipeline::checkpoint::ChapterTask>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<JobCheckpointManifest>,
+}
+
 /// Sanitize a job_id to a safe filesystem segment.
 ///
 /// Uses an allowlist (alphanumeric + `-` + `_`) instead of a denylist so that
@@ -157,6 +178,62 @@ pub async fn resume_job_handler(
     }))
 }
 
+/// `POST /v1/jobs/parse-manuscript` — parse raw markdown manuscript into chapters
+pub async fn parse_manuscript_handler(
+    State(_state): State<AppState>,
+    Json(body): Json<ParseManuscriptRequest>,
+) -> Result<Json<ParseManuscriptResponse>, (StatusCode, Json<ProblemDetails>)> {
+    if body.manuscript_text.trim().is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/empty-payload".to_string(),
+                title: "Missing Manuscript Text".to_string(),
+                status: 400,
+                detail: "The 'manuscript_text' field cannot be empty".to_string(),
+                instance: "/v1/jobs/parse-manuscript".to_string(),
+            }),
+        ));
+    }
+
+    let default_voice = body.default_voice.as_deref().unwrap_or("en-US-AriaNeural");
+    let default_speed = body.default_speed.unwrap_or(1.0).clamp(0.5, 2.5);
+    let title = body.title.unwrap_or_else(|| "Untitled Audiobook".to_string());
+
+    let chapters = JobCheckpointManifest::parse_manuscript(
+        &body.manuscript_text,
+        default_voice,
+        default_speed,
+    );
+
+    let total_words: usize = chapters
+        .iter()
+        .map(|c| c.text.split_whitespace().count())
+        .sum();
+    let estimated_duration_minutes = total_words as f32 / 150.0;
+
+    let manifest = if let Some(job_id) = body.job_id {
+        let work_dir = get_work_dir(&job_id);
+        let mut m = JobCheckpointManifest::new(job_id, "audiobook".to_string(), title.clone());
+        for ch in &chapters {
+            m.add_chapter(ch.title.clone(), ch.text.clone(), ch.voice_id.clone(), ch.speed);
+        }
+        let _ = m.save_to_dir(&work_dir);
+        Some(m)
+    } else {
+        None
+    };
+
+    Ok(Json(ParseManuscriptResponse {
+        title,
+        total_words,
+        total_chapters: chapters.len(),
+        estimated_duration_minutes,
+        chapters,
+        manifest,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +285,20 @@ mod tests {
         assert_eq!(req.job_id, "job-101");
         assert_eq!(req.chapters.len(), 1);
         assert_eq!(req.chapters[0].speed, Some(1.1));
+    }
+
+    #[test]
+    fn test_parse_manuscript_request_deserialization() {
+        let json = serde_json::json!({
+            "manuscript_text": "# Chapter 1\nHello world",
+            "title": "Test Book",
+            "default_voice": "mock-narrator",
+            "default_speed": 1.05
+        });
+
+        let req: ParseManuscriptRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(req.title, Some("Test Book".to_string()));
+        assert_eq!(req.default_voice, Some("mock-narrator".to_string()));
+        assert_eq!(req.default_speed, Some(1.05));
     }
 }

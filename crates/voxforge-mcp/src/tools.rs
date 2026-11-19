@@ -382,6 +382,32 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                 }
             }),
         },
+        McpTool {
+            name: "parse_manuscript".to_string(),
+            description: "Parse a raw markdown book manuscript or longform article into structured chapters for audiobook production with word counts and duration estimates.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "manuscript_text": {
+                        "type": "string",
+                        "description": "Full text or markdown content of the book or article"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Optional title of the book/work"
+                    },
+                    "default_voice": {
+                        "type": "string",
+                        "description": "Default voice ID for the narrator (e.g. en-US-AriaNeural)"
+                    },
+                    "default_speed": {
+                        "type": "number",
+                        "description": "Narrator reading speed multiplier (default 1.0)"
+                    }
+                },
+                "required": ["manuscript_text"]
+            }),
+        },
     ]
 }
 

@@ -79,6 +79,10 @@ pub fn build_api_router() -> Router<AppState> {
         // Longform & Audiobook Checkpointing & Resumption
         .route("/v1/jobs/checkpoints", get(jobs::list_checkpoints_handler))
         .route("/v1/jobs/checkpoint", post(jobs::create_checkpoint_handler))
+        .route(
+            "/v1/jobs/parse-manuscript",
+            post(jobs::parse_manuscript_handler),
+        )
         .route("/v1/jobs/:id/resume", post(jobs::resume_job_handler))
         // Telephony Twilio Media Streams Gateway
         .route(

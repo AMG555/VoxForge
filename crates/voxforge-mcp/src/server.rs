@@ -1289,6 +1289,45 @@ impl McpServer {
                 ToolCallResult::json(&report)
             }
 
+            "parse_manuscript" => {
+                let text = args.get("manuscript_text").and_then(|t| t.as_str()).unwrap_or("");
+                let title = args
+                    .get("title")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("Audiobook Manuscript");
+                let voice = args
+                    .get("default_voice")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("en-US-AriaNeural");
+                let speed = args
+                    .get("default_speed")
+                    .and_then(|s| s.as_f64())
+                    .unwrap_or(1.0) as f32;
+
+                if text.trim().is_empty() {
+                    return ToolCallResult::error("Parameter 'manuscript_text' cannot be empty");
+                }
+
+                let chapters = voxforge_pipeline::checkpoint::JobCheckpointManifest::parse_manuscript(
+                    text,
+                    voice,
+                    speed,
+                );
+                let total_words: usize = chapters
+                    .iter()
+                    .map(|c| c.text.split_whitespace().count())
+                    .sum();
+                let estimated_duration_minutes = total_words as f32 / 150.0;
+
+                ToolCallResult::json(&serde_json::json!({
+                    "title": title,
+                    "total_words": total_words,
+                    "total_chapters": chapters.len(),
+                    "estimated_duration_minutes": estimated_duration_minutes,
+                    "chapters": chapters
+                }))
+            }
+
             unknown => ToolCallResult::error(format!("Unknown tool: '{unknown}'")),
         }
     }
@@ -1401,6 +1440,26 @@ mod tests {
         let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
         assert_eq!(resp["id"], 12);
         assert_eq!(resp["result"]["isError"], false);
+
+        // Call parse_manuscript
+        let manuscript_call = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "tools/call",
+            "params": {
+                "name": "parse_manuscript",
+                "arguments": {
+                    "manuscript_text": "# Chapter 1\nOnce upon a time.\n\n# Chapter 2\nThey lived happily."
+                }
+            }
+        });
+        let resp_str = server.handle_message(&manuscript_call.to_string()).await.unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
+        assert_eq!(resp["id"], 13);
+        assert_eq!(resp["result"]["isError"], false);
+        let parse_text = resp["result"]["content"][0]["text"].as_str().unwrap();
+        let parse_result: serde_json::Value = serde_json::from_str(parse_text).unwrap();
+        assert_eq!(parse_result["total_chapters"], 2);
     }
 
     #[tokio::test]
