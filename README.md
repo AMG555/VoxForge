@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="VoxForge Logo" width="128" height="128" />
+<img src="assets/logo.png" alt="VoxForge Logo" width="128" height="128" />
 
 # VoxForge
 

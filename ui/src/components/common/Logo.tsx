@@ -25,7 +25,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 28, className = '', showText 
               <stop offset="45%" stopColor="#EA580C" />
               <stop offset="100%" stopColor="#9A3412" />
             </linearGradient>
-            <linearGradient id="navGlyph" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="navGlyph" x1="128" y1="56" x2="128" y2="180" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#FFFFFF" />
               <stop offset="100%" stopColor="#FEF3C7" />
             </linearGradient>
@@ -46,22 +46,22 @@ export const Logo: React.FC<LogoProps> = ({ size = 28, className = '', showText 
             />
           </g>
 
-          {/* 3 Harmonic Acoustic Wave Bars ("VOX") */}
-          <line x1="104" y1="82" x2="104" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
-          <line x1="128" y1="62" x2="128" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
-          <line x1="152" y1="82" x2="152" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+          {/* 3 Harmonic Acoustic Wave Bars ("VOX") - 2D geometry with rx=6 */}
+          <rect x="98" y="76" width="12" height="58" rx="6" fill="url(#navGlyph)" />
+          <rect x="122" y="56" width="12" height="78" rx="6" fill="url(#navGlyph)" />
+          <rect x="146" y="76" width="12" height="58" rx="6" fill="url(#navGlyph)" />
 
           {/* Radiating Sonic Arcs */}
           <path d="M84 92 C80 102 80 114 84 124" fill="none" stroke="url(#navGlyph)" strokeWidth="7" strokeLinecap="round" />
           <path d="M172 92 C176 102 176 114 172 124" fill="none" stroke="url(#navGlyph)" strokeWidth="7" strokeLinecap="round" />
 
           {/* Sleek Forged Anvil ("FORGE") */}
-          <path d="M72 142 L184 142" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+          <rect x="66" y="136" width="124" height="12" rx="6" fill="url(#navGlyph)" />
           <path
-            d="M102 148 C106 160 100 172 90 174 L166 174 C156 172 150 160 154 148"
+            d="M102 148 C106 160 100 172 90 174 L166 174 C156 172 150 160 154 148 Z"
             fill="url(#navGlyph)"
           />
-          <line x1="86" y1="176" x2="170" y2="176" stroke="url(#navGlyph)" strokeWidth="10" strokeLinecap="round" />
+          <rect x="81" y="171" width="94" height="10" rx="5" fill="url(#navGlyph)" />
 
           {/* Center Ember Core Point */}
           <circle cx="128" cy="160" r="4.5" fill="#EA580C" />
