@@ -38,7 +38,7 @@ if (-not (Test-Path $BinDir)) {
 }
 
 # 3. Retrieve latest release tag
-$LatestTag = "v0.4.0"
+$LatestTag = "v0.4.1"
 try {
     $ReleaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="VoxForge-Installer"} -ErrorAction SilentlyContinue
     if ($ReleaseInfo -and $ReleaseInfo.tag_name) {
