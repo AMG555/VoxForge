@@ -33,6 +33,11 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                     "output_file": {
                         "type": "string",
                         "description": "Optional local file path to save the generated audio (.wav or .pcm). Avoids returning large hex/base64 payload in model context."
+                    },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["hex", "file"],
+                        "description": "Output payload mode ('hex' or 'file'). 'file' mode saves audio to disk and returns the file path, preserving model context tokens. Can also be enabled globally via VOXFORGE_MCP_OUTPUT_MODE=files."
                     }
                 },
                 "required": ["text", "voice"]
@@ -157,6 +162,11 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                     "output_file": {
                         "type": "string",
                         "description": "Optional path to save the converted audio directly to disk (.wav)"
+                    },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["hex", "file"],
+                        "description": "Output payload mode ('hex' or 'file'). 'file' mode saves audio to disk and returns the file path, preserving model context tokens."
                     }
                 },
                 "required": ["target_voice"]
@@ -188,6 +198,11 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                     "output_file": {
                         "type": "string",
                         "description": "Optional path to save the resulting audio (.wav)"
+                    },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["hex", "file"],
+                        "description": "Output payload mode ('hex' or 'file'). 'file' mode saves audio to disk and returns the file path, preserving model context tokens."
                     }
                 },
                 "required": ["template"]

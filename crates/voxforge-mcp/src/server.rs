@@ -310,6 +310,7 @@ impl McpServer {
                 let speed = args.get("speed").and_then(|s| s.as_f64()).unwrap_or(1.0) as f32;
                 let pitch = args.get("pitch").and_then(|p| p.as_f64()).unwrap_or(0.0) as f32;
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
+                let output_mode = args.get("output_mode").and_then(|m| m.as_str());
 
                 if text.trim().is_empty() {
                     return ToolCallResult::error("Parameter 'text' cannot be empty");
@@ -318,12 +319,21 @@ impl McpServer {
                     return ToolCallResult::error(e);
                 }
 
-                // If output file specified, validate path upfront
+                let is_file_mode = output_mode == Some("file")
+                    || std::env::var("VOXFORGE_MCP_OUTPUT_MODE")
+                        .map(|v| v.eq_ignore_ascii_case("files") || v.eq_ignore_ascii_case("file"))
+                        .unwrap_or(false);
+
+                // If output file specified or file mode enabled, resolve target path
                 let safe_out_path = if let Some(out_str) = output_file {
                     match validate_safe_output_path(out_str) {
                         Ok(p) => Some(p),
                         Err(e) => return ToolCallResult::error(e),
                     }
+                } else if is_file_mode {
+                    let temp_dir = std::env::temp_dir().join("voxforge_takes");
+                    let _ = std::fs::create_dir_all(&temp_dir);
+                    Some(temp_dir.join(format!("synth_{}.wav", uuid::Uuid::new_v4().simple())))
                 } else {
                     None
                 };
@@ -704,16 +714,26 @@ impl McpServer {
                     .unwrap_or("");
                 let speed = args.get("speed").and_then(|s| s.as_f64()).unwrap_or(1.0) as f32;
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
+                let output_mode = args.get("output_mode").and_then(|m| m.as_str());
 
                 if target_voice.trim().is_empty() {
                     return ToolCallResult::error("Parameter 'target_voice' is required");
                 }
+
+                let is_file_mode = output_mode == Some("file")
+                    || std::env::var("VOXFORGE_MCP_OUTPUT_MODE")
+                        .map(|v| v.eq_ignore_ascii_case("files") || v.eq_ignore_ascii_case("file"))
+                        .unwrap_or(false);
 
                 let safe_out_path = if let Some(out_str) = output_file {
                     match validate_safe_output_path(out_str) {
                         Ok(p) => Some(p),
                         Err(e) => return ToolCallResult::error(e),
                     }
+                } else if is_file_mode {
+                    let temp_dir = std::env::temp_dir().join("voxforge_takes");
+                    let _ = std::fs::create_dir_all(&temp_dir);
+                    Some(temp_dir.join(format!("s2s_{}.wav", uuid::Uuid::new_v4().simple())))
                 } else {
                     None
                 };
@@ -837,12 +857,22 @@ impl McpServer {
                     .and_then(|t| t.as_str())
                     .map(|s| s.to_string());
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
+                let output_mode = args.get("output_mode").and_then(|m| m.as_str());
+
+                let is_file_mode = output_mode == Some("file")
+                    || std::env::var("VOXFORGE_MCP_OUTPUT_MODE")
+                        .map(|v| v.eq_ignore_ascii_case("files") || v.eq_ignore_ascii_case("file"))
+                        .unwrap_or(false);
 
                 let safe_out_path = if let Some(out_str) = output_file {
                     match validate_safe_output_path(out_str) {
                         Ok(p) => Some(p),
                         Err(e) => return ToolCallResult::error(e),
                     }
+                } else if is_file_mode {
+                    let temp_dir = std::env::temp_dir().join("voxforge_takes");
+                    let _ = std::fs::create_dir_all(&temp_dir);
+                    Some(temp_dir.join(format!("pipeline_{}.wav", uuid::Uuid::new_v4().simple())))
                 } else {
                     None
                 };
@@ -1002,12 +1032,22 @@ impl McpServer {
                         .and_then(|p| p.as_u64())
                         .unwrap_or(DEFAULT_SIGNATURE_PAYLOAD as u64) as u16;
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
+                let output_mode = args.get("output_mode").and_then(|m| m.as_str());
+
+                let is_file_mode = output_mode == Some("file")
+                    || std::env::var("VOXFORGE_MCP_OUTPUT_MODE")
+                        .map(|v| v.eq_ignore_ascii_case("files") || v.eq_ignore_ascii_case("file"))
+                        .unwrap_or(false);
 
                 let safe_out_path = if let Some(out_str) = output_file {
                     match validate_safe_output_path(out_str) {
                         Ok(p) => Some(p),
                         Err(e) => return ToolCallResult::error(e),
                     }
+                } else if is_file_mode {
+                    let temp_dir = std::env::temp_dir().join("voxforge_takes");
+                    let _ = std::fs::create_dir_all(&temp_dir);
+                    Some(temp_dir.join(format!("watermark_{}.wav", uuid::Uuid::new_v4().simple())))
                 } else {
                     None
                 };
@@ -1455,5 +1495,35 @@ mod tests {
         let audio_hex = synth_result["audio_wav_hex"].as_str().unwrap();
         let audio_bytes = hex::decode(audio_hex).unwrap();
         assert!(audio_bytes.starts_with(b"RIFF"));
+
+        // 5. Synthesize speech using output_mode: "file" to verify token-efficient file return
+        let synth_file_call = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 23,
+            "method": "tools/call",
+            "params": {
+                "name": "synthesize_speech",
+                "arguments": {
+                    "text": "File mode synthesis preserves agent context tokens.",
+                    "voice": "mock-en-female",
+                    "output_mode": "file"
+                }
+            }
+        });
+        let resp_str = server
+            .handle_message(&synth_file_call.to_string())
+            .await
+            .unwrap();
+        let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
+        assert_eq!(resp["id"], 23);
+        assert_eq!(resp["result"]["isError"], false);
+        let synth_text = resp["result"]["content"][0]["text"].as_str().unwrap();
+        let synth_result: serde_json::Value = serde_json::from_str(synth_text).unwrap();
+        assert_eq!(synth_result["status"], "success");
+        let file_path = synth_result["output_file"].as_str().unwrap();
+        assert!(std::path::Path::new(file_path).exists());
+        let file_bytes = std::fs::read(file_path).unwrap();
+        assert!(file_bytes.starts_with(b"RIFF"));
+        let _ = std::fs::remove_file(file_path);
     }
 }
