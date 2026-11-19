@@ -323,7 +323,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
 
                 <div className="p-3 rounded-xl bg-[#121822] border border-[#242E3D] space-y-1">
                   <div className="flex items-center space-x-2">
-                    <span className="px-2 py-0.5 rounded font-mono font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                    <span className="px-2 py-0.5 rounded font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
                       [sigh]
                     </span>
                     <span className="text-white font-medium">Relief or Weariness</span>
@@ -424,7 +424,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
                   <div className="p-3.5 rounded-xl bg-[#121822] border border-[#242E3D]">
                     <div className="flex items-center justify-between">
                       <span className="text-white font-bold">F5-TTS</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-500/20 text-indigo-300">Port 8880</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 text-sky-300">Port 8880</span>
                     </div>
                     <p className="text-[#94A3B8] mt-1.5 text-[11px]">Flow-matching non-autoregressive neural TTS engine for ultra-fast expressive cloning.</p>
                   </div>
@@ -442,7 +442,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
               <div className="p-3.5 rounded-xl bg-[#121822] border border-[#242E3D] space-y-2">
                 <h5 className="text-xs font-semibold text-white">How Auto-Detection Works:</h5>
                 <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  Simply run any of the above models locally (or in Docker/WSL). VoxForge continuously probes ports <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">9000</code>, <code className="text-indigo-300 bg-black/40 px-1 py-0.5 rounded">8880</code>, and <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">5000</code>. When detected, VoxForge transparently routes reference audio directly to the neural sidecar with zero manual configuration!
+                  Simply run any of the above models locally (or in Docker/WSL). VoxForge continuously probes ports <code className="text-cyan-300 bg-black/40 px-1 py-0.5 rounded">9000</code>, <code className="text-sky-300 bg-black/40 px-1 py-0.5 rounded">8880</code>, and <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">5000</code>. When detected, VoxForge transparently routes reference audio directly to the neural sidecar with zero manual configuration!
                 </p>
               </div>
             </div>

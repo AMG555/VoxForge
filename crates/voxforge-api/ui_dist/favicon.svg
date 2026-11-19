@@ -9,25 +9,39 @@
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="100%" stop-color="#fef3c7"/>
     </linearGradient>
+    <filter id="vfDropFav" x="-12%" y="-12%" width="124%" height="124%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
   </defs>
 
+  <!-- Dark Obsidian Tile (Squircle rx=56) -->
   <rect width="256" height="256" rx="56" fill="#0b0e14"/>
-  <circle cx="128" cy="128" r="106" fill="none" stroke="#1e293b" stroke-width="3"/>
+  <circle cx="128" cy="128" r="106" fill="none" stroke="#1e293b" stroke-width="2"/>
 
-  <!-- Shield -->
-  <path d="M128 36 L196 66 C196 132 170 186 128 216 C86 186 60 132 60 66 Z" 
-        fill="url(#vfShieldFav)" />
+  <!-- Molten Forge Shield -->
+  <g filter="url(#vfDropFav)">
+    <path d="M128 36 L196 66 C196 132 170 186 128 216 C86 186 60 132 60 66 Z" 
+          fill="url(#vfShieldFav)" />
+  </g>
 
-  <!-- 3 Soundwave Bars -->
-  <line x1="104" y1="82" x2="104" y2="128" stroke="url(#vfGlyphFav)" stroke-width="14" stroke-linecap="round"/>
-  <line x1="128" y1="62" x2="128" y2="128" stroke="url(#vfGlyphFav)" stroke-width="14" stroke-linecap="round"/>
-  <line x1="152" y1="82" x2="152" y2="128" stroke="url(#vfGlyphFav)" stroke-width="14" stroke-linecap="round"/>
+  <!-- 3 Harmonic Acoustic Wave Bars ("VOX") -->
+  <line x1="104" y1="82" x2="104" y2="128" stroke="url(#vfGlyphFav)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="128" y1="62" x2="128" y2="128" stroke="url(#vfGlyphFav)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="152" y1="82" x2="152" y2="128" stroke="url(#vfGlyphFav)" stroke-width="12" stroke-linecap="round"/>
 
-  <!-- Anvil -->
-  <path d="M72 142 L184 142" stroke="url(#vfGlyphFav)" stroke-width="14" stroke-linecap="round"/>
+  <!-- Radiating Sonic Arcs -->
+  <path d="M84 92 C80 102 80 114 84 124" fill="none" stroke="url(#vfGlyphFav)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M172 92 C176 102 176 114 172 124" fill="none" stroke="url(#vfGlyphFav)" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Sleek Forged Anvil ("FORGE") -->
+  <path d="M72 142 L184 142" stroke="url(#vfGlyphFav)" stroke-width="12" stroke-linecap="round"/>
   <path d="M102 148 C106 160 100 172 90 174 L166 174 C156 172 150 160 154 148" 
         fill="url(#vfGlyphFav)" />
-  <line x1="86" y1="176" x2="170" y2="176" stroke="url(#vfGlyphFav)" stroke-width="12" stroke-linecap="round"/>
+  <line x1="86" y1="176" x2="170" y2="176" stroke="url(#vfGlyphFav)" stroke-width="10" stroke-linecap="round"/>
 
-  <circle cx="128" cy="46" r="6" fill="#ffffff"/>
+  <!-- Center Ember Core Point -->
+  <circle cx="128" cy="160" r="4.5" fill="#ea580c"/>
+
+  <!-- Neural Creation Spark -->
+  <circle cx="128" cy="46" r="4.5" fill="#ffffff"/>
 </svg>

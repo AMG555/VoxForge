@@ -29,17 +29,45 @@ export const Logo: React.FC<LogoProps> = ({ size = 28, className = '', showText 
               <stop offset="0%" stopColor="#FFFFFF" />
               <stop offset="100%" stopColor="#FEF3C7" />
             </linearGradient>
+            <filter id="navDrop" x="-12%" y="-12%" width="124%" height="124%">
+              <feDropShadow dx="0" dy="5" stdDeviation="7" floodColor="#000000" floodOpacity="0.35" />
+            </filter>
           </defs>
+
+          {/* Dark Obsidian Tile */}
           <rect width="256" height="256" rx="56" fill="#0B0E14" />
-          <circle cx="128" cy="128" r="106" stroke="#1E293B" strokeWidth="3" />
-          <path d="M128 36 L196 66 C196 132 170 186 128 216 C86 186 60 132 60 66 Z" fill="url(#navShield)" />
-          <line x1="104" y1="82" x2="104" y2="128" stroke="url(#navGlyph)" strokeWidth="14" strokeLinecap="round" />
-          <line x1="128" y1="62" x2="128" y2="128" stroke="url(#navGlyph)" strokeWidth="14" strokeLinecap="round" />
-          <line x1="152" y1="82" x2="152" y2="128" stroke="url(#navGlyph)" strokeWidth="14" strokeLinecap="round" />
-          <path d="M72 142 L184 142" stroke="url(#navGlyph)" strokeWidth="14" strokeLinecap="round" />
-          <path d="M102 148 C106 160 100 172 90 174 L166 174 C156 172 150 160 154 148" fill="url(#navGlyph)" />
-          <line x1="86" y1="176" x2="170" y2="176" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
-          <circle cx="128" cy="46" r="6" fill="#FFFFFF" />
+          <circle cx="128" cy="128" r="106" stroke="#1E293B" strokeWidth="2" />
+
+          {/* Molten Forge Shield */}
+          <g filter="url(#navDrop)">
+            <path
+              d="M128 36 L196 66 C196 132 170 186 128 216 C86 186 60 132 60 66 Z"
+              fill="url(#navShield)"
+            />
+          </g>
+
+          {/* 3 Harmonic Acoustic Wave Bars ("VOX") */}
+          <line x1="104" y1="82" x2="104" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+          <line x1="128" y1="62" x2="128" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+          <line x1="152" y1="82" x2="152" y2="128" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+
+          {/* Radiating Sonic Arcs */}
+          <path d="M84 92 C80 102 80 114 84 124" fill="none" stroke="url(#navGlyph)" strokeWidth="7" strokeLinecap="round" />
+          <path d="M172 92 C176 102 176 114 172 124" fill="none" stroke="url(#navGlyph)" strokeWidth="7" strokeLinecap="round" />
+
+          {/* Sleek Forged Anvil ("FORGE") */}
+          <path d="M72 142 L184 142" stroke="url(#navGlyph)" strokeWidth="12" strokeLinecap="round" />
+          <path
+            d="M102 148 C106 160 100 172 90 174 L166 174 C156 172 150 160 154 148"
+            fill="url(#navGlyph)"
+          />
+          <line x1="86" y1="176" x2="170" y2="176" stroke="url(#navGlyph)" strokeWidth="10" strokeLinecap="round" />
+
+          {/* Center Ember Core Point */}
+          <circle cx="128" cy="160" r="4.5" fill="#EA580C" />
+
+          {/* Neural Creation Spark */}
+          <circle cx="128" cy="46" r="4.5" fill="#FFFFFF" />
         </svg>
       </div>
 

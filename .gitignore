@@ -57,3 +57,5 @@ clean.bat
 
 # Agent context documents (auto-generated, not for version control)
 AGENTS.md
+
+.verify/

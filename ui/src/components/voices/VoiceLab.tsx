@@ -1854,7 +1854,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 onClick={() => setStudioPlaygroundMode('sts')}
                 className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   studioPlaygroundMode === 'sts'
-                    ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-500/30'
+                    ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20'
                     : 'text-[#94A3B8] hover:text-white hover:bg-[#121820]'
                 }`}
               >
@@ -1870,10 +1870,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           </div>
 
           {studioPlaygroundMode === 'sts' ? (
-            <div className="p-6 rounded-2xl bg-[#0D1219] border border-purple-500/30 space-y-6 shadow-2xl animate-in fade-in duration-200">
+            <div className="p-6 rounded-2xl bg-[#0D1219] border border-amber-500/30 space-y-6 shadow-2xl animate-in fade-in duration-200">
               <div className="flex items-center justify-between border-b border-[#242E3D] pb-3">
                 <div className="flex items-center space-x-2.5">
-                  <span className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <span className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
                     <ArrowRightLeft className="w-5 h-5" />
                   </span>
                   <div>
@@ -1886,7 +1886,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-mono font-medium">
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-mono font-medium">
                     Zero-Latency Pipeline
                   </span>
                 </div>
@@ -1898,7 +1898,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 <div className="p-4 rounded-xl bg-[#121820] border border-[#242E3D] flex flex-col justify-between space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white font-mono flex items-center gap-1.5">
-                      <Mic className="w-4 h-4 text-purple-400" />
+                      <Mic className="w-4 h-4 text-amber-400" />
                       <span>Live Microphone Input</span>
                     </span>
                     {stsIsRecording && (
@@ -1923,7 +1923,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       <button
                         type="button"
                         onClick={handleStartStsRecording}
-                        className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center space-x-2 shadow-lg shadow-purple-500/30 transition-transform active:scale-95"
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center space-x-2 shadow-md shadow-amber-500/20 transition-transform active:scale-95"
                       >
                         <Mic className="w-4 h-4" />
                         <span>Record Microphone</span>
@@ -1974,7 +1974,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               {stsAudioUrl && (
                 <div className="p-3 bg-[#121820] rounded-xl border border-[#242E3D] flex items-center justify-between gap-3">
                   <div className="flex items-center space-x-2.5 truncate max-w-sm">
-                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
                     <span className="text-xs text-white font-mono truncate">{stsInputFileName}</span>
                   </div>
                   <audio controls src={stsAudioUrl} className="h-8 w-64 rounded bg-[#0B0E14]" />
@@ -1995,7 +1995,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     step="0.05"
                     value={stsSpeed}
                     onChange={(e) => setStsSpeed(parseFloat(e.target.value))}
-                    className="w-full accent-purple-500"
+                    className="w-full accent-amber-500"
                   />
                 </div>
 
@@ -2005,7 +2005,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       type="checkbox"
                       checked={stsPreserveTempo}
                       onChange={(e) => setStsPreserveTempo(e.target.checked)}
-                      className="accent-purple-500 w-4 h-4"
+                      className="accent-amber-500 w-4 h-4"
                     />
                     <span>Preserve Natural Speech Tempo</span>
                   </label>
@@ -2018,7 +2018,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   type="button"
                   onClick={handleConvertVoice}
                   disabled={!stsInputBase64 || stsIsConverting}
-                  className="flex items-center space-x-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 disabled:opacity-50 active:scale-95"
+                  className="flex items-center space-x-2 px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 active:scale-95"
                 >
                   {stsIsConverting ? (
                     <>
@@ -2239,7 +2239,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
             {/* Smart Dialect Assistant Banner (Manglish / Hinglish / Tanglish / Script alignment) */}
             {(detectedLang.isRomanizedDialect || (detectedLang.suggestedVoiceId && !selectedVoice?.id.startsWith(detectedLang.code.split('-')[0]))) && (
-              <div className="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 via-sky-500/10 to-amber-500/10 border border-purple-500/30 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+              <div className="p-3 rounded-lg bg-[#161D26] border border-amber-500/30 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-xl shrink-0">{detectedLang.flag}</span>
                   <div>
@@ -2249,7 +2249,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                           ? `${detectedLang.name} Detected`
                           : `${detectedLang.name} Script`}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
                         {detectedLang.isRomanizedDialect ? 'Romanized Dialect' : 'Native Script'}
                       </span>
                     </div>
@@ -2267,7 +2267,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       <button
                         type="button"
                         onClick={handleTransliteratePrompt}
-                        className="flex items-center space-x-1 px-3 py-1 rounded bg-purple-500/20 hover:bg-purple-500 text-purple-200 hover:text-white border border-purple-500/40 text-[11px] font-semibold transition-colors"
+                        className="flex items-center space-x-1 px-3 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-200 hover:text-black border border-amber-500/40 text-[11px] font-semibold transition-colors"
                         title="Transliterate Romanized dialect directly into native script"
                       >
                         <ArrowRightLeft className="w-3 h-3" />
@@ -2279,7 +2279,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                           type="checkbox"
                           checked={autoTransliterateOnSynth}
                           onChange={(e) => setAutoTransliterateOnSynth(e.target.checked)}
-                          className="accent-purple-500 w-3 h-3"
+                          className="accent-amber-500 w-3 h-3"
                         />
                         <span>Auto on Synth</span>
                       </label>
@@ -4236,7 +4236,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           <div className="bg-[#121820] border border-[#242E3D] rounded-xl w-full max-w-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-150 max-h-[90vh] flex flex-col">
             <div className="p-4 border-b border-[#242E3D] flex items-center justify-between shrink-0 bg-[#0E131A]">
               <div className="flex items-center space-x-2">
-                <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
                   <Wand2 className="w-4 h-4" />
                 </div>
                 <div>
@@ -4255,7 +4255,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             <form id="voice-design-form" onSubmit={handleDesignSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs font-semibold text-[#CBD5E1] mb-1.5">
-                  Natural Language Voice Description <span className="text-purple-400">*</span>
+                  Natural Language Voice Description <span className="text-amber-400">*</span>
                 </label>
                 <textarea
                   dir="auto"
@@ -4263,7 +4263,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   value={designPrompt}
                   onChange={(e) => setDesignPrompt(e.target.value)}
                   placeholder="e.g. Warm, soothing British podcast narrator with slight chest resonance and calm, intimate cadence"
-                  className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white placeholder-[#64748B] focus:border-purple-500 focus:outline-none resize-none"
+                  className="w-full bg-[#0B0E14] border border-[#242E3D] rounded-lg p-2.5 text-xs text-white placeholder-[#64748B] focus:border-amber-500 focus:outline-none resize-none"
                   required
                 />
                 <div className="flex flex-wrap gap-1.5 mt-2">
@@ -4334,7 +4334,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               {/* Director AI 5-Axis Taxonomic Sliders */}
               <div className="p-3.5 bg-[#0B0E14] rounded-xl border border-[#242E3D] space-y-3 font-mono text-xs">
                 <div className="flex items-center justify-between border-b border-[#1A222D] pb-1.5">
-                  <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Sliders className="w-3.5 h-3.5" />
                     <span>Director AI 5-Axis Taxonomy</span>
                   </span>
@@ -4345,7 +4345,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Energy:</span>
-                      <strong className={designDirector.energy >= 0 ? 'text-purple-400' : 'text-sky-400'}>
+                      <strong className={designDirector.energy >= 0 ? 'text-amber-400' : 'text-sky-400'}>
                         {designDirector.energy > 0 ? `+${designDirector.energy.toFixed(2)}` : designDirector.energy.toFixed(2)}
                       </strong>
                     </div>
@@ -4356,14 +4356,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       step="0.05"
                       value={designDirector.energy}
                       onChange={(e) => setDesignDirector((prev) => ({ ...prev, energy: parseFloat(e.target.value) }))}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-amber-500"
                     />
                   </div>
 
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Pace / Tempo:</span>
-                      <strong className={designDirector.pace >= 0 ? 'text-purple-400' : 'text-sky-400'}>
+                      <strong className={designDirector.pace >= 0 ? 'text-amber-400' : 'text-sky-400'}>
                         {designDirector.pace > 0 ? `+${designDirector.pace.toFixed(2)}` : designDirector.pace.toFixed(2)}
                       </strong>
                     </div>
@@ -4374,14 +4374,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       step="0.05"
                       value={designDirector.pace}
                       onChange={(e) => setDesignDirector((prev) => ({ ...prev, pace: parseFloat(e.target.value) }))}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-amber-500"
                     />
                   </div>
 
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Intimacy:</span>
-                      <strong className={designDirector.intimacy >= 0 ? 'text-purple-400' : 'text-sky-400'}>
+                      <strong className={designDirector.intimacy >= 0 ? 'text-amber-400' : 'text-sky-400'}>
                         {designDirector.intimacy > 0 ? `+${designDirector.intimacy.toFixed(2)}` : designDirector.intimacy.toFixed(2)}
                       </strong>
                     </div>
@@ -4392,14 +4392,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       step="0.05"
                       value={designDirector.intimacy}
                       onChange={(e) => setDesignDirector((prev) => ({ ...prev, intimacy: parseFloat(e.target.value) }))}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-amber-500"
                     />
                   </div>
 
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Formality:</span>
-                      <strong className={designDirector.formality >= 0 ? 'text-purple-400' : 'text-sky-400'}>
+                      <strong className={designDirector.formality >= 0 ? 'text-amber-400' : 'text-sky-400'}>
                         {designDirector.formality > 0 ? `+${designDirector.formality.toFixed(2)}` : designDirector.formality.toFixed(2)}
                       </strong>
                     </div>
@@ -4410,14 +4410,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       step="0.05"
                       value={designDirector.formality}
                       onChange={(e) => setDesignDirector((prev) => ({ ...prev, formality: parseFloat(e.target.value) }))}
-                      className="w-full accent-purple-500"
+                      className="w-full accent-amber-500"
                     />
                   </div>
                 </div>
               </div>
 
               {designStatus && (
-                <div className="p-2.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-mono">
+                <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono">
                   {designStatus}
                 </div>
               )}
@@ -4436,7 +4436,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 type="submit"
                 form="voice-design-form"
                 disabled={isDesigning || !designPrompt.trim()}
-                className="flex items-center space-x-2 px-5 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white text-xs font-semibold transition-colors shadow-lg shadow-purple-500/20 disabled:opacity-50"
+                className="flex items-center space-x-2 px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold transition-colors shadow-md shadow-amber-500/20 disabled:opacity-50"
               >
                 {isDesigning ? (
                   <>

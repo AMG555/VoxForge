@@ -25,91 +25,35 @@ export const Navigation: React.FC<NavigationProps> = ({
         <Logo size={32} />
 
         <nav className="flex space-x-1">
-          <button
-            onClick={() => setActiveTab('workflows')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'workflows'
-                ? 'bg-amber-500 text-black font-semibold shadow-sm'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-            title="Workflows & Projects Dashboard"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Workflows</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('canvas')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'canvas'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-          >
-            <GitFork className="w-3.5 h-3.5" />
-            <span>Pipeline Canvas</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('timeline')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'timeline'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-            title="Stories Multi-Track Timeline (DAW)"
-          >
-            <Music2 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Stories Timeline</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('voices')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'voices'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span>Voice Lab</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('catalog')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'catalog'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Model Catalog</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('hardware')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'hardware'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>Hardware & Engines</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('qa')}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              activeTab === 'qa'
-                ? 'bg-[#1A222D] text-white border border-[#3B485C]'
-                : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>A/B & QA Lab</span>
-          </button>
+          {[
+            { id: 'workflows', label: 'Workflows', icon: LayoutGrid, title: 'Workflows & Projects Dashboard' },
+            { id: 'canvas', label: 'Pipeline Canvas', icon: GitFork, title: 'Infinite Visual DSP DAG Pipeline Builder' },
+            { id: 'timeline', label: 'Stories Timeline', icon: Music2, title: 'Stories Multi-Track Timeline (DAW)' },
+            { id: 'voices', label: 'Voice Lab', icon: Mic, title: 'Neural Speech & Voice Cloning Lab' },
+            { id: 'catalog', label: 'Model Catalog', icon: Layers, title: 'Model Catalog & Engine Packages' },
+            { id: 'hardware', label: 'Hardware & Engines', icon: Cpu, title: 'Hardware Profiler & Engine Status' },
+            { id: 'qa', label: 'A/B & QA Lab', icon: Scale, title: 'Double-Blind MOS Quality Benchmark' },
+          ].map(({ id, label, icon: Icon, title }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id as any)}
+                className={`relative flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-[#1A222D] text-white border border-[#3B485C] shadow-sm font-semibold'
+                    : 'text-[#94A3B8] hover:text-white hover:bg-[#1A222D]/50 border border-transparent'
+                }`}
+                title={title}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-[#64748B]'}`} />
+                <span>{label}</span>
+                {isActive && (
+                  <span className="absolute -bottom-[1px] left-2 right-2 h-[2px] bg-amber-400 rounded-full shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+                )}
+              </button>
+            );
+          })}
         </nav>
       </div>
 

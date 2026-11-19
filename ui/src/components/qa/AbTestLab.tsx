@@ -326,7 +326,7 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
 
         {/* Double-Blind Audition Deck */}
         {isBlindTest && audioUrlA && audioUrlB && !isUnblinded && (
-          <div className="p-6 rounded-xl bg-gradient-to-br from-[#121820] to-[#0D1219] border border-purple-500/40 space-y-6 shadow-2xl animate-in fade-in duration-200">
+          <div className="p-6 rounded-xl bg-[#0E131A] border border-amber-500/40 space-y-6 shadow-2xl animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b border-[#242E3D] pb-3">
               <div className="flex items-center space-x-2">
                 <EyeOff className="w-4 h-4 text-purple-400" />
@@ -403,7 +403,7 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
               <button
                 type="button"
                 onClick={() => setIsUnblinded(true)}
-                className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition-all"
+                className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Reveal Identities & Verdict</span>
