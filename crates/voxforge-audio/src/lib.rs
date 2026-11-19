@@ -15,7 +15,10 @@ pub use dsp::{
 };
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;
-pub use metrics::{AudioAnalyzer, AudioQualityMetrics};
+pub use metrics::{
+    AnomalySeverity, AudioAnalyzer, AudioQualityMetrics, AudioSignalReport, SignalAnomaly,
+    SignalAnomalyKind,
+};
 pub use normalizer::{
     AudioNormalizer, LUFS_TARGET_BROADCAST, LUFS_TARGET_VOICE, LUFS_TARGET_YOUTUBE,
 };
@@ -231,5 +234,48 @@ mod tests {
         let rms = (sum_sq / samples.len() as f64).sqrt();
         let target = 32767.0 * 0.20;
         assert!((rms - target).abs() < 100.0);
+    }
+
+    #[test]
+    fn test_check_signal_anomalies_clean() {
+        let sr = 24000u32;
+        let samples: Vec<i16> = (0..sr)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                (12000.0 * (2.0 * std::f32::consts::PI * 440.0 * t).sin()) as i16
+            })
+            .collect();
+        let report = AudioAnalyzer::check_signal_anomalies(&samples, sr, 1);
+        assert!(report.is_clean);
+        assert_eq!(report.warnings_count, 0);
+        assert_eq!(report.anomalies.len(), 0);
+    }
+
+    #[test]
+    fn test_check_signal_anomalies_clipping() {
+        let sr = 24000u32;
+        let mut samples: Vec<i16> = vec![5000; sr as usize];
+        // Inject clipped block
+        samples[12000..12050].fill(32767);
+        let report = AudioAnalyzer::check_signal_anomalies(&samples, sr, 1);
+        assert!(!report.is_clean);
+        assert!(report
+            .anomalies
+            .iter()
+            .any(|a| a.kind == SignalAnomalyKind::Clipping));
+    }
+
+    #[test]
+    fn test_check_signal_anomalies_silence() {
+        let sr = 24000u32;
+        let mut samples: Vec<i16> = vec![8000; 12000]; // 0.5s speech
+        samples.extend(vec![0; 24000]); // 1.0s silence
+        samples.extend(vec![8000; 12000]); // 0.5s speech
+        let report = AudioAnalyzer::check_signal_anomalies(&samples, sr, 1);
+        assert!(!report.is_clean);
+        assert!(report
+            .anomalies
+            .iter()
+            .any(|a| a.kind == SignalAnomalyKind::LongSilence));
     }
 }
