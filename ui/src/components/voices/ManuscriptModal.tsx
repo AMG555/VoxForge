@@ -11,10 +11,13 @@ interface ManuscriptModalProps {
 interface ParsedChapter {
   index: number;
   title: string;
+  text: string;
+  voice_id?: string;
+  speed?: number;
+  content_hash?: string;
+  sha256_hash?: string;
   word_count: number;
   estimated_duration_minutes: number;
-  text: string;
-  sha256_hash: string;
 }
 
 interface ManuscriptResult {
@@ -60,7 +63,23 @@ export const ManuscriptModal: React.FC<ManuscriptModalProps> = ({ isOpen, onClos
         manuscript_text: text,
         max_words_per_chapter: maxWords > 0 ? maxWords : 1000,
       });
-      setResult(res);
+      const chapters: ParsedChapter[] = (res.chapters || []).map((ch: any) => {
+        const words = ch.word_count ?? (ch.text ? ch.text.split(/\s+/).filter(Boolean).length : 0);
+        const duration = ch.estimated_duration_minutes ?? (words / 150.0);
+        return {
+          ...ch,
+          word_count: words,
+          estimated_duration_minutes: duration,
+          content_hash: ch.content_hash || ch.sha256_hash || '',
+        };
+      });
+      setResult({
+        ...res,
+        total_words: res.total_words ?? chapters.reduce((acc, c) => acc + (c.word_count || 0), 0),
+        total_chapters: res.total_chapters ?? chapters.length,
+        estimated_duration_minutes: res.estimated_duration_minutes ?? chapters.reduce((acc, c) => acc + (c.estimated_duration_minutes || 0), 0),
+        chapters,
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to parse manuscript');
     } finally {
@@ -259,8 +278,11 @@ Across the glass observation pane, the audio visualizer oscillated with eerie sy
                             <Clock className="w-3 h-3 text-amber-400" />
                             ~{ch.estimated_duration_minutes.toFixed(1)} min
                           </span>
-                          <span className="text-[10px] text-[#64748B] truncate max-w-[120px]" title={ch.sha256_hash}>
-                            {ch.sha256_hash.substring(0, 10)}...
+                          <span
+                            className="text-[10px] text-[#64748B] truncate max-w-[120px]"
+                            title={ch.content_hash || ch.sha256_hash || ''}
+                          >
+                            {(ch.content_hash || ch.sha256_hash || '').substring(0, 10)}...
                           </span>
                         </div>
                       </div>

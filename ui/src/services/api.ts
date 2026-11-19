@@ -541,10 +541,13 @@ export const api = {
     chapters: Array<{
       index: number;
       title: string;
-      word_count: number;
-      estimated_duration_minutes: number;
       text: string;
-      sha256_hash: string;
+      voice_id?: string;
+      speed?: number;
+      content_hash?: string;
+      word_count?: number;
+      estimated_duration_minutes?: number;
+      sha256_hash?: string;
     }>;
   }> {
     const res = await fetch(`${BASE_URL}/v1/jobs/parse-manuscript`, {
