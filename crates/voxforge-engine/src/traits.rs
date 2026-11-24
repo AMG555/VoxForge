@@ -112,6 +112,16 @@ pub trait TtsEngine: Send + Sync {
         )))
     }
 
+    /// High-precision variant returning optional mono float32 samples alongside i16 PCM
+    /// so 24-bit/32-bit float neural sidecar renders do not suffer 16-bit quantization loss.
+    async fn synthesize_cloned_hq(
+        &self,
+        request: &ClonedSynthesisRequest,
+    ) -> Result<(AudioChunk, Option<Vec<f32>>)> {
+        let chunk = self.synthesize_cloned(request).await?;
+        Ok((chunk, None))
+    }
+
     /// Refine an existing cloned voice profile by folding in a new reference audio sample.
     /// The updated embedding is the weighted average of the current embedding and the new
     /// sample's embedding, incrementing the profile's version and sample_count.

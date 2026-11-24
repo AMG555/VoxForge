@@ -464,6 +464,11 @@ pub async fn synthesize_speech(
                         speed: payload.speed,
                         pitch: payload.pitch.unwrap_or(0.0),
                         format: payload.response_format,
+                        language: None,
+                        instruct: None,
+                        num_step: None,
+                        seed: None,
+                        precision: payload.precision,
                     };
                     let chunk = engine.synthesize_cloned(&cloned_req).await.map_err(|e| {
                         let err = ProblemDetails {

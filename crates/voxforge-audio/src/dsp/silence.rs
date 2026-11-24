@@ -376,6 +376,40 @@ impl SilenceTrimmer {
         }
         to
     }
+
+    /// Apply a smooth raised-cosine fade-out on the tail of a sample buffer to eliminate clicks.
+    pub fn fade_out_tail(samples: &mut [i16], sample_rate: u32, fade_ms: f32) {
+        if samples.len() < 4 || sample_rate == 0 || fade_ms <= 0.0 {
+            return;
+        }
+        let fade_len = ((sample_rate as f32 * fade_ms / 1000.0).round() as usize)
+            .clamp(2, samples.len());
+        let start = samples.len() - fade_len;
+        let denom = (fade_len - 1) as f32;
+        for (idx, sample) in samples[start..].iter_mut().enumerate() {
+            let phase = (idx as f32 / denom) * std::f32::consts::PI;
+            let gain = 0.5 * (1.0 + phase.cos());
+            *sample = ((*sample as f32) * gain).round().clamp(-32768.0, 32767.0) as i16;
+        }
+    }
+
+    /// Progressive-threshold silence trimmer (-45 -> -55 -> -65 dBFS) that never wipes quiet speech,
+    /// finishing the tail with a 25ms cosine fade-out.
+    pub fn trim_safe(samples: &[i16], sample_rate: u32, min_silence_pad_ms: u32) -> Vec<i16> {
+        if samples.is_empty() {
+            return Vec::new();
+        }
+        for &thresh in &[-45.0f32, -55.0, -65.0] {
+            let mut trimmed = Self::trim(samples, sample_rate, thresh, min_silence_pad_ms);
+            if !trimmed.is_empty() {
+                Self::fade_out_tail(&mut trimmed, sample_rate, 25.0);
+                return trimmed;
+            }
+        }
+        let mut fallback = samples.to_vec();
+        Self::fade_out_tail(&mut fallback, sample_rate, 25.0);
+        fallback
+    }
 }
 
 #[cfg(test)]
@@ -512,5 +546,20 @@ mod tests {
     fn test_trim_passage_to_pauses_empty_passthrough() {
         let result = SilenceTrimmer::trim_passage_to_pauses(&[], 24000, 1500, 50, -55.0);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_trim_safe_ladder_keeps_quiet_speech_and_fades_tail() {
+        let sr = 24000u32;
+        let mut buf = vec![0i16; 4800];
+        // ~ -60 dBFS quiet tone (amplitude 33)
+        for i in 0..4800 {
+            let v = ((i as f32 * 0.08).sin() * 36.0) as i16;
+            buf.push(v);
+        }
+        buf.extend(vec![0i16; 4800]);
+        let trimmed = SilenceTrimmer::trim_safe(&buf, sr, 20);
+        assert!(!trimmed.is_empty(), "Safety ladder must keep quiet speech");
+        assert!(trimmed.last().copied().unwrap_or(100).abs() <= 2);
     }
 }

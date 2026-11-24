@@ -92,6 +92,21 @@ pub struct ClonedSynthesisRequest {
     pub pitch: f32,
     #[serde(default)]
     pub format: AudioContainerFormat,
+    /// Optional target output language override (for cross-lingual synthesis).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// Optional emotion / acoustic delivery instruction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruct: Option<String>,
+    /// Diffusion / neural flow-matching sampling steps (8-64, default 32).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub num_step: Option<u32>,
+    /// Deterministic RNG seed for reproducible takes and cross-chunk timbre consistency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+    /// Output bit depth precision (16, 24, or 32-bit float).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precision: Option<u16>,
 }
 
 fn default_speed() -> f32 {

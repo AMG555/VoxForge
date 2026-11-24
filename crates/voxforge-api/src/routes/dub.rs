@@ -178,6 +178,11 @@ pub async fn dub_script(
                         speed,
                         pitch,
                         format,
+                        language: None,
+                        instruct: None,
+                        num_step: None,
+                        seed: None,
+                        precision: None,
                     };
                     eng.synthesize_cloned(&req)
                         .await

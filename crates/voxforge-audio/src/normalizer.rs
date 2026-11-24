@@ -270,6 +270,11 @@ impl AudioNormalizer {
         out
     }
 
+    /// Silence floor (~ -55 dBFS) below which normalization is skipped
+    /// so near-silent room tone or ambient hiss is never amplified into static.
+    const SILENCE_FLOOR_PEAK: i32 = 58;
+    const SILENCE_FLOOR_RMS: f64 = 58.0;
+
     pub fn peak_normalize(samples: &mut [i16], target_peak_ratio: f32) {
         if samples.is_empty() || !target_peak_ratio.is_finite() {
             return;
@@ -277,7 +282,7 @@ impl AudioNormalizer {
 
         let max_abs = samples.iter().map(|&s| (s as i32).abs()).max().unwrap_or(0);
 
-        if max_abs == 0 {
+        if max_abs < Self::SILENCE_FLOOR_PEAK {
             return;
         }
 
@@ -323,7 +328,7 @@ impl AudioNormalizer {
 
         let sum_sq: f64 = samples.iter().map(|&s| (s as f64).powi(2)).sum();
         let rms = (sum_sq / samples.len() as f64).sqrt();
-        if rms < 1.0 {
+        if rms < Self::SILENCE_FLOOR_RMS {
             return;
         }
 
@@ -387,5 +392,17 @@ mod tests {
         // Huge attenuation brings to near-zero
         AudioNormalizer::apply_gain_db(&mut samples, -100.0);
         assert!(samples[0].abs() <= 1);
+    }
+
+    #[test]
+    fn test_silence_floor_prevents_boosting_quiet_hiss() {
+        // -65 dBFS signal (~18 amplitude in i16) must not be amplified
+        let mut quiet = vec![18i16, -15, 12, -18];
+        let orig = quiet.clone();
+        AudioNormalizer::peak_normalize(&mut quiet, 0.9);
+        assert_eq!(quiet, orig);
+
+        AudioNormalizer::rms_normalize(&mut quiet, 0.25);
+        assert_eq!(quiet, orig);
     }
 }

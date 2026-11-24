@@ -71,6 +71,35 @@ impl AudioCache {
         text: &str,
         profile_version: Option<u32>,
     ) -> String {
+        Self::compute_key_full(
+            engine_id,
+            voice_id,
+            speed,
+            pitch,
+            text,
+            profile_version,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    /// Computes a full cache key incorporating optional language override,
+    /// style instruction, diffusion step count, and deterministic seed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_key_full(
+        engine_id: &str,
+        voice_id: &str,
+        speed: f32,
+        pitch: f32,
+        text: &str,
+        profile_version: Option<u32>,
+        language: Option<&str>,
+        instruct: Option<&str>,
+        num_step: Option<u32>,
+        seed: Option<u64>,
+    ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(engine_id.as_bytes());
         hasher.update(b":");
@@ -85,6 +114,22 @@ impl AudioCache {
             hasher.update(b":v");
             hasher.update(ver.to_be_bytes());
         }
+        if let Some(lang) = language {
+            hasher.update(b":lang=");
+            hasher.update(lang.as_bytes());
+        }
+        if let Some(inst) = instruct {
+            hasher.update(b":inst=");
+            hasher.update(inst.as_bytes());
+        }
+        if let Some(steps) = num_step {
+            hasher.update(b":steps=");
+            hasher.update(steps.to_be_bytes());
+        }
+        if let Some(s) = seed {
+            hasher.update(b":seed=");
+            hasher.update(s.to_be_bytes());
+        }
         hex::encode(hasher.finalize())
     }
 
@@ -97,10 +142,14 @@ impl AudioCache {
         text: &str,
     ) -> Option<AudioChunk> {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
+        self.get_by_key(&key).await
+    }
+
+    pub async fn get_by_key(&self, key: &str) -> Option<AudioChunk> {
         let mut guard = self.inner.lock().await;
         let CacheInner { entries, next_gen } = &mut *guard;
 
-        if let Some(entry) = entries.get_mut(&key) {
+        if let Some(entry) = entries.get_mut(key) {
             self.hits.fetch_add(1, Ordering::Relaxed);
             let gen = *next_gen;
             *next_gen = gen + 1;
@@ -122,10 +171,13 @@ impl AudioCache {
         chunk: AudioChunk,
     ) {
         let key = Self::compute_key(engine_id, voice_id, speed, pitch, text);
+        self.insert_by_key(key, chunk).await;
+    }
+
+    pub async fn insert_by_key(&self, key: String, chunk: AudioChunk) {
         let mut guard = self.inner.lock().await;
         let CacheInner { entries, next_gen } = &mut *guard;
 
-        // Update existing entry in a single lookup without eviction.
         if let Some(entry) = entries.get_mut(&key) {
             let gen = *next_gen;
             *next_gen = gen + 1;
@@ -134,22 +186,19 @@ impl AudioCache {
             return;
         }
 
-        // Evict least-recently-used entry when at capacity.
-        if guard.entries.len() >= self.capacity {
-            // O(capacity) scan — only runs when cache is full; capacity is bounded (default 500).
-            if let Some(lru_key) = guard
-                .entries
+        if entries.len() >= self.capacity {
+            if let Some(lru_key) = entries
                 .iter()
                 .min_by_key(|(_, e)| e.gen)
                 .map(|(k, _)| k.clone())
             {
-                guard.entries.remove(&lru_key);
+                entries.remove(&lru_key);
             }
         }
 
-        let gen = guard.next_gen;
-        guard.next_gen += 1;
-        guard.entries.insert(key, CacheEntry { chunk, gen });
+        let gen = *next_gen;
+        *next_gen = gen + 1;
+        entries.insert(key, CacheEntry { chunk, gen });
     }
 
     pub fn stats(&self) -> (u64, u64) {

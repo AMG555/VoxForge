@@ -435,45 +435,41 @@ fn compute_spectral_timbre_deltas(ref_pcm: &[i16], synth_pcm: &[i16]) -> (f32, f
 }
 
 /// Returns the empirical fundamental frequency mean F0 (in Hz) for the base voice.
+/// Estimate nominal pitch of an Edge-TTS neural voice (Hz) for accurate F0 shift deltas.
+///
+/// Uses explicit overrides for tuned reference voices, then resolves gender directly from
+/// [`EDGE_TTS_LANG_TABLE`] across all 130+ supported locales before falling back cleanly.
 pub fn nominal_base_voice_f0(voice_id: &str) -> f32 {
     let lower = voice_id.to_lowercase();
     if lower.contains("guy") {
-        118.0
+        return 118.0;
     } else if lower.contains("aria") {
-        208.0
+        return 208.0;
     } else if lower.contains("ryan") {
-        120.0
+        return 120.0;
     } else if lower.contains("sonia") {
-        210.0
+        return 210.0;
     } else if lower.contains("midhun") {
-        125.0
+        return 125.0;
     } else if lower.contains("sobhana") {
-        220.0
+        return 220.0;
     } else if lower.contains("madhur") {
-        120.0
+        return 120.0;
     } else if lower.contains("swara") {
-        215.0
-    } else if lower.contains("valluvar")
-        || lower.contains("mohan")
-        || lower.contains("gagan")
-        || lower.contains("bashkar")
-        || lower.contains("niranjan")
-        || lower.contains("ojas")
-        || lower.contains("alvaro")
-    {
-        120.0
-    } else if lower.contains("pallavi")
-        || lower.contains("shruti")
-        || lower.contains("sapna")
-        || lower.contains("tanishaa")
-        || lower.contains("dhwani")
-        || lower.contains("vaani")
-        || lower.contains("nanami")
-        || lower.contains("xiaoxiao")
-        || lower.contains("katja")
-        || lower.contains("denise")
-    {
-        215.0
+        return 215.0;
+    }
+
+    for &(_bcp47, male, female) in EDGE_TTS_LANG_TABLE {
+        if male.eq_ignore_ascii_case(voice_id) {
+            return 120.0;
+        }
+        if female.eq_ignore_ascii_case(voice_id) {
+            return 215.0;
+        }
+    }
+
+    if lower.contains("female") {
+        210.0
     } else if lower.contains("male") {
         120.0
     } else {
@@ -593,6 +589,11 @@ impl TtsEngine for Qwen3TtsEngine {
                 speed: request.speed,
                 pitch: request.pitch,
                 format: request.format,
+                language: None,
+                instruct: None,
+                num_step: None,
+                seed: None,
+                precision: None,
             };
             return self.synthesize_cloned(&cloned_req).await;
         }
@@ -1152,65 +1153,156 @@ impl TtsEngine for Qwen3TtsEngine {
         Ok(updated)
     }
 
+    /// Synthesize speech conditioned on a cloned voice profile with optional lossless f32 payload.
+    async fn synthesize_cloned_hq(
+        &self,
+        request: &ClonedSynthesisRequest,
+    ) -> Result<(AudioChunk, Option<Vec<f32>>)> {
+        self.synthesize_cloned_hq_inner(request).await
+    }
+
     async fn synthesize_cloned(&self, request: &ClonedSynthesisRequest) -> Result<AudioChunk> {
+        let (chunk, _) = self.synthesize_cloned_hq_inner(request).await?;
+        Ok(chunk)
+    }
+}
+
+impl Qwen3TtsEngine {
+    async fn synthesize_cloned_hq_inner(
+        &self,
+        request: &ClonedSynthesisRequest,
+    ) -> Result<(AudioChunk, Option<Vec<f32>>)> {
+        let target_lang = normalize_language_code(
+            request
+                .language
+                .as_deref()
+                .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                .unwrap_or(&request.profile.language),
+        );
+
         // 1. Dynamic sidecar resolution: check configured URL, env, or cached auto-detected ports
         let sidecar_url = self.resolve_sidecar_url();
 
         if let Some(ref url) = sidecar_url {
             let num_step: u32 = request
-                .profile
-                .metadata
-                .get("num_step")
-                .and_then(|s| s.parse().ok())
+                .num_step
+                .or_else(|| {
+                    request
+                        .profile
+                        .metadata
+                        .get("num_step")
+                        .and_then(|s| s.parse().ok())
+                })
                 .unwrap_or(32);
-            let instruct = request.profile.metadata.get("instruct").cloned();
-            let seed: Option<u64> = request
-                .profile
-                .metadata
-                .get("seed")
-                .and_then(|s| s.parse().ok());
+            let instruct = request
+                .instruct
+                .clone()
+                .or_else(|| request.profile.metadata.get("instruct").cloned());
+            let seed: Option<u64> = request.seed.or_else(|| {
+                request
+                    .profile
+                    .metadata
+                    .get("seed")
+                    .and_then(|s| s.parse().ok())
+            });
+            let precision: u16 = request
+                .precision
+                .or_else(|| {
+                    request
+                        .profile
+                        .metadata
+                        .get("precision")
+                        .and_then(|s| s.parse().ok())
+                })
+                .unwrap_or(16);
 
             let payload = serde_json::json!({
                 "text": request.text,
                 "voice_profile_id": request.profile.id,
                 "reference_audio": request.profile.reference_audio_base64,
                 "reference_transcript": request.profile.reference_transcript,
-                "language": request.profile.language,
+                "language": target_lang,
                 "speed": request.speed,
                 "pitch": request.pitch,
                 "num_step": num_step,
+                "precision": precision,
                 "instruct": instruct,
                 "seed": seed,
                 "mastering": true
             });
 
-            if let Ok(resp) = self.client.post(url).json(&payload).send().await {
-                if resp.status().is_success() {
-                    if let Ok(bytes) = resp.bytes().await {
-                        if bytes.starts_with(b"RIFF") {
-                            if let Ok((pcm, sr, _ch)) =
-                                voxforge_audio::WavEncoder::decode_wav_to_pcm16(&bytes)
-                            {
-                                return Ok(AudioChunk {
-                                    sample_rate: sr,
-                                    channels: 1,
-                                    pcm_data: pcm,
-                                    is_final: true,
-                                });
+            match self.client.post(url).json(&payload).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        match resp.bytes().await {
+                            Ok(bytes) if bytes.starts_with(b"RIFF") => {
+                                match voxforge_audio::WavEncoder::decode_wav_to_mono_f32(&bytes) {
+                                    Ok((samples_f32, sr)) if !samples_f32.is_empty() => {
+                                        let pcm: Vec<i16> = samples_f32
+                                            .iter()
+                                            .map(|&s| (s.clamp(-1.0, 1.0) * 32767.0).round() as i16)
+                                            .collect();
+                                        return Ok((
+                                            AudioChunk {
+                                                sample_rate: sr,
+                                                channels: 1,
+                                                pcm_data: pcm,
+                                                is_final: true,
+                                            },
+                                            Some(samples_f32),
+                                        ));
+                                    }
+                                    Ok(_) => {
+                                        tracing::warn!(url = %url, "Neural sidecar returned empty RIFF WAV payload; falling back to local DSP pipeline");
+                                    }
+                                    Err(err) => {
+                                        tracing::warn!(url = %url, error = %err, "Failed to decode sidecar RIFF WAV; trying PCM16 decoder");
+                                        if let Ok((pcm, sr)) =
+                                            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
+                                        {
+                                            return Ok((
+                                                AudioChunk {
+                                                    sample_rate: sr,
+                                                    channels: 1,
+                                                    pcm_data: pcm,
+                                                    is_final: true,
+                                                },
+                                                None,
+                                            ));
+                                        }
+                                    }
+                                }
                             }
-                        } else if !bytes.is_empty() {
-                            let pcm: Vec<i16> = bytes
-                                .chunks_exact(2)
-                                .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                                .collect();
-                            return Ok(AudioChunk {
-                                sample_rate: self.sample_rate,
-                                channels: 1,
-                                pcm_data: pcm,
-                                is_final: true,
-                            });
+                            Ok(bytes) if !bytes.is_empty() => {
+                                let pcm: Vec<i16> = bytes
+                                    .chunks_exact(2)
+                                    .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                                    .collect();
+                                return Ok((
+                                    AudioChunk {
+                                        sample_rate: self.sample_rate,
+                                        channels: 1,
+                                        pcm_data: pcm,
+                                        is_final: true,
+                                    },
+                                    None,
+                                ));
+                            }
+                            Ok(_) => {
+                                tracing::warn!(url = %url, "Neural sidecar returned empty response body");
+                            }
+                            Err(err) => {
+                                tracing::warn!(url = %url, error = %err, "Failed to read neural sidecar response bytes");
+                            }
                         }
+                    } else {
+                        let status = resp.status();
+                        let err_body = resp.text().await.unwrap_or_default();
+                        tracing::warn!(url = %url, %status, body = %err_body, "Neural sidecar returned non-success status; falling back");
                     }
+                }
+                Err(err) => {
+                    tracing::warn!(url = %url, error = %err, "Neural sidecar HTTP request failed; falling back");
                 }
             }
         }
@@ -1350,7 +1442,7 @@ impl TtsEngine for Qwen3TtsEngine {
         let fallback_voice = resolve_cross_lingual_base_voice(
             Some(&acoustic_gender),
             &request.text,
-            &request.profile.language,
+            &target_lang,
         );
 
         // 5. Calculate pitch delta matching the cloned speaker's exact fundamental pitch
@@ -1684,7 +1776,7 @@ impl TtsEngine for Qwen3TtsEngine {
         // Final brickwall to guard against any LUFS gain boost causing clipping (look-ahead)
         voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
 
-        Ok(chunk)
+        Ok((chunk, None))
     }
 }
 
@@ -1906,33 +1998,134 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
         "zh-CN-liaoning-XiaobeiNeural",
         "zh-CN-liaoning-XiaobeiNeural",
     ),
+    ("el-GR", "el-GR-NestorasNeural", "el-GR-AthinaNeural"),
 ];
+
+/// Normalize BCP-47 locales, ISO 639-3 macrolanguage codes, Romanized tags, and display names.
+pub fn normalize_language_code(lang: &str) -> String {
+    let trimmed = lang.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("AUTO") {
+        return "en-US".to_string();
+    }
+
+    let lower = trimmed.to_ascii_lowercase().replace('_', "-");
+    match lower.as_str() {
+        "portuguese (brazil)" | "brazilian portuguese" => return "pt-BR".to_string(),
+        "portuguese (portugal)" | "european portuguese" => return "pt-PT".to_string(),
+        "chinese (simplified)" => return "zh-CN".to_string(),
+        "chinese (traditional)" => return "zh-TW".to_string(),
+        "ml-latn" => return "ml".to_string(),
+        "hi-latn" => return "hi".to_string(),
+        "ta-latn" => return "ta".to_string(),
+        _ => {}
+    }
+
+    fn map_macro(code: &str) -> &str {
+        match code {
+            "arb" | "arz" | "acm" | "apc" | "ary" | "ajp" | "aeb" | "apd" => "ar",
+            "cmn" | "zho" | "yue" | "wuu" => "zh",
+            "mal" => "ml",
+            "hin" => "hi",
+            "tam" => "ta",
+            "tel" => "te",
+            "kan" => "kn",
+            "ben" => "bn",
+            "urd" => "ur",
+            "npi" | "nep" => "ne",
+            "jpn" => "ja",
+            "kor" => "ko",
+            "fra" | "fre" => "fr",
+            "deu" | "ger" => "de",
+            "spa" => "es",
+            "por" => "pt",
+            "rus" => "ru",
+            "ita" => "it",
+            "nld" | "dut" => "nl",
+            "tur" => "tr",
+            "vie" => "vi",
+            "ind" => "id",
+            "tha" => "th",
+            "ell" | "gre" => "el",
+            "heb" => "he",
+            "ukr" => "uk",
+            "pol" => "pl",
+            "ces" | "cze" => "cs",
+            "swe" => "sv",
+            "ron" | "rum" => "ro",
+            "hun" => "hu",
+            "fas" | "per" => "fa",
+            "mar" => "mr",
+            "guj" => "gu",
+            "pan" => "pa",
+            "sin" => "si",
+            "khm" => "km",
+            "lao" => "lo",
+            "mya" | "bur" => "my",
+            "amh" => "am",
+            "kat" | "geo" => "ka",
+            "hye" | "arm" => "hy",
+            _ => code,
+        }
+    }
+
+    let parts: Vec<&str> = lower.split('-').filter(|p| !p.is_empty()).collect();
+    if parts.is_empty() {
+        return "en-US".to_string();
+    }
+    let base = map_macro(parts[0]);
+    if parts.len() >= 2 {
+        let region = parts[1];
+        if region == "latn" {
+            return base.to_string();
+        }
+        if matches!(region, "hans" | "cn" | "sg") {
+            return format!("{base}-CN");
+        }
+        if matches!(region, "hant" | "tw" | "hk") {
+            return format!("{base}-TW");
+        }
+        if region.len() == 2 {
+            return format!("{base}-{}", region.to_ascii_uppercase());
+        }
+        return format!("{base}-{region}");
+    }
+    base.to_string()
+}
 
 /// Detect which Unicode script block dominates the text.
 /// Returns a BCP-47 script-based language code or empty string if Latin/unknown.
-fn detect_script_lang(text: &str) -> &'static str {
-    let mut counts = [0u32; 16];
-    // indices: 0=ml, 1=hi/mr/Sanskrit, 2=ta, 3=te, 4=kn, 5=bn, 6=gu, 7=pa,
-    //          8=ar/ur, 9=ja, 10=cjk, 11=ko, 12=si, 13=km, 14=lo, 15=my
+pub fn detect_script_lang(text: &str) -> &'static str {
+    let mut counts = [0u32; 23];
+    // 0=ml, 1=hi, 2=ta, 3=te, 4=kn, 5=bn, 6=gu, 7=pa,
+    // 8=ar, 9=ja, 10=zh, 11=ko, 12=si, 13=km, 14=lo, 15=my,
+    // 16=ru(Cyrillic), 17=el(Greek), 18=he(Hebrew), 19=th(Thai),
+    // 20=ka(Georgian), 21=hy(Armenian), 22=am(Ethiopic)
     for c in text.chars() {
         let cp = c as u32;
         match cp {
-            0x0D00..=0x0D7F => counts[0] += 1, // Malayalam
-            0x0900..=0x097F => counts[1] += 1, // Devanagari
-            0x0B80..=0x0BFF => counts[2] += 1, // Tamil
-            0x0C00..=0x0C7F => counts[3] += 1, // Telugu
-            0x0C80..=0x0CFF => counts[4] += 1, // Kannada
-            0x0980..=0x09FF => counts[5] += 1, // Bengali
-            0x0A80..=0x0AFF => counts[6] += 1, // Gujarati
-            0x0A00..=0x0A7F => counts[7] += 1, // Gurmukhi
-            0x0600..=0x06FF | 0x0750..=0x077F | 0xFB50..=0xFDFF => counts[8] += 1, // Arabic/Persian
-            0x3040..=0x30FF | 0x31F0..=0x31FF => counts[9] += 1, // Japanese kana
-            0x4E00..=0x9FFF | 0x3400..=0x4DBF => counts[10] += 1, // CJK
-            0xAC00..=0xD7A3 | 0x1100..=0x11FF => counts[11] += 1, // Korean
-            0x0D80..=0x0DFF => counts[12] += 1, // Sinhala
-            0x1780..=0x17FF => counts[13] += 1, // Khmer
-            0x0E80..=0x0EFF => counts[14] += 1, // Lao
-            0x1000..=0x109F => counts[15] += 1, // Myanmar
+            0x0D00..=0x0D7F => counts[0] += 1,
+            0x0900..=0x097F => counts[1] += 1,
+            0x0B80..=0x0BFF => counts[2] += 1,
+            0x0C00..=0x0C7F => counts[3] += 1,
+            0x0C80..=0x0CFF => counts[4] += 1,
+            0x0980..=0x09FF => counts[5] += 1,
+            0x0A80..=0x0AFF => counts[6] += 1,
+            0x0A00..=0x0A7F => counts[7] += 1,
+            0x0600..=0x06FF | 0x0750..=0x077F | 0xFB50..=0xFDFF => counts[8] += 1,
+            0x3040..=0x30FF | 0x31F0..=0x31FF => counts[9] += 1,
+            0x4E00..=0x9FFF | 0x3400..=0x4DBF => counts[10] += 1,
+            0xAC00..=0xD7A3 | 0x1100..=0x11FF => counts[11] += 1,
+            0x0D80..=0x0DFF => counts[12] += 1,
+            0x1780..=0x17FF => counts[13] += 1,
+            0x0E80..=0x0EFF => counts[14] += 1,
+            0x1000..=0x109F => counts[15] += 1,
+            0x0400..=0x04FF => counts[16] += 1,
+            0x0370..=0x03FF => counts[17] += 1,
+            0x0590..=0x05FF => counts[18] += 1,
+            0x0E00..=0x0E7F => counts[19] += 1,
+            0x10A0..=0x10FF => counts[20] += 1,
+            0x0530..=0x058F => counts[21] += 1,
+            0x1200..=0x137F => counts[22] += 1,
             _ => {}
         }
     }
@@ -1962,6 +2155,13 @@ fn detect_script_lang(text: &str) -> &'static str {
         13 => "km",
         14 => "lo",
         15 => "my",
+        16 => "ru",
+        17 => "el",
+        18 => "he",
+        19 => "th",
+        20 => "ka",
+        21 => "hy",
+        22 => "am",
         _ => "",
     }
 }
@@ -1989,14 +2189,14 @@ pub fn resolve_cross_lingual_base_voice(
 
     // 1. Script detection — non-Latin scripts short-circuit the profile tag entirely.
     //    e.g. Malayalam text with profile_lang="en-US" must still return an ml-* voice.
-    let script_lang = if text.len() >= 3 {
+    let script_lang = if !text.trim().is_empty() {
         detect_script_lang(text)
     } else {
         ""
     };
 
     if !script_lang.is_empty() {
-        // Script was detected: search by script prefix first, then exact script-locale match.
+        // Script was detected: search by script prefix first.
         let script_prefix = script_lang.split('-').next().unwrap_or(script_lang);
         for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
             if bcp47.starts_with(script_prefix) {
@@ -2005,15 +2205,17 @@ pub fn resolve_cross_lingual_base_voice(
         }
     }
 
-    // 2. Exact locale match (e.g. "en-GB", "fr-CA") — only reached for Latin/undetected scripts.
+    let normalized = normalize_language_code(profile_lang);
+
+    // 2. Exact locale match (e.g. "en-GB", "fr-CA", "pt-BR", "pt-PT") — only reached for Latin/undetected scripts.
     for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
-        if profile_lang.eq_ignore_ascii_case(bcp47) {
+        if profile_lang.eq_ignore_ascii_case(bcp47) || normalized.eq_ignore_ascii_case(bcp47) {
             return pick(male, female);
         }
     }
 
-    // 3. Language-prefix match on profile_lang (e.g. "ar" matches first "ar-*" entry)
-    let prefix = profile_lang.split('-').next().unwrap_or(profile_lang);
+    // 3. Language-prefix match on normalized language code (e.g. "arb"->"ar" matches "ar-SA")
+    let prefix = normalized.split('-').next().unwrap_or(&normalized);
     for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
         if bcp47.starts_with(prefix) && !prefix.is_empty() {
             return pick(male, female);
@@ -2072,6 +2274,11 @@ mod tests {
             speed: 1.0,
             pitch: 0.0,
             format: AudioContainerFormat::Wav,
+            language: None,
+            instruct: None,
+            num_step: None,
+            seed: None,
+            precision: None,
         };
 
         match engine.synthesize_cloned(&synth_req).await {
@@ -2120,6 +2327,26 @@ mod tests {
         let en_voice =
             resolve_cross_lingual_base_voice(Some(&Gender::Male), "Hello world", "en-US");
         assert_eq!(en_voice, "en-US-GuyNeural");
+
+        // ISO 639-3 macrolanguage codes & expanded scripts
+        assert_eq!(normalize_language_code("arb"), "ar");
+        assert_eq!(normalize_language_code("mal"), "ml");
+        assert_eq!(normalize_language_code("ml-Latn"), "ml");
+        assert_eq!(normalize_language_code("Portuguese (Brazil)"), "pt-BR");
+        assert_eq!(
+            resolve_cross_lingual_base_voice(Some(&Gender::Male), "Marhaba", "arb"),
+            "ar-SA-HamedNeural"
+        );
+        assert_eq!(detect_script_lang("Привет мир"), "ru");
+        assert_eq!(detect_script_lang("Γεια σου"), "el");
+        assert_eq!(detect_script_lang("שלום"), "he");
+        assert_eq!(detect_script_lang("สวัสดี"), "th");
+        assert_eq!(detect_script_lang("გამარჯობა"), "ka");
+        assert_eq!(detect_script_lang("Բարև"), "hy");
+        assert_eq!(detect_script_lang("ሰላም"), "am");
+        assert!((nominal_base_voice_f0("ar-SA-HamedNeural") - 120.0).abs() < 1.0);
+        assert!((nominal_base_voice_f0("ru-RU-DmitryNeural") - 120.0).abs() < 1.0);
+        assert!((nominal_base_voice_f0("el-GR-NestorasNeural") - 120.0).abs() < 1.0);
     }
 
     #[test]

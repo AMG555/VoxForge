@@ -347,6 +347,11 @@ impl McpServer {
                             speed,
                             pitch,
                             format: AudioContainerFormat::Wav,
+                            language: None,
+                            instruct: None,
+                            num_step: None,
+                            seed: None,
+                            precision: None,
                         };
                         match engine.synthesize_cloned(&synth_req).await {
                             Ok(chunk) => {
