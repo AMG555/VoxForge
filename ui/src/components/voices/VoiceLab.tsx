@@ -135,7 +135,24 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [pitch, setPitch] = useState<number>(0.0);
   const [instruct, setInstruct] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [synthError, setSynthError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [sidecarStatus, setSidecarStatus] = useState<{ running: boolean; url?: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .getHealth()
+      .then((h) => {
+        if (active && h.neural_sidecar) {
+          setSidecarStatus(h.neural_sidecar);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -159,6 +176,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [stsInputBase64, setStsInputBase64] = useState<string>('');
   const [stsInputFileName, setStsInputFileName] = useState<string>('');
   const [stsIsConverting, setStsIsConverting] = useState<boolean>(false);
+  const [stsError, setStsError] = useState<string | null>(null);
   const [stsPreserveTempo, setStsPreserveTempo] = useState<boolean>(true);
   const [stsSpeed, setStsSpeed] = useState<number>(1.0);
   const [stsConvertedUrl, setStsConvertedUrl] = useState<string | null>(null);
@@ -599,7 +617,9 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
   // Voice cloning studio state
   const [showCloneModal, setShowCloneModal] = useState<boolean>(false);
-  const [cloneMode, setCloneMode] = useState<'record' | 'upload'>('record');
+  const [cloneMode, setCloneMode] = useState<'record' | 'upload' | 'url'>('record');
+  const [cloneSourceUrl, setCloneSourceUrl] = useState<string>('');
+  const [isFetchingUrl, setIsFetchingUrl] = useState<boolean>(false);
   const [cloneName, setCloneName] = useState<string>('');
   const [cloneTranscript, setCloneTranscript] = useState<string>('');
   const [cloneGender, setCloneGender] = useState<'male' | 'female' | 'neutral'>('neutral');
@@ -736,6 +756,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
   const handleGenerate = async () => {
     if (!text.trim() || !canGenerate) return;
+    setSynthError(null);
     try {
       setIsGenerating(true);
       if (audioUrl) {
@@ -785,29 +806,23 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           ? detectedLang.nativeTargetCode || detectedLang.code
           : undefined;
 
-      try {
-        const targetVoiceObj = localVoices.find((v) => v.id === voiceToSynthesize) || selectedVoice;
-        const targetModel =
-          targetVoiceObj?.engine_id ||
-          (isCustomVoice(targetVoiceObj) ? 'qwen3-tts' : undefined);
+      const targetVoiceObj = localVoices.find((v) => v.id === voiceToSynthesize) || selectedVoice;
+      const targetModel =
+        targetVoiceObj?.engine_id ||
+        (isCustomVoice(targetVoiceObj) ? 'qwen3-tts' : undefined);
 
-        blob = await api.synthesizeDirect({
-          input: promptText,
-          voice: voiceToSynthesize,
-          model: targetModel,
-          language: effectiveTargetLang,
-          speed,
-          pitch,
-          instruct: instruct.trim() || undefined,
-          num_step: refinementSteps,
-          precision: audioPrecision,
-          seed: currentSeed,
-        });
-      } catch (backendErr) {
-        console.warn('Backend synthesis unreachable; falling back to studio reference synthesis sample:', backendErr);
-        const sample = await AudioProcessor.createDemoReferenceSample('broadcaster');
-        blob = sample.wavBlob;
-      }
+      blob = await api.synthesizeDirect({
+        input: promptText,
+        voice: voiceToSynthesize,
+        model: targetModel,
+        language: effectiveTargetLang,
+        speed,
+        pitch,
+        instruct: instruct.trim() || undefined,
+        num_step: refinementSteps,
+        precision: audioPrecision,
+        seed: currentSeed,
+      });
 
       // Apply Pro Studio Mastering DSP chain (Tube Warmth, 4-Band EQ, De-Esser, Reverb)
       if (studioMode && studioConfig.enabled) {
@@ -863,6 +878,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       }
     } catch (err: any) {
       console.error('Synthesis error:', err);
+      setSynthError(
+        err?.message ||
+          'Speech synthesis failed. Check that the VoxForge server is online and selected voice supports this language.'
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -988,6 +1007,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
   const handleConvertVoice = async () => {
     if (!stsInputBase64) return;
+    setStsError(null);
     try {
       setStsIsConverting(true);
       if (stsConvertedUrl) {
@@ -995,11 +1015,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         setStsConvertedUrl(null);
       }
 
+      const effectiveStsLang =
+        selectedLanguageCode !== 'AUTO'
+          ? selectedLanguageCode
+          : detectedLang.code !== 'unknown'
+          ? detectedLang.nativeTargetCode || detectedLang.code
+          : undefined;
+
       const blob = await api.speechToSpeech({
         audio_base64: stsInputBase64,
         target_voice: selectedVoiceId,
         speed: stsSpeed,
         preserve_tempo: stsPreserveTempo,
+        language: effectiveStsLang,
+        instruct: instruct.trim() || undefined,
+        seed: pinnedSeed ?? activeSeed,
+        precision: audioPrecision,
       });
 
       const url = URL.createObjectURL(blob);
@@ -1024,6 +1055,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       setActiveTakeId(newTake.id);
     } catch (err: any) {
       console.error('Speech-to-Speech conversion failed:', err);
+      setStsError(err?.message || 'Speech-to-Speech conversion failed.');
     } finally {
       setStsIsConverting(false);
     }
@@ -1216,6 +1248,41 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   };
 
 
+  const handleFetchCloneUrl = async () => {
+    const trimmed = cloneSourceUrl.trim();
+    if (!trimmed || isFetchingUrl) return;
+    setIsFetchingUrl(true);
+    setCloneError(null);
+    try {
+      const fetched = await api.fetchRemoteAudioUrl(trimmed);
+      const byteString = atob(fetched.audio_base64);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      const rawBlob = new Blob([bytes], { type: fetched.content_type || 'audio/wav' });
+      try {
+        const result = await AudioProcessor.preprocessForCloning(rawBlob);
+        if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+        setRecordedAudioUrl(URL.createObjectURL(result.wavBlob));
+        setCloneAudioBase64(result.wavBase64);
+        assessReferenceClip(result.wavBase64);
+        setAudioQuality(result.metrics);
+        setCloneFileName(`${fetched.filename} (Enhanced 24kHz Studio WAV)`);
+      } catch {
+        if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+        setRecordedAudioUrl(URL.createObjectURL(rawBlob));
+        setCloneAudioBase64(fetched.audio_base64);
+        assessReferenceClip(fetched.audio_base64);
+        setCloneFileName(fetched.filename);
+      }
+    } catch (err: any) {
+      setCloneError(err?.message || 'Failed fetching audio from URL.');
+    } finally {
+      setIsFetchingUrl(false);
+    }
+  };
+
   const handleServerTranscribeClone = async () => {
     if (!cloneAudioBase64 || isServerTranscribing) return;
     setIsServerTranscribing(true);
@@ -1290,6 +1357,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       setCloneName('');
       setCloneTranscript('');
       setCloneAudioBase64('');
+      setCloneSourceUrl('');
       setCloneFileName('');
       setCloneLanguage('AUTO');
       setAdditionalSamples([]);
@@ -1892,8 +1960,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             </div>
 
             <div className="hidden sm:flex items-center space-x-2 pr-2 text-[11px] font-mono text-[#64748B]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>VoxForge AI Studio Online</span>
+              <span
+                className={`w-2 h-2 rounded-full animate-pulse ${
+                  sidecarStatus?.running ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+              />
+              <span
+                title={
+                  sidecarStatus?.running
+                    ? `Local neural sidecar connected at ${sidecarStatus.url}`
+                    : 'Running standalone Rust engine. Launch scripts/start-sidecar.bat (OmniVoice) on port 9000 for 646-lang zero-shot neural cloning.'
+                }
+              >
+                {sidecarStatus?.running
+                  ? 'Neural Sidecar Connected (:9000)'
+                  : 'VoxForge AI Studio Online'}
+              </span>
             </div>
           </div>
 
@@ -2061,6 +2143,21 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   )}
                 </button>
               </div>
+              {stsError && (
+                <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{stsError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStsError(null)}
+                    className="text-red-400/70 hover:text-red-200 p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -3022,6 +3119,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               </div>
             )}
 
+            {synthError && (
+              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between animate-in fade-in duration-150">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{synthError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSynthError(null)}
+                  className="text-red-400/70 hover:text-red-200 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {studioPlaygroundMode === 'tts' && (
               canGenerate ? (
                 <div className="flex items-center space-x-4">
@@ -3615,19 +3728,19 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   />
                 </div>
 
-                {/* Input Mode Selector: Instant Microphone vs File Upload */}
+                {/* Input Mode Selector: Instant Microphone vs File Upload vs From URL */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-1.5">
                     Reference Audio Source *
                   </label>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="grid grid-cols-3 gap-2 mb-3">
                     <button
                       type="button"
                       onClick={() => {
                         setCloneMode('record');
                         resetRecording();
                       }}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center space-x-2 transition-all ${
+                      className={`py-2 px-2.5 rounded-lg text-xs font-medium border flex items-center justify-center space-x-1.5 transition-all ${
                         cloneMode === 'record'
                           ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-semibold shadow-sm shadow-amber-500/10'
                           : 'bg-[#0B0E14] border-[#242E3D] text-[#94A3B8] hover:border-[#3B485C]'
@@ -3643,7 +3756,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                         setCloneMode('upload');
                         resetRecording();
                       }}
-                      className={`py-2 px-3 rounded-lg text-xs font-medium border flex items-center justify-center space-x-2 transition-all ${
+                      className={`py-2 px-2.5 rounded-lg text-xs font-medium border flex items-center justify-center space-x-1.5 transition-all ${
                         cloneMode === 'upload'
                           ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-semibold shadow-sm shadow-amber-500/10'
                           : 'bg-[#0B0E14] border-[#242E3D] text-[#94A3B8] hover:border-[#3B485C]'
@@ -3651,6 +3764,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>Upload Audio File</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCloneMode('url');
+                        resetRecording();
+                      }}
+                      className={`py-2 px-2.5 rounded-lg text-xs font-medium border flex items-center justify-center space-x-1.5 transition-all ${
+                        cloneMode === 'url'
+                          ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-semibold shadow-sm shadow-amber-500/10'
+                          : 'bg-[#0B0E14] border-[#242E3D] text-[#94A3B8] hover:border-[#3B485C]'
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Import URL</span>
                     </button>
                   </div>
 
@@ -3808,6 +3937,41 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                           </div>
                         </div>
                       )}
+                    </div>
+                  ) : cloneMode === 'url' ? (
+                    <div className="border border-[#242E3D] bg-[#0B0E14] rounded-xl p-4 space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          value={cloneSourceUrl}
+                          onChange={(e) => setCloneSourceUrl(e.target.value)}
+                          placeholder="https://example.com/voice-sample.wav or public video/audio URL"
+                          className="flex-1 bg-[#121820] border border-[#242E3D] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleFetchCloneUrl}
+                          disabled={isFetchingUrl || !cloneSourceUrl.trim()}
+                          className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center space-x-1.5 disabled:opacity-50"
+                        >
+                          {isFetchingUrl ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Fetching...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-3.5 h-3.5" />
+                              <span>Fetch Audio</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-[#64748B] font-mono">
+                        {cloneFileName
+                          ? `Loaded: ${cloneFileName}`
+                          : 'Supports direct .wav/.mp3/.flac/.m4a/.ogg links or public video URLs (clean speech recommended)'}
+                      </p>
                     </div>
                   ) : (
                     <label className="flex flex-col items-center justify-center border border-dashed border-[#242E3D] hover:border-amber-500/50 bg-[#0B0E14] rounded-xl p-5 cursor-pointer transition-colors group">

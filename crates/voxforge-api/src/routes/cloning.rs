@@ -473,8 +473,16 @@ pub(crate) fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), Str
         input.trim()
     };
 
+    if clean.is_empty() {
+        return Err("Empty audio payload".to_string());
+    }
+
     let out = decode_b64_bytes(clean)
         .or_else(|_| hex::decode(clean).map_err(|e| format!("Invalid audio encoding: {e}")))?;
+
+    if out.is_empty() {
+        return Err("Decoded audio payload is empty".to_string());
+    }
 
     if out.len() >= 12 && &out[0..4] == b"RIFF" && &out[8..12] == b"WAVE" {
         let (mono, sr) = voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&out)

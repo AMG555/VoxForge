@@ -24,7 +24,11 @@ const getHeaders = (customHeaders: Record<string, string> = {}): Record<string, 
 };
 
 export const api = {
-  async getHealth(): Promise<{ status: string; version: string }> {
+  async getHealth(): Promise<{
+    status: string;
+    version: string;
+    neural_sidecar?: { running: boolean; url?: string };
+  }> {
     const res = await fetch(`${BASE_URL}/health`, {
       headers: getHeaders(),
     });
@@ -197,7 +201,27 @@ export const api = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Voice cloning failed' }));
-      throw new Error(err.detail || 'Voice cloning failed');
+      throw new Error(err.detail || err.title || 'Voice cloning failed');
+    }
+    return res.json();
+  },
+
+  async fetchRemoteAudioUrl(url: string): Promise<{
+    audio_base64: string;
+    filename: string;
+    content_type: string;
+    size_bytes: number;
+    source_url: string;
+    normalized_wav: boolean;
+  }> {
+    const res = await fetch(`${BASE_URL}/v1/voices/fetch-url`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Remote audio fetch failed' }));
+      throw new Error(err.detail || err.title || 'Remote audio fetch failed');
     }
     return res.json();
   },
@@ -259,6 +283,10 @@ export const api = {
     target_voice: string;
     speed?: number;
     preserve_tempo?: boolean;
+    language?: string;
+    instruct?: string;
+    seed?: number;
+    precision?: number;
   }): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/audio/speech-to-speech`, {
       method: 'POST',
@@ -268,12 +296,16 @@ export const api = {
         target_voice: payload.target_voice,
         speed: payload.speed ?? 1.0,
         preserve_tempo: payload.preserve_tempo ?? true,
+        language: payload.language && payload.language !== 'AUTO' ? payload.language : undefined,
+        instruct: payload.instruct,
+        seed: payload.seed,
+        precision: payload.precision,
         response_format: 'wav',
       }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Speech-to-Speech conversion failed' }));
-      throw new Error(err.detail || 'Speech-to-Speech conversion failed');
+      throw new Error(err.detail || err.title || 'Speech-to-Speech conversion failed');
     }
     return res.blob();
   },

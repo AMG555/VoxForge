@@ -175,6 +175,7 @@ export interface CloneVoicePayload {
   name: string;
   engine_id?: string;
   reference_audio_base64?: string;
+  reference_audio_url?: string;
   reference_transcript?: string;
   additional_reference_audio_base64?: string[];
   language?: string;
