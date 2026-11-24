@@ -1609,4 +1609,79 @@ mod tests {
         let res = app.oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::OK);
     }
+
+    #[tokio::test]
+    async fn test_fetch_url_ssrf_block_and_cloned_sts() {
+        let state = setup_test_state(None).await;
+        let wav = voxforge_audio::WavEncoder::encode_pcm16_to_wav(
+            &[300i16; 4800],
+            24000,
+            1,
+        )
+        .unwrap();
+        let wav_b64 = routes::cloning::base64_encode(&wav);
+
+        state
+            .voice_profiles
+            .insert(voxforge_core::models::VoiceProfile {
+                id: "cloned-sts-target".to_string(),
+                name: "STS Target Clone".to_string(),
+                engine_id: "qwen3-tts".to_string(),
+                description: None,
+                language: "ml-IN".to_string(),
+                gender: Some(voxforge_core::models::Gender::Female),
+                reference_audio_path: None,
+                reference_audio_base64: Some(wav_b64.clone()),
+                reference_transcript: Some("Reference speech".to_string()),
+                embedding: None,
+                clone_capabilities: None,
+                similarity_score: None,
+                sample_count: 1,
+                version: 1,
+                metadata: std::collections::HashMap::new(),
+                created_at: chrono::Utc::now(),
+                refined_at: None,
+            })
+            .await;
+
+        let app = create_app(state);
+
+        // 1. POST /v1/voices/fetch-url must block loopback/private targets (403)
+        let fetch_req = Request::builder()
+            .method("POST")
+            .uri("/v1/voices/fetch-url")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({ "url": "http://127.0.0.1:8080/health" }).to_string(),
+            ))
+            .unwrap();
+        let fetch_res = app.clone().oneshot(fetch_req).await.unwrap();
+        assert_eq!(fetch_res.status(), StatusCode::FORBIDDEN);
+
+        // 2. POST /v1/audio/speech-to-speech must route cloned target profile directly
+        let sts_req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech-to-speech")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "audio_base64": wav_b64,
+                    "target_voice": "cloned-sts-target",
+                    "language": "ml-IN",
+                    "precision": 24,
+                    "response_format": "wav"
+                })
+                .to_string(),
+            ))
+            .unwrap();
+        let sts_res = app.oneshot(sts_req).await.unwrap();
+        assert_eq!(sts_res.status(), StatusCode::OK);
+        assert_eq!(
+            sts_res
+                .headers()
+                .get("x-voxforge-target-voice")
+                .and_then(|v| v.to_str().ok()),
+            Some("cloned-sts-target")
+        );
+    }
 }

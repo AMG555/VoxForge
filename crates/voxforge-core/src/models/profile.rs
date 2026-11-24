@@ -63,6 +63,9 @@ pub struct CloneVoiceRequest {
     pub reference_audio_base64: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_audio_path: Option<String>,
+    /// Optional HTTP(S) URL of reference audio to fetch (SSRF-validated).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_audio_url: Option<String>,
     /// Optional exact transcript of the reference audio for conditioning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reference_transcript: Option<String>,

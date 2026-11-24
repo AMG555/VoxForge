@@ -146,18 +146,42 @@ pub async fn clone_voice(
         }
     }
 
-    if body.reference_audio_base64.is_none() && body.reference_audio_path.is_none() {
+    if body.reference_audio_base64.is_none()
+        && body.reference_audio_path.is_none()
+        && body.reference_audio_url.is_none()
+    {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(ProblemDetails {
                 problem_type: "https://voxforge.org/errors/missing-audio".to_string(),
                 title: "Missing Reference Audio".to_string(),
                 status: 400,
-                detail: "Either 'reference_audio_base64' or 'reference_audio_path' is required"
+                detail: "Either 'reference_audio_base64', 'reference_audio_path', or 'reference_audio_url' is required"
                     .to_string(),
                 instance: "/v1/voices/clone".to_string(),
             }),
         ));
+    }
+
+    if body.reference_audio_base64.is_none() && body.reference_audio_path.is_none() {
+        if let Some(ref raw_url) = body.reference_audio_url {
+            let fetched = fetch_remote_audio(raw_url).await.map_err(|(status, detail)| {
+                (
+                    status,
+                    Json(ProblemDetails {
+                        problem_type: "https://voxforge.org/errors/url-fetch-failed".to_string(),
+                        title: "Remote Audio Fetch Failed".to_string(),
+                        status: status.as_u16(),
+                        detail,
+                        instance: "/v1/voices/clone".to_string(),
+                    }),
+                )
+            })?;
+            body.reference_audio_base64 = Some(fetched.audio_base64);
+            body.metadata
+                .entry("source_url".to_string())
+                .or_insert(fetched.source_url);
+        }
     }
 
     // Resolve the target cloning engine
@@ -365,12 +389,42 @@ pub struct VoiceAudioAssessment {
     pub recommendations: Vec<String>,
 }
 
-fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
+pub(crate) fn base64_encode(data: &[u8]) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    let mut i = 0;
+    while i < data.len() {
+        let b0 = data[i] as u32;
+        let b1 = if i + 1 < data.len() { data[i + 1] as u32 } else { 0 };
+        let b2 = if i + 2 < data.len() { data[i + 2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        out.push(CHARSET[((triple >> 18) & 0x3F) as usize] as char);
+        out.push(CHARSET[((triple >> 12) & 0x3F) as usize] as char);
+        out.push(if i + 1 < data.len() {
+            CHARSET[((triple >> 6) & 0x3F) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if i + 2 < data.len() {
+            CHARSET[(triple & 0x3F) as usize] as char
+        } else {
+            '='
+        });
+        i += 3;
+    }
+    out
+}
+
+pub(crate) fn decode_b64_bytes(input: &str) -> Result<Vec<u8>, String> {
     let clean = if let Some(idx) = input.find(',') {
         input[idx + 1..].trim()
     } else {
         input.trim()
     };
+
+    if clean.is_empty() {
+        return Err("Empty audio payload".to_string());
+    }
 
     let mut table = [0xFFu8; 256];
     for (i, &b) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -381,10 +435,6 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
     }
     table[b'-' as usize] = 62;
     table[b'_' as usize] = 63;
-
-    if clean.is_empty() {
-        return Err("Empty audio payload".to_string());
-    }
 
     let mut out = Vec::with_capacity(clean.len() * 3 / 4);
     let mut buf = 0u32;
@@ -410,19 +460,30 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
         }
     }
 
+    if out.is_empty() {
+        return Err("Empty decoded audio payload".to_string());
+    }
+    Ok(out)
+}
+
+pub(crate) fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
+    let clean = if let Some(idx) = input.find(',') {
+        input[idx + 1..].trim()
+    } else {
+        input.trim()
+    };
+
+    let out = decode_b64_bytes(clean)
+        .or_else(|_| hex::decode(clean).map_err(|e| format!("Invalid audio encoding: {e}")))?;
+
     if out.len() >= 12 && &out[0..4] == b"RIFF" && &out[8..12] == b"WAVE" {
-        if let Ok((pcm, sr, ch)) = voxforge_audio::WavEncoder::decode_wav_to_pcm16(&out) {
-            if ch > 1 {
-                let channels = ch as usize;
-                let mut mono = Vec::with_capacity(pcm.len() / channels);
-                for frame in pcm.chunks_exact(channels) {
-                    let sum: i32 = frame.iter().map(|&s| s as i32).sum();
-                    mono.push((sum / channels as i32) as i16);
-                }
-                return Ok((mono, sr, 1));
-            }
-            return Ok((pcm, sr, ch));
-        }
+        let (mono, sr) = voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&out)
+            .map_err(|e| format!("Invalid WAV container: {e}"))?;
+        return Ok((mono, sr, 1));
+    }
+
+    if out.len() % 2 != 0 {
+        return Err("Raw PCM payload byte length must be even (16-bit samples)".to_string());
     }
 
     let samples = out
@@ -430,6 +491,431 @@ fn decode_b64_to_pcm(input: &str) -> Result<(Vec<i16>, u32, u16), String> {
         .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
         .collect();
     Ok((samples, 24000, 1))
+}
+
+const MAX_REMOTE_AUDIO_BYTES: usize = 25 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+pub struct FetchAudioUrlRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FetchAudioUrlResponse {
+    pub audio_base64: String,
+    pub filename: String,
+    pub content_type: String,
+    pub size_bytes: usize,
+    pub source_url: String,
+    pub normalized_wav: bool,
+}
+
+struct TempDirGuard(std::path::PathBuf);
+
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+pub(crate) fn is_public_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            let is_cgnat = octets[0] == 100 && (octets[1] & 0b1100_0000) == 64;
+            let is_this_net = octets[0] == 0;
+            let is_benchmark = octets[0] == 198 && (octets[1] & 0xFE) == 18;
+            let is_ietf = octets[0] == 192 && octets[1] == 0 && octets[2] == 0;
+            !(v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_unspecified()
+                || v4.is_multicast()
+                || is_cgnat
+                || is_this_net
+                || is_benchmark
+                || is_ietf)
+        }
+        std::net::IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return is_public_ip(std::net::IpAddr::V4(mapped));
+            }
+            let seg0 = v6.segments()[0];
+            let is_ula = (seg0 & 0xFE00) == 0xFC00;
+            let is_link_local = (seg0 & 0xFFC0) == 0xFE80;
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || is_ula
+                || is_link_local)
+        }
+    }
+}
+
+pub(crate) async fn validate_remote_url(
+    raw_url: &str,
+) -> Result<(reqwest::Url, Vec<std::net::SocketAddr>), (StatusCode, String)> {
+    let trimmed = raw_url.trim();
+    if trimmed.is_empty() || trimmed.len() > 2048 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "URL must be between 1 and 2048 characters".to_string(),
+        ));
+    }
+
+    let parsed = reqwest::Url::parse(trimmed)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Invalid URL: {e}")))?;
+
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Only http:// and https:// URLs are permitted".to_string(),
+        ));
+    }
+
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "URLs with embedded credentials are not permitted".to_string(),
+        ));
+    }
+
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "URL is missing a host".to_string()))?;
+    let host_lower = host.trim_end_matches('.').to_ascii_lowercase();
+    if host_lower == "localhost"
+        || host_lower.ends_with(".localhost")
+        || host_lower.ends_with(".local")
+        || host_lower.ends_with(".internal")
+        || host_lower == "metadata.google.internal"
+    {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Local or internal network URLs are blocked".to_string(),
+        ));
+    }
+
+    let port = parsed
+        .port_or_known_default()
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "URL port could not be determined".to_string()))?;
+
+    if let Ok(ip) = host.trim_matches(|c| c == '[' || c == ']').parse::<std::net::IpAddr>() {
+        if !is_public_ip(ip) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "Access to private, loopback, or link-local IPs is blocked".to_string(),
+            ));
+        }
+        return Ok((parsed, vec![std::net::SocketAddr::new(ip, port)]));
+    }
+
+    let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("DNS resolution failed for '{host}': {e}")))?
+        .collect();
+
+    if addrs.is_empty() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            format!("Host '{host}' resolved to no addresses"),
+        ));
+    }
+
+    for addr in &addrs {
+        if !is_public_ip(addr.ip()) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "Target URL resolved to a non-public IP address".to_string(),
+            ));
+        }
+    }
+
+    Ok((parsed, addrs))
+}
+
+fn looks_like_audio_bytes(bytes: &[u8], content_type: &str) -> bool {
+    let ct = content_type.to_ascii_lowercase();
+    if ct.starts_with("audio/") || ct.starts_with("video/") || ct.contains("application/ogg") {
+        return true;
+    }
+    if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
+        return true;
+    }
+    if bytes.len() >= 4
+        && (&bytes[0..3] == b"ID3"
+            || &bytes[0..4] == b"OggS"
+            || &bytes[0..4] == b"fLaC"
+            || &bytes[0..4] == b"\x1a\x45\xdf\xa3"
+            || (bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0))
+    {
+        return true;
+    }
+    bytes.len() >= 8 && &bytes[4..8] == b"ftyp"
+}
+
+async fn transcode_bytes_to_wav24k(bytes: &[u8], ext_hint: &str) -> Option<Vec<u8>> {
+    let tmp_dir = std::env::temp_dir().join(format!("voxforge_url_{}", uuid::Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&tmp_dir).ok()?;
+    let _guard = TempDirGuard(tmp_dir.clone());
+
+    let in_path = tmp_dir.join(format!("input.{ext_hint}"));
+    let out_path = tmp_dir.join("normalized.wav");
+    tokio::fs::write(&in_path, bytes).await.ok()?;
+
+    let mut cmd = tokio::process::Command::new("ffmpeg");
+    cmd.args([
+        "-y",
+        "-v",
+        "error",
+        "-i",
+    ])
+    .arg(&in_path)
+    .args(["-vn", "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", "-f", "wav"])
+    .arg(&out_path)
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::piped());
+
+    let status = tokio::time::timeout(std::time::Duration::from_secs(20), cmd.output())
+        .await
+        .ok()?
+        .ok()?;
+    if !status.status.success() {
+        return None;
+    }
+    let wav = tokio::fs::read(&out_path).await.ok()?;
+    if wav.len() >= 44 && &wav[0..4] == b"RIFF" {
+        Some(wav)
+    } else {
+        None
+    }
+}
+
+async fn extract_audio_with_ytdlp(safe_url: &str) -> Result<Vec<u8>, String> {
+    let tmp_dir = std::env::temp_dir().join(format!("voxforge_ytdlp_{}", uuid::Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&tmp_dir)
+        .map_err(|e| format!("Failed creating temporary extraction directory: {e}"))?;
+    let _guard = TempDirGuard(tmp_dir.clone());
+    let template = tmp_dir.join("clip.%(ext)s");
+
+    let mut cmd = tokio::process::Command::new("yt-dlp");
+    cmd.args([
+        "--no-playlist",
+        "--no-warnings",
+        "--max-downloads",
+        "1",
+        "--max-filesize",
+        "25M",
+        "--extract-audio",
+        "--audio-format",
+        "wav",
+        "--postprocessor-args",
+        "ffmpeg:-ac 1 -ar 24000",
+        "--output",
+    ])
+    .arg(&template)
+    .arg("--")
+    .arg(safe_url)
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped());
+
+    let output = tokio::time::timeout(std::time::Duration::from_secs(45), cmd.output())
+        .await
+        .map_err(|_| "Remote media extraction timed out after 45 seconds".to_string())?
+        .map_err(|e| {
+            format!("Web media extraction requires yt-dlp + ffmpeg installed on host ({e})")
+        })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let detail = stderr.lines().last().unwrap_or("Extraction failed").trim();
+        return Err(format!("Could not extract audio from URL: {detail}"));
+    }
+
+    let entries = std::fs::read_dir(&tmp_dir)
+        .map_err(|e| format!("Failed inspecting extracted audio: {e}"))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()).eq_some_ignore_ascii_case("wav") {
+            let bytes = tokio::fs::read(&path)
+                .await
+                .map_err(|e| format!("Failed reading extracted WAV: {e}"))?;
+            if bytes.len() > MAX_REMOTE_AUDIO_BYTES {
+                return Err("Extracted audio exceeds 25MB limit".to_string());
+            }
+            return Ok(bytes);
+        }
+    }
+
+    Err("No WAV audio produced from URL".to_string())
+}
+
+trait OptStrExt {
+    fn eq_some_ignore_ascii_case(&self, other: &str) -> bool;
+}
+
+impl OptStrExt for Option<&str> {
+    fn eq_some_ignore_ascii_case(&self, other: &str) -> bool {
+        self.map(|v| v.eq_ignore_ascii_case(other)).unwrap_or(false)
+    }
+}
+
+pub(crate) async fn fetch_remote_audio(
+    raw_url: &str,
+) -> Result<FetchAudioUrlResponse, (StatusCode, String)> {
+    let (mut current_url, mut addrs) = validate_remote_url(raw_url).await?;
+    let mut final_bytes: Option<(Vec<u8>, String, String)> = None;
+
+    for _hop in 0..=4 {
+        let host = current_url.host_str().unwrap_or_default().to_string();
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(20))
+            .user_agent("VoxForge/0.5")
+            .resolve_to_addrs(&host, &addrs)
+            .build()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("HTTP client error: {e}")))?;
+
+        let mut resp = client
+            .get(current_url.clone())
+            .send()
+            .await
+            .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed fetching URL: {e}")))?;
+
+        if resp.status().is_redirection() {
+            let loc = resp
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| (StatusCode::BAD_GATEWAY, "Redirect without Location header".to_string()))?;
+            let next = current_url
+                .join(loc)
+                .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid redirect URL: {e}")))?;
+            let (validated, next_addrs) = validate_remote_url(next.as_str()).await?;
+            current_url = validated;
+            addrs = next_addrs;
+            continue;
+        }
+
+        if !resp.status().is_success() {
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                format!("Remote server returned HTTP {}", resp.status()),
+            ));
+        }
+
+        if let Some(len) = resp.content_length() {
+            if len as usize > MAX_REMOTE_AUDIO_BYTES {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "Remote audio exceeds 25MB limit".to_string(),
+                ));
+            }
+        }
+
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        let mut buf = Vec::new();
+        while let Some(chunk) = resp
+            .chunk()
+            .await
+            .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Error reading stream: {e}")))?
+        {
+            if buf.len() + chunk.len() > MAX_REMOTE_AUDIO_BYTES {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "Remote audio stream exceeded 25MB limit".to_string(),
+                ));
+            }
+            buf.extend_from_slice(&chunk);
+        }
+
+        final_bytes = Some((buf, content_type, current_url.to_string()));
+        break;
+    }
+
+    let (bytes, content_type, resolved_url) = final_bytes.ok_or_else(|| {
+        (StatusCode::BAD_GATEWAY, "Too many HTTP redirects".to_string())
+    })?;
+
+    let mut filename = current_url
+        .path_segments()
+        .and_then(|mut s| s.next_back())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("remote_reference.wav")
+        .to_string();
+
+    if looks_like_audio_bytes(&bytes, &content_type) {
+        let is_wav = bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE";
+        if !is_wav {
+            let ext = filename.rsplit('.').next().unwrap_or("bin");
+            if let Some(wav) = transcode_bytes_to_wav24k(&bytes, ext).await {
+                if !filename.to_ascii_lowercase().ends_with(".wav") {
+                    filename = format!("{filename}.wav");
+                }
+                let size_bytes = wav.len();
+                return Ok(FetchAudioUrlResponse {
+                    audio_base64: base64_encode(&wav),
+                    filename,
+                    content_type: "audio/wav".to_string(),
+                    size_bytes,
+                    source_url: resolved_url,
+                    normalized_wav: true,
+                });
+            }
+        }
+        let size_bytes = bytes.len();
+        return Ok(FetchAudioUrlResponse {
+            audio_base64: base64_encode(&bytes),
+            filename,
+            content_type,
+            size_bytes,
+            source_url: resolved_url,
+            normalized_wav: is_wav,
+        });
+    }
+
+    // Webpage URL fallback (e.g., online video/post): try yt-dlp on validated public URL
+    let wav = extract_audio_with_ytdlp(&resolved_url)
+        .await
+        .map_err(|detail| (StatusCode::UNPROCESSABLE_ENTITY, detail))?;
+    let size_bytes = wav.len();
+    Ok(FetchAudioUrlResponse {
+        audio_base64: base64_encode(&wav),
+        filename: "extracted_remote_voice.wav".to_string(),
+        content_type: "audio/wav".to_string(),
+        size_bytes,
+        source_url: resolved_url,
+        normalized_wav: true,
+    })
+}
+
+/// `POST /v1/voices/fetch-url` — download or extract audio from a public HTTP(S) URL for voice cloning.
+pub async fn fetch_reference_url(
+    Json(body): Json<FetchAudioUrlRequest>,
+) -> Result<Json<FetchAudioUrlResponse>, (StatusCode, Json<ProblemDetails>)> {
+    let res = fetch_remote_audio(&body.url).await.map_err(|(status, detail)| {
+        (
+            status,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/url-fetch-failed".to_string(),
+                title: "Remote Audio Fetch Failed".to_string(),
+                status: status.as_u16(),
+                detail,
+                instance: "/v1/voices/fetch-url".to_string(),
+            }),
+        )
+    })?;
+    Ok(Json(res))
 }
 
 /// `POST /v1/voices/assess` — evaluate reference audio quality for zero-shot voice cloning.
@@ -1401,5 +1887,43 @@ mod tests {
             .parse()
             .unwrap();
         assert!((blended_f0 - 170.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_decode_b64_to_pcm_handles_24bit_and_32bit_float_wav() {
+        let f32_samples: Vec<f32> = vec![0.0, 0.25, -0.5, 0.75, -0.125];
+        for depth in [16u16, 24u16, 32u16] {
+            let wav = voxforge_audio::WavEncoder::encode_f32_to_wav_with_precision(
+                &f32_samples,
+                24000,
+                1,
+                depth,
+            )
+            .unwrap();
+            let b64 = base64_encode(&wav);
+            let (pcm, sr, ch) = decode_b64_to_pcm(&b64).unwrap();
+            assert_eq!(sr, 24000);
+            assert_eq!(ch, 1);
+            assert_eq!(pcm.len(), f32_samples.len());
+            assert!((pcm[1] as f32 / 32768.0 - 0.25).abs() < 0.01);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_validate_remote_url_blocks_ssrf_targets() {
+        for bad in [
+            "http://127.0.0.1:8080/audio.wav",
+            "http://localhost/audio.wav",
+            "https://169.254.169.254/latest/meta-data",
+            "http://10.0.0.1/secret.wav",
+            "http://192.168.1.50/secret.wav",
+            "http://[::1]:9000/audio.wav",
+            "file:///etc/passwd",
+        ] {
+            assert!(
+                validate_remote_url(bad).await.is_err(),
+                "Expected SSRF rejection for {bad}"
+            );
+        }
     }
 }

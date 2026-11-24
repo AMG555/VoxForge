@@ -309,6 +309,24 @@ impl McpServer {
                     .unwrap_or("en-US-AriaNeural");
                 let speed = args.get("speed").and_then(|s| s.as_f64()).unwrap_or(1.0) as f32;
                 let pitch = args.get("pitch").and_then(|p| p.as_f64()).unwrap_or(0.0) as f32;
+                let language = args
+                    .get("language")
+                    .and_then(|l| l.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                    .map(voxforge_engine::qwen3::normalize_language_code);
+                let instruct = args
+                    .get("instruct")
+                    .and_then(|i| i.as_str())
+                    .map(|s| s.to_string());
+                let seed = args.get("seed").and_then(|s| s.as_u64());
+                let precision = args
+                    .get("precision")
+                    .and_then(|p| p.as_u64())
+                    .and_then(|v| match v {
+                        16 | 24 | 32 => Some(v as u16),
+                        _ => None,
+                    });
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
                 let output_mode = args.get("output_mode").and_then(|m| m.as_str());
 
@@ -341,25 +359,38 @@ impl McpServer {
                 // Check cloned profiles first
                 if let Some(profile) = self.voice_profiles.get(voice).await {
                     if let Some(engine) = self.engine_registry.get(&profile.engine_id).await {
+                        let norm_lang = language.as_deref().or(Some(profile.language.as_str()));
                         let synth_req = ClonedSynthesisRequest {
-                            text: text.to_string(),
+                            text: self.pronunciation.process_with_language(text, norm_lang),
                             profile: profile.clone(),
                             speed,
                             pitch,
                             format: AudioContainerFormat::Wav,
-                            language: None,
-                            instruct: None,
+                            language: language.clone(),
+                            instruct: instruct.clone(),
                             num_step: None,
-                            seed: None,
-                            precision: None,
+                            seed,
+                            precision,
                         };
-                        match engine.synthesize_cloned(&synth_req).await {
-                            Ok(chunk) => {
-                                let wav_bytes = match WavEncoder::encode_pcm16_to_wav(
-                                    &chunk.pcm_data,
-                                    chunk.sample_rate,
-                                    1,
-                                ) {
+                        match engine.synthesize_cloned_hq(&synth_req).await {
+                            Ok((chunk, opt_f32)) => {
+                                let bits = precision.unwrap_or(16);
+                                let wav_bytes = if let (Some(f32_buf), true) = (opt_f32.as_ref(), bits > 16) {
+                                    WavEncoder::encode_f32_to_wav_with_precision(
+                                        f32_buf,
+                                        chunk.sample_rate,
+                                        1,
+                                        bits,
+                                    )
+                                } else {
+                                    WavEncoder::encode_pcm_to_wav_with_precision(
+                                        &chunk.pcm_data,
+                                        chunk.sample_rate,
+                                        1,
+                                        bits,
+                                    )
+                                };
+                                let wav_bytes = match wav_bytes {
                                     Ok(b) => b,
                                     Err(e) => return ToolCallResult::error(e.to_string()),
                                 };
@@ -399,8 +430,9 @@ impl McpServer {
                 // Direct voice resolution
                 match self.engine_registry.resolve_voice(voice).await {
                     Ok((engine, voice_info)) => {
+                        let eff_lang = language.as_deref().or(Some(voice_info.language.as_str()));
                         let req = SynthesisRequest {
-                            text: text.to_string(),
+                            text: self.pronunciation.process_with_language(text, eff_lang),
                             voice_id: voice_info.id.clone(),
                             speed,
                             pitch,
@@ -508,6 +540,7 @@ impl McpServer {
                     engine_id: engine_id.to_string(),
                     reference_audio_base64: Some(audio_hex),
                     reference_audio_path: ref_audio_path.map(|s| s.to_string()),
+                    reference_audio_url: None,
                     reference_transcript: args
                         .get("reference_transcript")
                         .and_then(|t| t.as_str())

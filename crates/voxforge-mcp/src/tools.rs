@@ -25,6 +25,23 @@ pub fn get_mcp_tools() -> Vec<McpTool> {
                         "type": "number",
                         "description": "Pitch shift in semitones (-12.0 to 12.0). Default is 0.0"
                     },
+                    "language": {
+                        "type": "string",
+                        "description": "Optional BCP-47/ISO language code (e.g. ml-IN, en-US, arb) for cross-lingual synthesis and native number normalization"
+                    },
+                    "instruct": {
+                        "type": "string",
+                        "description": "Optional expressive delivery instruction (e.g. cheerful, whisper, storytelling)"
+                    },
+                    "seed": {
+                        "type": "integer",
+                        "description": "Optional deterministic seed for reproducible takes"
+                    },
+                    "precision": {
+                        "type": "integer",
+                        "enum": [16, 24, 32],
+                        "description": "Optional WAV output bit depth (16, 24, or 32). Default is 16"
+                    },
                     "response_format": {
                         "type": "string",
                         "enum": ["wav", "pcm"],

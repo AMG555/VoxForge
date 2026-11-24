@@ -101,6 +101,7 @@ pub fn build_api_router() -> Router<AppState> {
         // Voice cloning and persistent profiles
         .route("/v1/voices/profiles", get(cloning::list_profiles))
         .route("/v1/voices/clone", post(cloning::clone_voice))
+        .route("/v1/voices/fetch-url", post(cloning::fetch_reference_url))
         .route("/v1/voices/assess", post(cloning::assess_reference_audio))
         .route("/v1/audio/check", post(cloning::check_audio_signal))
         .route("/v1/voices/verify", post(cloning::verify_voice))

@@ -693,8 +693,15 @@ pub async fn synthesize_speech_stream(
     validate_speech_request(&payload)?;
     let (engine, voice) = resolve_engine_and_voice(&state, &payload).await?;
 
+    let eff_lang = payload
+        .language
+        .as_deref()
+        .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+        .or(Some(voice.language.as_str()));
     let synth_req = SynthesisRequest {
-        text: state.pronunciation.process(&payload.input),
+        text: state
+            .pronunciation
+            .process_with_language(&payload.input, eff_lang),
         voice_id: voice.id,
         speed: payload.speed,
         pitch: payload.pitch.unwrap_or(0.0),
@@ -799,8 +806,15 @@ async fn handle_speech_socket(mut socket: WebSocket, state: AppState) {
                     }
                 };
 
+                let eff_lang = req
+                    .language
+                    .as_deref()
+                    .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                    .or(Some(voice.language.as_str()));
                 let synth_req = SynthesisRequest {
-                    text: state.pronunciation.process(&req.input),
+                    text: state
+                        .pronunciation
+                        .process_with_language(&req.input, eff_lang),
                     voice_id: voice.id,
                     speed: req.speed.clamp(0.25, 4.0),
                     pitch: req.pitch.unwrap_or(0.0).clamp(-50.0, 50.0),

@@ -835,6 +835,7 @@ async fn run_clone(args: CloneArgs) -> Result<()> {
         engine_id: "qwen3-tts".to_string(),
         reference_audio_base64: Some(hex_encoded),
         reference_audio_path: Some(args.audio.to_string_lossy().to_string()),
+        reference_audio_url: None,
         reference_transcript: args.transcript,
         additional_reference_audio_base64: vec![],
         language: args.language,

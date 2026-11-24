@@ -32,6 +32,15 @@ pub struct DubScriptLine {
     /// Optional pitch shift in semitones for this line (default 0.0).
     #[serde(default)]
     pub pitch: Option<f32>,
+    /// Optional explicit output language / dialect for cross-lingual synthesis & number normalization.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Optional natural-language delivery instruction.
+    #[serde(default)]
+    pub instruct: Option<String>,
+    /// Optional deterministic seed.
+    #[serde(default)]
+    pub seed: Option<u64>,
 }
 
 /// Request body for POST /v1/audio/dub.
@@ -172,32 +181,63 @@ pub async fn dub_script(
 
             if let Some(eng) = engine {
                 if eng.supports_cloning() {
+                    let eff_lang = line
+                        .language
+                        .as_deref()
+                        .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                        .map(voxforge_engine::qwen3::normalize_language_code);
+                    let norm_lang = eff_lang.as_deref().or(Some(profile.language.as_str()));
                     let req = voxforge_core::models::ClonedSynthesisRequest {
-                        text: state.pronunciation.process(&line.text),
+                        text: state.pronunciation.process_with_language(&line.text, norm_lang),
                         profile: profile.clone(),
                         speed,
                         pitch,
                         format,
-                        language: None,
-                        instruct: None,
+                        language: eff_lang,
+                        instruct: line.instruct.clone(),
                         num_step: None,
-                        seed: None,
-                        precision: None,
+                        seed: line.seed,
+                        precision: body.precision,
                     };
-                    eng.synthesize_cloned(&req)
+                    eng.synthesize_cloned_hq(&req)
                         .await
-                        .map(|c| c.pcm_data)
+                        .map(|(c, _)| c.pcm_data)
                         .unwrap_or_default()
                 } else {
-                    synthesize_via_registry(&state, &line.speaker, &line.text, speed, pitch, format)
-                        .await?
+                    synthesize_via_registry(
+                        &state,
+                        &line.speaker,
+                        &line.text,
+                        line.language.as_deref(),
+                        speed,
+                        pitch,
+                        format,
+                    )
+                    .await?
                 }
             } else {
-                synthesize_via_registry(&state, &line.speaker, &line.text, speed, pitch, format)
-                    .await?
+                synthesize_via_registry(
+                    &state,
+                    &line.speaker,
+                    &line.text,
+                    line.language.as_deref(),
+                    speed,
+                    pitch,
+                    format,
+                )
+                .await?
             }
         } else {
-            synthesize_via_registry(&state, &line.speaker, &line.text, speed, pitch, format).await?
+            synthesize_via_registry(
+                &state,
+                &line.speaker,
+                &line.text,
+                line.language.as_deref(),
+                speed,
+                pitch,
+                format,
+            )
+            .await?
         };
 
         let start_sample = if let Some(secs) = line.start_seconds {
@@ -287,7 +327,7 @@ pub async fn dub_script(
             })?,
     };
 
-    let audio_base64 = base64_encode(&audio_bytes);
+    let audio_base64 = crate::routes::cloning::base64_encode(&audio_bytes);
 
     Ok(Json(DubResponse {
         audio_base64,
@@ -302,6 +342,7 @@ async fn synthesize_via_registry(
     state: &AppState,
     speaker: &str,
     text: &str,
+    language: Option<&str>,
     speed: f32,
     pitch: f32,
     format: AudioContainerFormat,
@@ -353,8 +394,12 @@ async fn synthesize_via_registry(
         }
     };
 
+    let eff_lang = language
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+        .or(Some(voice.language.as_str()));
     let req = SynthesisRequest {
-        text: state.pronunciation.process(text),
+        text: state.pronunciation.process_with_language(text, eff_lang),
         voice_id: voice.id,
         speed,
         pitch,
@@ -381,41 +426,6 @@ async fn synthesize_via_registry(
     Ok(chunk.pcm_data)
 }
 
-/// Minimal base64 encoder (no external dep — mirrors the decoder in cloning.rs).
-fn base64_encode(data: &[u8]) -> String {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
-    let mut i = 0;
-    while i < data.len() {
-        let b0 = data[i] as u32;
-        let b1 = if i + 1 < data.len() {
-            data[i + 1] as u32
-        } else {
-            0
-        };
-        let b2 = if i + 2 < data.len() {
-            data[i + 2] as u32
-        } else {
-            0
-        };
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-        out.push(CHARSET[((triple >> 18) & 0x3F) as usize] as char);
-        out.push(CHARSET[((triple >> 12) & 0x3F) as usize] as char);
-        if i + 1 < data.len() {
-            out.push(CHARSET[((triple >> 6) & 0x3F) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        if i + 2 < data.len() {
-            out.push(CHARSET[(triple & 0x3F) as usize] as char);
-        } else {
-            out.push('=');
-        }
-        i += 3;
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -423,7 +433,7 @@ mod tests {
     #[test]
     fn test_base64_encode_roundtrip() {
         let data = b"Hello, VoxForge dubbing!";
-        let encoded = base64_encode(data);
+        let encoded = crate::routes::cloning::base64_encode(data);
         // Verify it is valid base64 by checking length and characters.
         assert!(!encoded.is_empty());
         assert!(encoded
