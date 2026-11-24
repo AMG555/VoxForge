@@ -508,7 +508,7 @@ mod tests {
         assert!(voices.iter().any(|v| v.id == "bf_emma"));
 
         let req = SynthesisRequest {
-            text: "Voicebox parity test with Kokoro neural engine.".to_string(),
+            text: "VoxForge synthesis test with Kokoro neural engine.".to_string(),
             voice_id: "af_heart".to_string(),
             speed: 1.0,
             pitch: 0.0,

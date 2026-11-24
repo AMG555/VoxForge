@@ -25,7 +25,7 @@ pub const KOKORO_VOICES: &[KokoroVoiceDef] = &[
         language: "en-US",
         gender: Gender::Female,
         accent: "American",
-        description: "Voicebox flagship warm, conversational American female voice.",
+        description: "VoxForge flagship warm, conversational American female voice.",
     },
     KokoroVoiceDef {
         id: "af_bella",

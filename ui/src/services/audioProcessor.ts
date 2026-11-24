@@ -635,7 +635,7 @@ export const DEFAULT_STUDIO_MASTERING: StudioMasteringConfig = {
 
 /**
  * Global AudioContext watchdog to prevent browser suspension when window is backgrounded.
- * Fixes Voicebox issue #41 where WebAudio context permanently pauses.
+ * Fixes WebAudio suspended context issue where playback permanently pauses.
  */
 let sharedAudioContext: AudioContext | null = null;
 let watchdogInitialized = false;

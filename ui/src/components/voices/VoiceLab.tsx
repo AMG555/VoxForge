@@ -143,7 +143,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   // Studio Playground Mode: Text-to-Speech vs Voice Changer (Speech-to-Speech)
   const [studioPlaygroundMode, setStudioPlaygroundMode] = useState<'tts' | 'sts'>('tts');
 
-  // Voicebox Karaoke Teleprompter state
+  // VoxForge Karaoke Teleprompter state
   const [teleprompterProgress, setTeleprompterProgress] = useState<number>(0);
   const [teleprompterCurrentTime, setTeleprompterCurrentTime] = useState<number>(0);
   const [teleprompterDuration, setTeleprompterDuration] = useState<number>(0);
@@ -1893,7 +1893,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
             <div className="hidden sm:flex items-center space-x-2 pr-2 text-[11px] font-mono text-[#64748B]">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Voicebox AI Studio Online</span>
+              <span>VoxForge AI Studio Online</span>
             </div>
           </div>
 
@@ -3310,7 +3310,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 </div>
               )}
 
-              {/* Voicebox Live Karaoke Teleprompter */}
+              {/* VoxForge Live Karaoke Teleprompter */}
               {spokenPrompt && (
                 <div className="p-4 rounded-xl bg-gradient-to-br from-[#121820] to-[#0D1219] border border-amber-500/30 space-y-3 shadow-2xl animate-in fade-in duration-200">
                   <div className="flex items-center justify-between border-b border-[#242E3D] pb-2.5">
@@ -3323,7 +3323,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       </span>
                       <span className="text-xs font-bold text-white font-mono uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Voicebox Live Karaoke Teleprompter</span>
+                        <span>VoxForge Live Karaoke Teleprompter</span>
                       </span>
                     </div>
                     <div className="flex items-center space-x-3 text-[11px] font-mono text-[#94A3B8]">

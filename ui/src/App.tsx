@@ -265,7 +265,7 @@ export const App: React.FC = () => {
         {activeTab === 'qa' && <AbTestLab voices={voices} />}
       </main>
 
-      {/* Voicebox Global Push-to-Talk Dictation Studio */}
+      {/* VoxForge Global Push-to-Talk Dictation Studio */}
       <DictationBar
         isOpen={isDictationOpen}
         onClose={() => setIsDictationOpen(false)}

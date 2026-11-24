@@ -253,7 +253,7 @@ export const DictationBar: React.FC<DictationBarProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-                  VOICEBOX DICTATION & PUSH-TO-TALK
+                  VOXFORGE DICTATION & PUSH-TO-TALK
                 </h3>
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-[#1A222D] text-[#94A3B8] border border-[#242E3D] flex items-center space-x-1">
                   <Keyboard className="w-2.5 h-2.5" />

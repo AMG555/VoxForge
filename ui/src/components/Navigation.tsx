@@ -66,7 +66,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
                 : 'bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white border-[#242E3D]'
             }`}
-            title="Voicebox Push-to-Talk Dictation (Ctrl+Shift+D)"
+            title="VoxForge Push-to-Talk Dictation (Ctrl+Shift+D)"
           >
             <Mic className="w-3.5 h-3.5 text-amber-400" />
             <span>Dictate</span>
