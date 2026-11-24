@@ -23,10 +23,14 @@
 //! // → "Run sequel query for 1000 rupees"
 //! ```
 
+pub mod chunker;
 pub mod dictionary;
 pub mod normalizer;
+pub mod number_words_ml;
+pub mod number_words_ur;
 pub mod processor;
 
+pub use chunker::{chunk_text, effective_max_chars};
 pub use dictionary::{DictionaryEntry, PronunciationDictionary};
 pub use normalizer::TextNormalizer;
 pub use processor::{ProcessorConfig, PronunciationProcessor};

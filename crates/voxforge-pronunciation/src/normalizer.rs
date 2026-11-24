@@ -3,7 +3,7 @@
 //! All transforms are deterministic and pure — no I/O, no state.
 
 use regex::Regex;
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 
 /// Currency symbols mapped to their spoken form.
 static CURRENCY_MAP: &[(&str, &str)] = &[
@@ -147,20 +147,281 @@ fn year_to_words(year: u32) -> String {
 pub struct TextNormalizer;
 
 impl TextNormalizer {
-    /// Normalize `text` through all normalization passes.
-    ///
-    /// Pass order matters: URLs and emails first to avoid punctuation/cadence mangling,
-    /// followed by clock times, temporal years, currencies, scale suffixes, and cadence smoothing.
+    /// Normalize `text` through all normalization passes using default (English/generic) rules.
     pub fn normalize(text: &str) -> String {
-        let s = Self::normalize_urls(text);
-        let s = Self::normalize_emails(&s);
-        let s = Self::normalize_clock_times(&s);
-        let s = Self::normalize_temporal_years(&s);
-        let s = Self::normalize_currency_amounts(&s);
-        let s = Self::normalize_scale_suffixes(&s);
-        let s = Self::normalize_percentages(&s);
-        let s = Self::strip_comma_separators(&s);
-        Self::humanize_cadence(&s)
+        Self::normalize_for_language(text, None)
+    }
+
+    /// Language-aware pre-synthesis text normalization.
+    ///
+    /// Pass order matters:
+    /// 1. Strip unsafe control characters (preserving ZWNJ/ZWJ), HTML entities, markdown emphasis,
+    ///    and excess punctuation floods while leaving `[pause ...]` / `[[...]]` bracket cues intact.
+    /// 2. Normalize spans outside brackets: URLs, emails, clock times, temporal years (English),
+    ///    ranges (`20~30`), abbreviations, currencies, European decimals, and native numbers
+    ///    for Malayalam (`ml`) / Urdu (`ur`).
+    /// 3. Apply conversational cadence smoothing.
+    pub fn normalize_for_language(text: &str, language: Option<&str>) -> String {
+        let base_lang = language
+            .unwrap_or("en")
+            .trim()
+            .split(['-', '_'])
+            .next()
+            .unwrap_or("en")
+            .to_ascii_lowercase();
+
+        let out = Self::normalize_outside_brackets(text, |segment| {
+            let mut s = Self::sanitize_for_speech(segment);
+            s = Self::normalize_urls(&s);
+            s = Self::normalize_emails(&s);
+
+            match base_lang.as_str() {
+                "ml" | "mal" => {
+                    s = Self::normalize_tilde_ranges(&s, "മുതൽ", "");
+                    s = Self::normalize_scale_suffixes(&s);
+                    s = Self::strip_comma_separators(&s);
+                    s = crate::number_words_ml::replace_numbers_malayalam(&s);
+                }
+                "ur" | "urd" => {
+                    s = Self::normalize_tilde_ranges(&s, "سے", "تک");
+                    s = Self::normalize_scale_suffixes(&s);
+                    s = Self::strip_comma_separators(&s);
+                    s = crate::number_words_ur::replace_numbers_urdu(&s);
+                }
+                "de" | "deu" | "es" | "spa" | "fr" | "fra" | "pt" | "por" | "it" | "ita"
+                | "nl" | "nld" | "pl" | "pol" | "ru" | "rus" => {
+                    s = Self::normalize_tilde_ranges(&s, match base_lang.as_str() {
+                        "de" | "deu" => "bis",
+                        "fr" | "fra" => "à",
+                        "it" | "ita" => "a",
+                        _ => "a",
+                    }, "");
+                    s = Self::expand_language_abbreviations(&s, &base_lang);
+                    s = Self::normalize_european_decimals(&s);
+                    s = Self::normalize_currency_amounts(&s);
+                    s = Self::normalize_scale_suffixes(&s);
+                    s = Self::normalize_percentages(&s);
+                    s = Self::strip_comma_separators(&s);
+                }
+                _ => {
+                    s = Self::normalize_tilde_ranges(&s, "to", "");
+                    s = Self::expand_language_abbreviations(&s, &base_lang);
+                    s = Self::normalize_clock_times(&s);
+                    s = Self::normalize_temporal_years(&s);
+                    s = Self::normalize_currency_amounts(&s);
+                    s = Self::normalize_scale_suffixes(&s);
+                    s = Self::normalize_percentages(&s);
+                    s = Self::strip_comma_separators(&s);
+                }
+            }
+            s
+        });
+
+        Self::humanize_cadence(&out)
+    }
+
+    /// Run a transformation only outside `[...]` and `[[...]]` cue/phonetic brackets.
+    pub fn normalize_outside_brackets<F>(text: &str, mut f: F) -> String
+    where
+        F: FnMut(&str) -> String,
+    {
+        if !text.contains('[') {
+            return f(text);
+        }
+        let mut result = String::with_capacity(text.len());
+        let mut cursor = 0usize;
+        let bytes = text.as_bytes();
+        while cursor < bytes.len() {
+            if let Some(rel_open) = text[cursor..].find('[') {
+                let open_idx = cursor + rel_open;
+                if open_idx > cursor {
+                    result.push_str(&f(&text[cursor..open_idx]));
+                }
+                let is_double = text[open_idx..].starts_with("[[");
+                let close_pat = if is_double { "]]" } else { "]" };
+                if let Some(rel_close) = text[open_idx + close_pat.len()..].find(close_pat) {
+                    let close_end = open_idx + close_pat.len() + rel_close + close_pat.len();
+                    result.push_str(&text[open_idx..close_end]);
+                    cursor = close_end;
+                } else {
+                    result.push_str(&f(&text[open_idx..]));
+                    break;
+                }
+            } else {
+                result.push_str(&f(&text[cursor..]));
+                break;
+            }
+        }
+        result
+    }
+
+    /// Strip unsafe control chars (keeping ZWNJ/ZWJ `\u{200C}`/`\u{200D}`), HTML entities,
+    /// markdown emphasis, and repeated punctuation floods (`!!!!` -> `!!!`).
+    pub fn sanitize_for_speech(text: &str) -> String {
+        let mut cleaned = String::with_capacity(text.len());
+        for c in text.chars() {
+            let cp = c as u32;
+            if cp == 0x200C || cp == 0x200D || cp == 0x0A || cp == 0x09 || !c.is_control() {
+                cleaned.push(c);
+            }
+        }
+
+        let decoded = cleaned
+            .replace("&amp;", " and ")
+            .replace("&nbsp;", " ")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", " ")
+            .replace("&gt;", " ");
+
+        // Strip markdown emphasis without damaging snake_case identifiers
+        static RE_MD_BOLD: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"\*\*([^*]+)\*\*|__([^_]+)__").expect("valid bold regex")
+        });
+        static RE_MD_ITALIC: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?m)(^|\s)\*([^*\n]+)\*($|\s|[.,!?;:])|(^|\s)_([^_\n]+)_($|\s|[.,!?;:])")
+                .expect("valid italic regex")
+        });
+        static RE_EXCL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"!{4,}").unwrap());
+        static RE_QUEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\?{4,}").unwrap());
+        static RE_DOTS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.{4,}").unwrap());
+
+        let s = RE_MD_BOLD
+            .replace_all(&decoded, |c: &regex::Captures<'_>| {
+                c.get(1).or_else(|| c.get(2)).map(|m| m.as_str()).unwrap_or("").to_string()
+            })
+            .to_string();
+        let s = RE_MD_ITALIC
+            .replace_all(&s, |c: &regex::Captures<'_>| {
+                if let Some(inner) = c.get(2) {
+                    format!("{}{}{}", &c[1], inner.as_str(), &c[3])
+                } else {
+                    format!(
+                        "{}{}{}",
+                        c.get(4).map(|m| m.as_str()).unwrap_or(""),
+                        c.get(5).map(|m| m.as_str()).unwrap_or(""),
+                        c.get(6).map(|m| m.as_str()).unwrap_or("")
+                    )
+                }
+            })
+            .to_string();
+        let s = RE_EXCL.replace_all(&s, "!!!");
+        let s = RE_QUEST.replace_all(&s, "???");
+        RE_DOTS.replace_all(&s, "...").to_string()
+    }
+
+    fn normalize_tilde_ranges(text: &str, connector: &str, tail: &str) -> String {
+        static RE_TILDE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(\d+(?:[.,]\d+)?)\s*[~〜]\s*(\d+(?:[.,]\d+)?)").expect("valid tilde regex")
+        });
+        RE_TILDE
+            .replace_all(text, |c: &regex::Captures<'_>| {
+                if tail.is_empty() {
+                    format!("{} {connector} {}", &c[1], &c[2])
+                } else {
+                    format!("{} {connector} {} {tail}", &c[1], &c[2])
+                }
+            })
+            .to_string()
+    }
+
+    fn normalize_european_decimals(text: &str) -> String {
+        static RE_EURO_DEC: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\b(\d+),(\d{1,2})\b").expect("valid euro decimal"));
+        RE_EURO_DEC.replace_all(text, "$1.$2").to_string()
+    }
+
+    fn expand_language_abbreviations(text: &str, base_lang: &str) -> String {
+        static DE_ABBREVS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+            [
+                (r"\bz\.B\.", "zum Beispiel"),
+                (r"\bbzw\.", "beziehungsweise"),
+                (r"\busw\.", "und so weiter"),
+                (r"\bca\.", "circa"),
+                (r"\bDr\.", "Doktor"),
+            ]
+            .into_iter()
+            .filter_map(|(p, r)| Regex::new(p).ok().map(|re| (re, r)))
+            .collect()
+        });
+        static ES_ABBREVS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+            [
+                (r"\bSr\.", "Señor"),
+                (r"\bSra\.", "Señora"),
+                (r"\bSrta\.", "Señorita"),
+                (r"\bDr\.", "Doctor"),
+                (r"\bDra\.", "Doctora"),
+                (r"\bUd\.", "Usted"),
+            ]
+            .into_iter()
+            .filter_map(|(p, r)| Regex::new(p).ok().map(|re| (re, r)))
+            .collect()
+        });
+        static FR_ABBREVS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+            [
+                (r"\bM\.", "Monsieur"),
+                (r"\bMme\b\.?", "Madame"),
+                (r"\bMlle\b\.?", "Mademoiselle"),
+                (r"\bDr\.", "Docteur"),
+            ]
+            .into_iter()
+            .filter_map(|(p, r)| Regex::new(p).ok().map(|re| (re, r)))
+            .collect()
+        });
+        static EN_ABBREVS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+            [
+                (r"\bMr\.", "Mister"),
+                (r"\bMrs\.", "Missus"),
+                (r"\bMs\.", "Miss"),
+                (r"\bDr\.", "Doctor"),
+                (r"\bProf\.", "Professor"),
+                (r"\betc\.", "et cetera"),
+                (r"\be\.g\.", "for example"),
+                (r"\bi\.e\.", "that is"),
+                (r"\bvs\.", "versus"),
+            ]
+            .into_iter()
+            .filter_map(|(p, r)| Regex::new(p).ok().map(|re| (re, r)))
+            .collect()
+        });
+
+        let pairs = match base_lang {
+            "de" | "deu" => &*DE_ABBREVS,
+            "es" | "spa" => &*ES_ABBREVS,
+            "fr" | "fra" => &*FR_ABBREVS,
+            _ => &*EN_ABBREVS,
+        };
+
+        let mut out = text.to_string();
+        for (re, rep) in pairs {
+            out = re.replace_all(&out, *rep).to_string();
+        }
+        out
+    }
+
+    /// Collapse ASR / neural hallucination loops (6+ repeated consecutive words or short phrase cycles).
+    pub fn collapse_repetitive_artifacts(text: &str) -> String {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        if words.len() < 4 {
+            return text.trim().to_string();
+        }
+        let mut deduped: Vec<&str> = Vec::with_capacity(words.len());
+        let mut i = 0usize;
+        while i < words.len() {
+            let w = words[i];
+            deduped.push(w);
+            let mut run = 1usize;
+            while i + run < words.len() && words[i + run].eq_ignore_ascii_case(w) {
+                run += 1;
+            }
+            if run >= 6 {
+                i += run;
+            } else {
+                i += 1;
+            }
+        }
+        deduped.join(" ")
     }
 
     /// Humanize text cadence: insert natural breathing pauses for clauses >10 words,
@@ -446,6 +707,32 @@ mod tests {
         assert!(
             res.contains("engine, because"),
             "Comma should remain before conjunction: {res}"
+        );
+    }
+
+    #[test]
+    fn normalizes_multilingual_abbreviations_brackets_and_markdown() {
+        let raw = "Dr. **Smith** waited [pause 500ms] for 20~30 minutes &amp; more!!!!";
+        let out = TextNormalizer::normalize_for_language(raw, Some("en-US"));
+        assert!(out.contains("Doctor Smith"), "got: {out}");
+        assert!(out.contains("[pause 500ms]"), "bracket preserved: {out}");
+        assert!(out.contains("20 to 30"), "tilde range normalized: {out}");
+        assert!(out.contains("and"), "HTML entity decoded: {out}");
+        assert!(!out.contains("**"), "markdown stripped: {out}");
+        assert!(!out.contains("!!!!"), "punctuation capped: {out}");
+
+        // ZWNJ in Malayalam chillu compound stays intact & numbers verbalize cleanly
+        let ml = "അവൻ\u{200C}ക്ക് 25% ലാഭം 10~20";
+        let ml_out = TextNormalizer::normalize_for_language(ml, Some("ml-IN"));
+        assert!(ml_out.contains('\u{200C}'), "ZWNJ preserved: {ml_out}");
+        assert!(ml_out.contains("ഇരുപത്തിയഞ്ച് ശതമാനം"), "ml pct: {ml_out}");
+        assert!(ml_out.contains("പത്ത് മുതൽ ഇരുപത്"), "ml range: {ml_out}");
+
+        // Collapse 6+ repetition loops
+        let loopy = "hello wait wait wait wait wait wait world";
+        assert_eq!(
+            TextNormalizer::collapse_repetitive_artifacts(loopy),
+            "hello wait world"
         );
     }
 }

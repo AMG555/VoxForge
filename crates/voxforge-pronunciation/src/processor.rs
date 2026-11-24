@@ -64,17 +64,22 @@ impl PronunciationProcessor {
         &self.dictionary
     }
 
-    /// Run the full processing pipeline on `text`.
-    ///
-    /// 1. Symbol / number normalization (if enabled)
-    /// 2. Dictionary substitution (longest-term-first to avoid partial matches)
+    /// Run the full processing pipeline on `text` using default (English/generic) normalization.
     pub fn process(&self, text: &str) -> String {
-        let text = if self.normalize_symbols {
-            TextNormalizer::normalize(text)
+        self.process_with_language(text, None)
+    }
+
+    /// Run language-aware normalization and dictionary substitution on `text`.
+    ///
+    /// Supports native number verbalization (`ml`, `ur`), multilingual abbreviations
+    /// (`en`, `de`, `es`, `fr`), bracketed cue preservation, and markdown cleanup.
+    pub fn process_with_language(&self, text: &str, language: Option<&str>) -> String {
+        let normalized = if self.normalize_symbols {
+            TextNormalizer::normalize_for_language(text, language)
         } else {
             text.to_string()
         };
-        self.dictionary.apply(&text)
+        self.dictionary.apply(&normalized)
     }
 }
 
