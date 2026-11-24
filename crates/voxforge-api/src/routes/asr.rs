@@ -81,6 +81,32 @@ pub async fn transcribe_audio(
     State(state): State<AppState>,
     Json(payload): Json<TranscriptionRequestPayload>,
 ) -> Result<Response, (StatusCode, Json<ProblemDetails>)> {
+    let format_str = payload
+        .response_format
+        .clone()
+        .unwrap_or_else(|| "json".to_string())
+        .to_lowercase();
+
+    // Try real neural Whisper sidecar first when available and mock engine isn't explicitly requested.
+    if payload.model.as_deref() != Some("mock-asr") {
+        if let Some(ref b64) = payload.audio_base64 {
+            if let Some(neural_text) =
+                try_sidecar_transcribe(b64, payload.language.as_deref()).await
+            {
+                if format_str == "text" {
+                    let mut res = Response::new(Body::from(neural_text));
+                    res.headers_mut().insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("text/plain; charset=utf-8"),
+                    );
+                    return Ok(res);
+                }
+                let simple = SimpleTranscriptionResponse { text: neural_text };
+                return Ok(Json(simple).into_response());
+            }
+        }
+    }
+
     // 1. Decode audio data
     let (pcm_samples, sample_rate) = decode_audio_input(&payload).map_err(|detail| {
         (
@@ -130,12 +156,6 @@ pub async fn transcribe_audio(
         .as_ref()
         .map(|g| g.iter().any(|s| s == "word"))
         .unwrap_or(true);
-
-    let format_str = payload
-        .response_format
-        .clone()
-        .unwrap_or_else(|| "json".to_string())
-        .to_lowercase();
 
     let options = TranscriptionOptions {
         language: payload.language.clone(),
@@ -344,6 +364,15 @@ fn decode_audio_input(payload: &TranscriptionRequestPayload) -> Result<(Vec<i16>
     }
 
     Err("Either 'audio_base64' or 'audio_path' must be provided".to_string())
+}
+
+/// Probe and invoke the local neural Whisper sidecar `/transcribe` endpoint if live.
+/// Never falls back to synthetic placeholder strings so callers only receive real transcripts.
+pub async fn try_sidecar_transcribe(
+    audio_base64: &str,
+    language: Option<&str>,
+) -> Option<String> {
+    voxforge_engine::qwen3::transcribe_via_sidecar(audio_base64, language).await
 }
 
 #[cfg(test)]

@@ -1545,4 +1545,68 @@ mod tests {
                 || res.status() == StatusCode::BAD_REQUEST
         );
     }
+
+    #[tokio::test]
+    async fn test_speech_with_explicit_language_and_voice_iso_filter() {
+        let state = setup_test_state(None).await;
+        state
+            .voice_profiles
+            .insert(voxforge_core::models::VoiceProfile {
+                id: "cloned-iso-test".to_string(),
+                name: "Malayalam Clone".to_string(),
+                engine_id: "qwen3-tts".to_string(),
+                description: None,
+                language: "ml-IN".to_string(),
+                gender: Some(voxforge_core::models::Gender::Female),
+                reference_audio_path: None,
+                reference_audio_base64: None,
+                reference_transcript: None,
+                embedding: None,
+                clone_capabilities: None,
+                similarity_score: None,
+                sample_count: 1,
+                version: 1,
+                metadata: std::collections::HashMap::new(),
+                created_at: chrono::Utc::now(),
+                refined_at: None,
+            })
+            .await;
+
+        let app = create_app(state);
+
+        // ISO 639-3 `mal` must resolve to `ml` cloned profile
+        let req = Request::builder()
+            .uri("/v1/voices?language=mal")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            json["voices"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|v| v["id"] == "cloned-iso-test"),
+            "ISO 639-3 'mal' query should match ml-IN voice: {json}"
+        );
+
+        // Explicit `language` field in OpenAiSpeechRequest must be accepted
+        let speech_body = serde_json::json!({
+            "model": "mock-tts",
+            "voice": "mock-en-female",
+            "input": "Testing 50% cross-lingual synthesis.",
+            "language": "ml-IN",
+            "response_format": "wav"
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/v1/audio/speech")
+            .header("content-type", "application/json")
+            .body(Body::from(speech_body.to_string()))
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
 }

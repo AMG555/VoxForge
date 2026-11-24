@@ -57,6 +57,7 @@ export const api = {
     input: string;
     voice: string;
     model?: string;
+    language?: string;
     speed?: number;
     pitch?: number;
     instruct?: string;
@@ -81,6 +82,7 @@ export const api = {
             : 'edge-tts'),
         input: options.input,
         voice: options.voice,
+        language: options.language && options.language !== 'AUTO' ? options.language : undefined,
         speed: options.speed ?? 1.0,
         pitch: options.pitch ?? 0.0,
         instruct: options.instruct,
@@ -94,7 +96,7 @@ export const api = {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Synthesis failed' }));
-      throw new Error(err.detail || 'Synthesis failed');
+      throw new Error(err.detail || err.title || err.error || 'Synthesis failed');
     }
 
     return res.blob();

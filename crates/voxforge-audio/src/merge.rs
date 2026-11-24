@@ -178,6 +178,65 @@ impl AudioMerger {
         out
     }
 
+    /// Lossless f32 equal-power crossfade concatenation for high-precision 24/32-bit renders.
+    pub fn concatenate_f32_with_equal_power_crossfade(
+        chunks: &[&[f32]],
+        sample_rate: u32,
+        crossfade_ms: u32,
+    ) -> Vec<f32> {
+        if chunks.is_empty() {
+            return Vec::new();
+        }
+        if chunks.len() == 1 {
+            return chunks[0].to_vec();
+        }
+
+        let safe_crossfade_ms = crossfade_ms.clamp(1, 10_000);
+        let safe_sample_rate = sample_rate.min(192_000);
+        let fade_len = ((safe_sample_rate as f32) * (safe_crossfade_ms as f32 / 1000.0)) as usize;
+
+        let total_len: usize = chunks.iter().map(|c| c.len()).sum::<usize>()
+            - fade_len.saturating_mul(chunks.len().saturating_sub(1));
+
+        let mut out = Vec::with_capacity(total_len.max(1));
+        let half_pi = std::f32::consts::FRAC_PI_2;
+
+        if chunks[0].len() > fade_len {
+            out.extend_from_slice(&chunks[0][..chunks[0].len() - fade_len]);
+        }
+
+        for (idx, pair) in chunks.windows(2).enumerate() {
+            let seg_a = pair[0];
+            let seg_b = pair[1];
+            let actual_fade = fade_len.min(seg_a.len()).min(seg_b.len());
+
+            if actual_fade == 0 {
+                out.extend_from_slice(seg_b);
+                continue;
+            }
+
+            let a_tail = &seg_a[seg_a.len() - actual_fade..];
+            let b_head = &seg_b[..actual_fade];
+
+            for i in 0..actual_fade {
+                let t = i as f32 / actual_fade as f32;
+                let angle = t * half_pi;
+                let a = if a_tail[i].is_finite() { a_tail[i] } else { 0.0 };
+                let b = if b_head[i].is_finite() { b_head[i] } else { 0.0 };
+                out.push((a * angle.cos() + b * angle.sin()).clamp(-1.0, 1.0));
+            }
+
+            let is_last = idx + 1 == chunks.len() - 1;
+            if is_last {
+                out.extend_from_slice(&seg_b[actual_fade..]);
+            } else if seg_b.len() > actual_fade + fade_len {
+                out.extend_from_slice(&seg_b[actual_fade..seg_b.len() - fade_len]);
+            }
+        }
+
+        out
+    }
+
     /// Studio chunk joining: fade-out tail → silence gap → fade-in head.
     ///
     /// Uses this pattern instead of overlapping
@@ -359,5 +418,16 @@ mod tests {
         let out = AudioMerger::silence_gap_join(&[&loud, &loud, &loud], sr, 20, 100);
         // i16 is by definition in [-32768, 32767]; verify non-empty and no panic
         assert!(!out.is_empty());
+    }
+
+    #[test]
+    fn test_f32_equal_power_crossfade_preserves_continuity_and_bounds() {
+        let sr = 24_000u32;
+        let seg_a = vec![0.4f32; 2400];
+        let seg_b = vec![0.4f32; 2400];
+        let out = AudioMerger::concatenate_f32_with_equal_power_crossfade(&[&seg_a, &seg_b], sr, 20);
+        // fade_len = 480 samples -> total = 2400 + 2400 - 480 = 4320
+        assert_eq!(out.len(), 4320);
+        assert!(out.iter().all(|&s| s.is_finite() && s.abs() <= 1.0));
     }
 }

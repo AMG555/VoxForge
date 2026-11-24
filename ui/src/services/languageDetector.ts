@@ -181,6 +181,65 @@ export const ALL_646_LANGUAGES: LanguageOption[] = [
     })),
 ];
 
+export const REGIONAL_DIALECTS: Record<string, Array<{ code: string; label: string }>> = {
+  en: [
+    { code: 'en-US', label: 'US' },
+    { code: 'en-GB', label: 'UK' },
+    { code: 'en-IN', label: 'India' },
+    { code: 'en-AU', label: 'Australia' },
+  ],
+  es: [
+    { code: 'es-ES', label: 'Spain' },
+    { code: 'es-MX', label: 'Mexico' },
+    { code: 'es-AR', label: 'Argentina' },
+    { code: 'es-CO', label: 'Colombia' },
+  ],
+  pt: [
+    { code: 'pt-BR', label: 'Brazil' },
+    { code: 'pt-PT', label: 'Portugal' },
+  ],
+  fr: [
+    { code: 'fr-FR', label: 'France' },
+    { code: 'fr-CA', label: 'Canada' },
+  ],
+  de: [
+    { code: 'de-DE', label: 'Germany' },
+    { code: 'de-AT', label: 'Austria' },
+    { code: 'de-CH', label: 'Switzerland' },
+  ],
+  ar: [
+    { code: 'ar-SA', label: 'Saudi Arabia' },
+    { code: 'ar-EG', label: 'Egypt' },
+    { code: 'ar-MA', label: 'Morocco' },
+  ],
+  zh: [
+    { code: 'zh-CN', label: 'Simplified' },
+    { code: 'zh-TW', label: 'Traditional' },
+    { code: 'zh-HK', label: 'Cantonese' },
+  ],
+};
+
+const MACRO_ISO_MAP: Record<string, string> = {
+  arb: 'ar', arz: 'ar', acm: 'ar', apc: 'ar', ary: 'ar', ajp: 'ar',
+  cmn: 'zh', zho: 'zh', yue: 'zh',
+  mal: 'ml', hin: 'hi', tam: 'ta', tel: 'te', kan: 'kn', ben: 'bn',
+  urd: 'ur', npi: 'ne', jpn: 'ja', kor: 'ko', fra: 'fr', deu: 'de',
+  spa: 'es', por: 'pt', rus: 'ru', ita: 'it', nld: 'nl', tur: 'tr',
+  vie: 'vi', tha: 'th', ell: 'el', heb: 'he', amh: 'am', kat: 'ka', hye: 'hy',
+};
+
+export function normalizeLanguageCode(code?: string): string {
+  if (!code || code === 'AUTO') return 'AUTO';
+  const parts = code.trim().replace('_', '-').split('-').filter(Boolean);
+  if (parts.length === 0) return 'AUTO';
+  const base = MACRO_ISO_MAP[parts[0].toLowerCase()] || parts[0].toLowerCase();
+  if (parts.length >= 2) {
+    if (parts[1].toLowerCase() === 'latn') return base;
+    return `${base}-${parts[1].toUpperCase()}`;
+  }
+  return base;
+}
+
 // Lexicon for Romanized Manglish (Malayalam written in Latin script)
 const MANGLISH_KEYWORDS = new Set([
   'adipoli', 'adpoli', 'kidilam', 'machane', 'chunke', 'pwoli', 'sceneanu', 'sceneaanu',
@@ -254,6 +313,17 @@ export function detectLanguage(text: string): DetectedLanguage {
   let cjkChars = 0;
   let japaneseChars = 0;
   let koreanChars = 0;
+  let cyrillicChars = 0;
+  let greekChars = 0;
+  let hebrewChars = 0;
+  let thaiChars = 0;
+  let georgianChars = 0;
+  let armenianChars = 0;
+  let ethiopicChars = 0;
+  let sinhalaChars = 0;
+  let khmerChars = 0;
+  let laoChars = 0;
+  let myanmarChars = 0;
   let totalScriptChars = 0;
 
   for (let i = 0; i < trimmed.length; i++) {
@@ -316,6 +386,61 @@ export function detectLanguage(text: string): DetectedLanguage {
     // CJK Unified Ideographs: U+4E00 - U+9FFF
     else if (code >= 0x4e00 && code <= 0x9fff) {
       cjkChars++;
+      totalScriptChars++;
+    }
+    // Cyrillic: U+0400 - U+04FF
+    else if (code >= 0x0400 && code <= 0x04ff) {
+      cyrillicChars++;
+      totalScriptChars++;
+    }
+    // Greek: U+0370 - U+03FF
+    else if (code >= 0x0370 && code <= 0x03ff) {
+      greekChars++;
+      totalScriptChars++;
+    }
+    // Hebrew: U+0590 - U+05FF
+    else if (code >= 0x0590 && code <= 0x05ff) {
+      hebrewChars++;
+      totalScriptChars++;
+    }
+    // Thai: U+0E00 - U+0E7F
+    else if (code >= 0x0e00 && code <= 0x0e7f) {
+      thaiChars++;
+      totalScriptChars++;
+    }
+    // Georgian: U+10A0 - U+10FF
+    else if (code >= 0x10a0 && code <= 0x10ff) {
+      georgianChars++;
+      totalScriptChars++;
+    }
+    // Armenian: U+0530 - U+058F
+    else if (code >= 0x0530 && code <= 0x058f) {
+      armenianChars++;
+      totalScriptChars++;
+    }
+    // Ethiopic (Amharic): U+1200 - U+137F
+    else if (code >= 0x1200 && code <= 0x137f) {
+      ethiopicChars++;
+      totalScriptChars++;
+    }
+    // Sinhala: U+0D80 - U+0DFF
+    else if (code >= 0x0d80 && code <= 0x0dff) {
+      sinhalaChars++;
+      totalScriptChars++;
+    }
+    // Khmer: U+1780 - U+17FF
+    else if (code >= 0x1780 && code <= 0x17ff) {
+      khmerChars++;
+      totalScriptChars++;
+    }
+    // Lao: U+0E80 - U+0EFF
+    else if (code >= 0x0e80 && code <= 0x0eff) {
+      laoChars++;
+      totalScriptChars++;
+    }
+    // Myanmar: U+1000 - U+109F
+    else if (code >= 0x1000 && code <= 0x109f) {
+      myanmarChars++;
       totalScriptChars++;
     }
   }
@@ -453,6 +578,32 @@ export function detectLanguage(text: string): DetectedLanguage {
       suggestedVoiceId: 'zh-CN-XiaoxiaoNeural',
       confidence: 0.95,
     };
+  }
+
+  const expandedScripts: Array<[number, string, string, string, string]> = [
+    [cyrillicChars, 'ru-RU', 'Russian (Русский)', '🇷🇺', 'ru-RU-SvetlanaNeural'],
+    [greekChars, 'el-GR', 'Greek (Ελληνικά)', '🇬🇷', 'el-GR-AthinaNeural'],
+    [hebrewChars, 'he-IL', 'Hebrew (עברית)', '🇮🇱', 'he-IL-HilaNeural'],
+    [thaiChars, 'th-TH', 'Thai (ไทย)', '🇹🇭', 'th-TH-PremwadeeNeural'],
+    [georgianChars, 'ka-GE', 'Georgian (ქართული)', '🇬🇪', 'ka-GE-EkaNeural'],
+    [armenianChars, 'hy-AM', 'Armenian (Հայերեն)', '🇦🇲', 'hy-AM-AnahitNeural'],
+    [ethiopicChars, 'am-ET', 'Amharic (አማርኛ)', '🇪🇹', 'am-ET-MekdesNeural'],
+    [sinhalaChars, 'si-LK', 'Sinhala (සිංහල)', '🇱🇰', 'si-LK-ThiliniNeural'],
+    [khmerChars, 'km-KH', 'Khmer (ខ្មែរ)', '🇰🇭', 'km-KH-SreymomNeural'],
+    [laoChars, 'lo-LA', 'Lao (ລາວ)', '🇱🇦', 'lo-LA-KeomanyNeural'],
+    [myanmarChars, 'my-MM', 'Burmese (မြန်မာ)', '🇲🇲', 'my-MM-NilarNeural'],
+  ];
+  for (const [count, code, name, flag, suggestedVoiceId] of expandedScripts) {
+    if (count >= 2 || (count > 0 && totalScriptChars === count)) {
+      return {
+        code,
+        name,
+        flag,
+        isRomanizedDialect: false,
+        suggestedVoiceId,
+        confidence: Math.min(1.0, 0.7 + (count / trimmed.length) * 0.3),
+      };
+    }
   }
 
   // 2. Latin Script: Check for Romanized Indic Dialects (Manglish, Hinglish, Tanglish)

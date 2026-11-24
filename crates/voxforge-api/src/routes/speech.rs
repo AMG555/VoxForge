@@ -52,6 +52,10 @@ pub struct OpenAiSpeechRequest {
     /// Optional crossfade duration in ms when synthesizing multi-sentence long text. Default: 30ms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crossfade_ms: Option<u32>,
+    /// Optional explicit output language / dialect code (e.g. "ml-IN", "es-MX", "arb", "ja-JP").
+    /// Enables cross-lingual speech with any cloned voice profile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
     /// Optional SLA-policy-based routing. When present the engine is chosen
     /// automatically by `VoiceRouter`; `model` and `voice` still select the
     /// voice *within* the chosen engine as before.
@@ -429,61 +433,98 @@ pub async fn synthesize_speech(
         };
         if let Some(engine) = target_engine {
             if engine.supports_cloning() {
+                let effective_lang = payload
+                    .language
+                    .as_deref()
+                    .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                    .map(voxforge_engine::qwen3::normalize_language_code);
                 let chunks = split_text_into_chunks(&payload.input, 800);
                 let crossfade_ms = payload.crossfade_ms.unwrap_or(30);
-                let mut pcm_chunks = Vec::new();
+                let mut pcm_chunks: Vec<Vec<i16>> = Vec::with_capacity(chunks.len());
+                let mut f32_chunks: Vec<Vec<f32>> = Vec::with_capacity(chunks.len());
+                let mut all_chunks_have_f32 = true;
                 let mut sample_rate = 24000;
                 let mut channels = 1;
 
                 for chunk_text in chunks {
-                    let mut cloned_profile = profile.clone();
-                    if let Some(ref inst) = payload.instruct {
-                        cloned_profile
-                            .metadata
-                            .insert("instruct".to_string(), inst.clone());
-                    }
-                    if let Some(steps) = payload.num_step {
-                        cloned_profile
-                            .metadata
-                            .insert("num_step".to_string(), steps.to_string());
-                    }
-                    if let Some(prec) = payload.precision {
-                        cloned_profile
-                            .metadata
-                            .insert("precision".to_string(), prec.to_string());
-                    }
-                    if let Some(seed) = payload.seed {
-                        cloned_profile
-                            .metadata
-                            .insert("seed".to_string(), seed.to_string());
-                    }
-
+                    let norm_lang = effective_lang.as_deref().or(Some(profile.language.as_str()));
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
-                        text: state.pronunciation.process(&chunk_text),
-                        profile: cloned_profile,
+                        text: state
+                            .pronunciation
+                            .process_with_language(&chunk_text, norm_lang),
+                        profile: profile.clone(),
                         speed: payload.speed,
                         pitch: payload.pitch.unwrap_or(0.0),
                         format: payload.response_format,
-                        language: None,
-                        instruct: None,
-                        num_step: None,
-                        seed: None,
+                        language: effective_lang.clone(),
+                        instruct: payload.instruct.clone(),
+                        num_step: payload.num_step,
+                        seed: payload.seed,
                         precision: payload.precision,
                     };
-                    let chunk = engine.synthesize_cloned(&cloned_req).await.map_err(|e| {
+                    let (chunk, opt_f32) =
+                        engine.synthesize_cloned_hq(&cloned_req).await.map_err(|e| {
+                            let err = ProblemDetails {
+                                problem_type: "https://voxforge.org/errors/cloned-synthesis-failure"
+                                    .to_string(),
+                                title: "Cloned Synthesis Error".to_string(),
+                                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                                detail: e.to_string(),
+                                instance: "/v1/audio/speech".to_string(),
+                            };
+                            (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+                        })?;
+                    sample_rate = chunk.sample_rate;
+                    channels = chunk.channels;
+                    pcm_chunks.push(chunk.pcm_data);
+                    if let Some(f32_buf) = opt_f32 {
+                        f32_chunks.push(f32_buf);
+                    } else {
+                        all_chunks_have_f32 = false;
+                    }
+                }
+
+                // Preserve lossless 24-bit/32-bit float fidelity when neural sidecar produced f32 output
+                if all_chunks_have_f32
+                    && !f32_chunks.is_empty()
+                    && payload.response_format == AudioContainerFormat::Wav
+                    && payload.precision.unwrap_or(16) > 16
+                {
+                    let final_f32 = if f32_chunks.len() == 1 {
+                        f32_chunks.remove(0)
+                    } else {
+                        let slices: Vec<&[f32]> =
+                            f32_chunks.iter().map(|v| v.as_slice()).collect();
+                        AudioMerger::concatenate_f32_with_equal_power_crossfade(
+                            &slices,
+                            sample_rate,
+                            crossfade_ms,
+                        )
+                    };
+                    let wav_bytes = WavEncoder::encode_f32_to_wav_with_precision(
+                        &final_f32,
+                        sample_rate,
+                        channels,
+                        payload.precision.unwrap_or(24),
+                    )
+                    .map_err(|e| {
                         let err = ProblemDetails {
-                            problem_type: "https://voxforge.org/errors/cloned-synthesis-failure"
+                            problem_type: "https://voxforge.org/errors/encoding-failure"
                                 .to_string(),
-                            title: "Cloned Synthesis Error".to_string(),
+                            title: "Encoding Error".to_string(),
                             status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
                             detail: e.to_string(),
                             instance: "/v1/audio/speech".to_string(),
                         };
                         (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
                     })?;
-                    sample_rate = chunk.sample_rate;
-                    channels = chunk.channels;
-                    pcm_chunks.push(chunk.pcm_data);
+
+                    let mut response = Response::new(Body::from(wav_bytes));
+                    response.headers_mut().insert(
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("audio/wav"),
+                    );
+                    return Ok(response);
                 }
 
                 let final_pcm = if pcm_chunks.len() == 1 {
@@ -526,9 +567,16 @@ pub async fn synthesize_speech(
             match seg {
                 ParalinguisticSegment::Text(text) => {
                     let chunks = split_text_into_chunks(&text, 800);
+                    let eff_lang = payload
+                        .language
+                        .as_deref()
+                        .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+                        .or(Some(voice.language.as_str()));
                     for chunk_text in chunks {
                         let synth_req = SynthesisRequest {
-                            text: state.pronunciation.process(&chunk_text),
+                            text: state
+                                .pronunciation
+                                .process_with_language(&chunk_text, eff_lang),
                             voice_id: voice.id.clone(),
                             speed: payload.speed,
                             pitch: payload.pitch.unwrap_or(0.0),
@@ -570,9 +618,16 @@ pub async fn synthesize_speech(
         }
     } else {
         let chunks = split_text_into_chunks(&payload.input, 800);
+        let eff_lang = payload
+            .language
+            .as_deref()
+            .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
+            .or(Some(voice.language.as_str()));
         for chunk_text in chunks {
             let synth_req = SynthesisRequest {
-                text: state.pronunciation.process(&chunk_text),
+                text: state
+                    .pronunciation
+                    .process_with_language(&chunk_text, eff_lang),
                 voice_id: voice.id.clone(),
                 speed: payload.speed,
                 pitch: payload.pitch.unwrap_or(0.0),

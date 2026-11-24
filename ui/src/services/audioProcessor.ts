@@ -83,7 +83,8 @@ export class AudioProcessor {
   }
 
   /**
-   * Downmix multi-channel audio to mono Float32Array
+   * Downmix multi-channel audio to mono Float32Array safely without phase cancellation.
+   * Picks the loudest single channel if averaging causes >50% RMS loss (out-of-phase stereo).
    */
   private static downmixToMono(buffer: AudioBuffer): Float32Array {
     const numChannels = buffer.numberOfChannels;
@@ -95,12 +96,39 @@ export class AudioProcessor {
       return mono;
     }
 
+    const chanEnergy = new Float64Array(numChannels);
+    let mixedEnergy = 0;
+
     for (let c = 0; c < numChannels; c++) {
       const channelData = buffer.getChannelData(c);
       for (let i = 0; i < length; i++) {
-        mono[i] += channelData[i] / numChannels;
+        const s = Number.isFinite(channelData[i]) ? channelData[i] : 0;
+        chanEnergy[c] += s * s;
+        mono[i] += s / numChannels;
       }
     }
+
+    for (let i = 0; i < length; i++) {
+      mixedEnergy += mono[i] * mono[i];
+    }
+
+    let loudestCh = 0;
+    let maxEnergy = chanEnergy[0] || 0;
+    for (let c = 1; c < numChannels; c++) {
+      if (chanEnergy[c] > maxEnergy) {
+        maxEnergy = chanEnergy[c];
+        loudestCh = c;
+      }
+    }
+
+    const mixedRms = Math.sqrt(mixedEnergy / Math.max(1, length));
+    const loudestRms = Math.sqrt(maxEnergy / Math.max(1, length));
+    if (loudestRms > 1e-6 && mixedRms < 0.5 * loudestRms) {
+      const chosen = new Float32Array(length);
+      chosen.set(buffer.getChannelData(loudestCh));
+      return chosen;
+    }
+
     return mono;
   }
 
@@ -186,7 +214,7 @@ export class AudioProcessor {
       if (abs > peak) peak = abs;
     }
 
-    if (peak <= 0.0001) return samples;
+    if (peak <= 0.0018) return samples; // -55 dBFS silence floor: never amplify empty room noise
 
     const gain = Math.min(targetLinear / peak, 5.0); // limit max gain boost to +14dB
     const output = new Float32Array(samples.length);
@@ -593,15 +621,15 @@ export interface StudioMasteringConfig {
 export const DEFAULT_STUDIO_MASTERING: StudioMasteringConfig = {
   enabled: false,
   highPassRumbleCut: true,
-  lowWarmthGainDb: 3.0,
-  midPresenceGainDb: 1.5,
-  highAirGainDb: 2.5,
-  tubeDrive: 40,
-  roomReverb: 'booth',
-  reverbMix: 15,
-  deEsserStrength: 35,
-  compressorRatio: 4,
-  makeupGainDb: 2.0,
+  lowWarmthGainDb: 2.0,
+  midPresenceGainDb: 1.0,
+  highAirGainDb: 1.5,
+  tubeDrive: 20,
+  roomReverb: 'dry',
+  reverbMix: 0,
+  deEsserStrength: 30,
+  compressorRatio: 3,
+  makeupGainDb: 1.0,
   humanizeCadence: true,
 };
 

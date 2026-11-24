@@ -26,7 +26,6 @@ import {
   Trash2,
   Plus,
   FileUp,
-  Languages,
   ArrowRightLeft,
   BookA,
   BookOpen,
@@ -43,6 +42,7 @@ import { AudioVisualizer } from '../common/AudioVisualizer';
 import { PronunciationModal } from './PronunciationModal';
 import { VoiceTipsModal } from './VoiceTipsModal';
 import { ManuscriptModal } from './ManuscriptModal';
+import { LanguageDialectBar } from './LanguageDialectBar';
 import {
   AudioProcessor,
   AudioQualityAssessment,
@@ -390,6 +390,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
     if (autoMatchVoice && detectedLang.suggestedVoiceId && text.trim().length >= 4) {
       const currentVoice = localVoices.find((v) => v.id === selectedVoiceId);
+      if (currentVoice && isCustomVoice(currentVoice)) return;
       const targetPrefix = detectedLang.code.split('-')[0];
       const currentPrefix = currentVoice?.language ? currentVoice.language.split('-')[0] : 'en';
 
@@ -606,6 +607,8 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [cloneAudioBase64, setCloneAudioBase64] = useState<string>('');
   const [cloneFileName, setCloneFileName] = useState<string>('');
   const [isCloning, setIsCloning] = useState<boolean>(false);
+  const [cloneError, setCloneError] = useState<string | null>(null);
+  const [isServerTranscribing, setIsServerTranscribing] = useState<boolean>(false);
   const [audioQuality, setAudioQuality] = useState<AudioQualityAssessment | null>(null);
   const [isAutoTranscribing, setIsAutoTranscribing] = useState<boolean>(false);
   // Studio parameters: Refinement Steps (Sampling Steps) and Export Precision
@@ -764,15 +767,23 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       const renderStartTime = performance.now();
       const currentSeed = pinnedSeed ?? activeSeed;
 
-      // Ensure target voice matches language family ONLY if autoMatchVoice is active AND user has not manually chosen a voice
+      // Ensure target voice matches language family ONLY when a standard preset is active (never override cloned speakers)
+      const isSelectedCustom = isCustomVoice(selectedVoice);
       let voiceToSynthesize = selectedVoice.id;
-      if (!manualVoiceOverrideRef.current && autoMatchVoice && detectedLang.suggestedVoiceId) {
+      if (!isSelectedCustom && !manualVoiceOverrideRef.current && autoMatchVoice && detectedLang.suggestedVoiceId) {
         const currentPrefix = selectedVoice.language ? selectedVoice.language.split('-')[0] : 'en';
         const targetPrefix = detectedLang.code.split('-')[0];
         if (currentPrefix !== targetPrefix) {
           voiceToSynthesize = detectedLang.suggestedVoiceId;
         }
       }
+
+      const effectiveTargetLang =
+        selectedLanguageCode !== 'AUTO'
+          ? selectedLanguageCode
+          : detectedLang.code !== 'unknown'
+          ? detectedLang.nativeTargetCode || detectedLang.code
+          : undefined;
 
       try {
         const targetVoiceObj = localVoices.find((v) => v.id === voiceToSynthesize) || selectedVoice;
@@ -784,6 +795,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           input: promptText,
           voice: voiceToSynthesize,
           model: targetModel,
+          language: effectiveTargetLang,
           speed,
           pitch,
           instruct: instruct.trim() || undefined,
@@ -1049,7 +1061,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             const recognizer = new SpeechRec();
             recognizer.continuous = true;
             recognizer.interimResults = true;
-            recognizer.lang = 'en-US';
+            recognizer.lang = cloneLanguage !== 'AUTO' ? cloneLanguage : 'en-US';
             recognizer.onresult = (event: any) => {
               let transcript = '';
               for (let i = 0; i < event.results.length; i++) {
@@ -1204,10 +1216,30 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   };
 
 
+  const handleServerTranscribeClone = async () => {
+    if (!cloneAudioBase64 || isServerTranscribing) return;
+    setIsServerTranscribing(true);
+    setCloneError(null);
+    try {
+      const langHint = cloneLanguage && cloneLanguage !== 'AUTO' ? cloneLanguage : undefined;
+      const res = await api.transcribeAudio(cloneAudioBase64, 'whisper-base', langHint);
+      if (res?.text?.trim()) {
+        setCloneTranscript(res.text.trim());
+      } else {
+        setCloneError('No speech detected in the uploaded reference clip.');
+      }
+    } catch (err: any) {
+      setCloneError(err?.message || 'Automatic transcription failed.');
+    } finally {
+      setIsServerTranscribing(false);
+    }
+  };
+
   const handleCloneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cloneName || !cloneAudioBase64) return;
     setIsCloning(true);
+    setCloneError(null);
     try {
       let resolvedLang = cloneLanguage;
       if (resolvedLang === 'AUTO') {
@@ -1221,36 +1253,31 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         }
       }
 
-      let res: { id?: string; similarity_score?: number; version?: number; sample_count?: number } = {};
-      try {
-        res = await api.cloneVoice({
-          name: cloneName,
-          engine_id: 'qwen3-tts',
-          reference_audio_base64: cloneAudioBase64,
-          reference_transcript: cloneTranscript || undefined,
-          additional_reference_audio_base64: additionalSamples.length > 0
-            ? additionalSamples.map((s) => s.base64)
-            : undefined,
-          gender: cloneGender,
-          language: resolvedLang,
-          metadata: {
-            num_step: refinementSteps.toString(),
-            precision: audioPrecision.toString(),
-          },
-        });
-      } catch (backendErr) {
-        console.warn('Backend cloning offline; registering local zero-shot voice profile:', backendErr);
-        res = { id: `cloned-${Date.now()}` };
-      }
+      const res = await api.cloneVoice({
+        name: cloneName,
+        engine_id: 'qwen3-tts',
+        reference_audio_base64: cloneAudioBase64,
+        reference_transcript: cloneTranscript || undefined,
+        additional_reference_audio_base64: additionalSamples.length > 0
+          ? additionalSamples.map((s) => s.base64)
+          : undefined,
+        gender: cloneGender,
+        language: resolvedLang,
+        metadata: {
+          num_step: refinementSteps.toString(),
+          precision: audioPrecision.toString(),
+        },
+      });
+
       const newVoice: Voice = {
-        id: res.id || `cloned-${Date.now()}`,
+        id: res.id,
         name: `${cloneName} (Cloned)`,
         engine_id: 'qwen3-tts',
-        language: resolvedLang,
+        language: res.language || resolvedLang,
         gender: cloneGender,
         sample_rate_hz: 24000,
         tags: ['cloned', 'zero-shot', 'cross-lingual'],
-        description: `Zero-shot voice profile generated from ${additionalSamples.length > 0 ? `${1 + additionalSamples.length} reference samples` : 'reference sample'} (${resolvedLang})`,
+        description: `Zero-shot voice profile generated from ${additionalSamples.length > 0 ? `${1 + additionalSamples.length} reference samples` : 'reference sample'} (${res.language || resolvedLang})`,
         similarity_score: res.similarity_score,
         version: res.version,
         sample_count: res.sample_count,
@@ -1269,6 +1296,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       resetRecording();
     } catch (err: any) {
       console.error('Cloning error:', err);
+      setCloneError(err?.message || 'Voice cloning failed. Verify the backend server and audio sample.');
     } finally {
       setIsCloning(false);
     }
@@ -2178,67 +2206,25 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           )}
 
           <div className="space-y-2.5">
-            {/* Multilingual Dialect Routing Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center space-x-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] flex items-center space-x-1.5">
-                  <Languages className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Input Prompt & Dialect Routing</span>
-                </label>
-
-                {/* Manual Language Selector Dropdown */}
-                <select
-                  value={selectedLanguageCode}
-                  onChange={(e) => setSelectedLanguageCode(e.target.value)}
-                  className="bg-[#0B0E14] border border-[#242E3D] rounded px-2.5 py-1 text-xs font-mono text-[#CBD5E1] hover:border-amber-500/50 focus:border-amber-500 focus:outline-none cursor-pointer"
-                  title="Choose input language manually or keep on Auto-Detect"
-                >
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code} className="bg-[#121820] text-white">
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Detected Language Pill */}
-                <div className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-[#121820] border border-[#242E3D] text-[11px] font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{detectedLang.flag}</span>
-                  <span className="text-white font-medium">{detectedLang.name}</span>
-                  {selectedLanguageCode === 'AUTO' && (
-                    <span className="text-[10px] text-amber-400/80">
-                      ({Math.round(detectedLang.confidence * 100)}% match)
-                    </span>
-                  )}
-                </div>
-
-                {/* Auto-Match Voice Checkbox */}
-                <label
-                  className="flex items-center space-x-1 text-[11px] font-mono text-[#CBD5E1] cursor-pointer px-2 py-0.5 rounded bg-[#0B0E14] border border-[#242E3D] hover:border-amber-500/40"
-                  title="Automatically switch neural voice to match the input language"
-                >
-                  <input
-                    type="checkbox"
-                    checked={autoMatchVoice}
-                    onChange={(e) => {
-                      setAutoMatchVoice(e.target.checked);
-                      if (e.target.checked) {
-                        manualVoiceOverrideRef.current = false;
-                      }
-                    }}
-                    className="accent-amber-500 w-3 h-3"
-                  />
-                  <span>Auto-Match Voice</span>
-                </label>
-              </div>
-
-              <div className="text-[11px] font-mono text-[#64748B]">
-                {text.length} chars • {text.trim().split(/\s+/).filter(Boolean).length} words
-              </div>
-            </div>
+            {/* Modular Multilingual, 646-Language & Regional Dialect Bar */}
+            <LanguageDialectBar
+              selectedLanguageCode={selectedLanguageCode}
+              onSelectLanguage={setSelectedLanguageCode}
+              detectedLang={detectedLang}
+              autoMatchVoice={autoMatchVoice}
+              onToggleAutoMatchVoice={(checked) => {
+                setAutoMatchVoice(checked);
+                if (checked) {
+                  manualVoiceOverrideRef.current = false;
+                }
+              }}
+              isClonedVoiceSelected={Boolean(selectedVoice && isCustomVoice(selectedVoice))}
+              charCount={text.length}
+              wordCount={text.trim().split(/\s+/).filter(Boolean).length}
+            />
 
             {/* Smart Dialect Assistant Banner (Manglish / Hinglish / Tanglish / Script alignment) */}
-            {(detectedLang.isRomanizedDialect || (detectedLang.suggestedVoiceId && !selectedVoice?.id.startsWith(detectedLang.code.split('-')[0]))) && (
+            {(detectedLang.isRomanizedDialect || (!isCustomVoice(selectedVoice) && detectedLang.suggestedVoiceId && !selectedVoice?.id.startsWith(detectedLang.code.split('-')[0]))) && (
               <div className="p-3 rounded-lg bg-[#161D26] border border-amber-500/30 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
                 <div className="flex items-center space-x-2.5">
                   <span className="text-xl shrink-0">{detectedLang.flag}</span>
@@ -3601,6 +3587,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                   type="button"
                   onClick={() => {
                     if (isRecording) stopRecording();
+                    setCloneError(null);
                     setShowCloneModal(false);
                   }}
                   className="p-1.5 rounded-lg text-[#64748B] hover:text-white hover:bg-[#1A222D] transition-colors"
@@ -3958,21 +3945,38 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#94A3B8] mb-1">
-                    Reference Transcript{' '}
-                    {isAutoTranscribing ? (
-                      <span className="text-amber-400 font-mono text-[10px] animate-pulse">
-                        (Listening & Auto-Transcribing...)
-                      </span>
-                    ) : cloneTranscript ? (
-                      <span className="text-emerald-400 font-mono text-[10px]">
-                        (✓ Spoken Transcript Captured)
-                      </span>
-                    ) : (
-                      <span className="text-[#64748B] lowercase font-normal">(optional, auto-transcribes on microphone)</span>
-                    )}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="vox-clone-transcript" className="block text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">
+                      Reference Transcript{' '}
+                      {isAutoTranscribing ? (
+                        <span className="text-amber-400 font-mono text-[10px] animate-pulse">
+                          (Listening &amp; Auto-Transcribing...)
+                        </span>
+                      ) : cloneTranscript ? (
+                        <span className="text-emerald-400 font-mono text-[10px]">
+                          (Transcript Ready)
+                        </span>
+                      ) : (
+                        <span className="text-[#64748B] lowercase font-normal">(recommended for highest fidelity)</span>
+                      )}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleServerTranscribeClone}
+                      disabled={!cloneAudioBase64 || isServerTranscribing}
+                      className="flex items-center space-x-1 px-2 py-0.5 rounded bg-[#121820] hover:bg-[#1E293B] border border-[#242E3D] hover:border-amber-500/50 text-[10px] font-mono text-amber-300 disabled:opacity-40 transition-colors"
+                      title="Transcribe reference audio via backend Whisper sidecar"
+                    >
+                      {isServerTranscribing ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-3 h-3" />
+                      )}
+                      <span>{isServerTranscribing ? 'Transcribing...' : 'Auto-Transcribe Clip'}</span>
+                    </button>
+                  </div>
                   <textarea
+                    id="vox-clone-transcript"
                     dir="auto"
                     rows={2}
                     value={cloneTranscript}
@@ -4189,6 +4193,15 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
 
               {/* Sticky Modal Footer */}
               <div className="p-4 border-t border-[#242E3D] bg-[#0E131A] shrink-0">
+                {cloneError && (
+                  <div
+                    role="alert"
+                    className="mb-2.5 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2"
+                  >
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>{cloneError}</span>
+                  </div>
+                )}
                 {additionalSamples.length > 0 && (
                   <p className="text-[10px] font-mono text-amber-400 mb-2 text-right">
                     Using {1 + additionalSamples.length} reference samples — embedding centroid will be averaged for higher accuracy.

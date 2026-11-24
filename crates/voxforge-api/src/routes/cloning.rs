@@ -59,7 +59,7 @@ pub async fn get_profile(
 /// `POST /v1/voices/clone` — clone a voice from reference audio.
 pub async fn clone_voice(
     State(state): State<AppState>,
-    Json(body): Json<CloneVoiceRequest>,
+    Json(mut body): Json<CloneVoiceRequest>,
 ) -> Result<(StatusCode, Json<VoiceProfile>), (StatusCode, Json<ProblemDetails>)> {
     if body.name.trim().is_empty() {
         return Err((
@@ -192,6 +192,27 @@ pub async fn clone_voice(
                 instance: "/v1/voices/clone".to_string(),
             }),
         ));
+    }
+
+    // Auto-transcribe reference clip via live neural Whisper sidecar when transcript omitted.
+    let needs_transcript = body
+        .reference_transcript
+        .as_deref()
+        .map(|s| s.trim().is_empty())
+        .unwrap_or(true);
+    if needs_transcript {
+        if let Some(ref b64) = body.reference_audio_base64 {
+            let lang_hint = if body.language.trim().is_empty()
+                || body.language.eq_ignore_ascii_case("AUTO")
+            {
+                None
+            } else {
+                Some(body.language.as_str())
+            };
+            if let Some(transcript) = crate::routes::asr::try_sidecar_transcribe(b64, lang_hint).await {
+                body.reference_transcript = Some(transcript);
+            }
+        }
     }
 
     let profile = engine.clone_voice(&body).await.map_err(|e| {

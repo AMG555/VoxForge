@@ -2233,6 +2233,67 @@ fn auto_detect_local_port(port: u16) -> bool {
     TcpStream::connect_timeout(&addr, Duration::from_millis(15)).is_ok()
 }
 
+/// Probe and invoke the local neural Whisper sidecar `/transcribe` endpoint if live.
+/// Returns `None` without fabricated placeholder text when offline or unavailable.
+pub async fn transcribe_via_sidecar(
+    audio_base64: &str,
+    language: Option<&str>,
+) -> Option<String> {
+    if audio_base64.trim().is_empty() {
+        return None;
+    }
+
+    let base_url = if let Ok(url) = std::env::var("VOXFORGE_SIDECAR_URL") {
+        let trimmed = url.trim().trim_end_matches('/').to_string();
+        if trimmed.is_empty() {
+            return None;
+        }
+        trimmed
+    } else if auto_detect_local_port(9000) {
+        "http://127.0.0.1:9000".to_string()
+    } else {
+        return None;
+    };
+
+    let endpoint = if base_url.ends_with("/synthesize") {
+        format!("{}/transcribe", base_url.trim_end_matches("/synthesize"))
+    } else {
+        format!("{base_url}/transcribe")
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .ok()?;
+
+    let payload = serde_json::json!({
+        "audio_base64": audio_base64,
+        "language": language,
+    });
+
+    match client.post(&endpoint).json(&payload).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                return json
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(ToString::to_string);
+            }
+            None
+        }
+        Ok(resp) => {
+            tracing::debug!(status = %resp.status(), endpoint = %endpoint, "Sidecar /transcribe non-success status");
+            None
+        }
+        Err(err) => {
+            tracing::debug!(error = %err, endpoint = %endpoint, "Sidecar /transcribe request failed");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

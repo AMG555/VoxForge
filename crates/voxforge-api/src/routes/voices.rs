@@ -46,7 +46,19 @@ pub async fn list_voices(
     }
 
     if let Some(lang) = &query.language {
-        voices.retain(|v| v.language.starts_with(lang));
+        let normalized_query = voxforge_engine::qwen3::normalize_language_code(lang);
+        let q_prefix = normalized_query
+            .split('-')
+            .next()
+            .unwrap_or(&normalized_query)
+            .to_ascii_lowercase();
+        voices.retain(|v| {
+            let norm_v = voxforge_engine::qwen3::normalize_language_code(&v.language);
+            v.language.eq_ignore_ascii_case(lang)
+                || v.language.starts_with(lang.as_str())
+                || norm_v.eq_ignore_ascii_case(&normalized_query)
+                || norm_v.to_ascii_lowercase().starts_with(&q_prefix)
+        });
     }
     if let Some(eng) = &query.engine {
         voices.retain(|v| &v.engine_id == eng);
