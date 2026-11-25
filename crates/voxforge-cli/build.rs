@@ -46,8 +46,21 @@ fn main() {
         res.set("LegalCopyright", "Copyright (c) 2026 VoxForge Contributors");
         res.set("OriginalFilename", "voxforge.exe");
         res.set("InternalName", "voxforge");
-        res.set_version_info(winres::VersionInfo::PRODUCTVERSION, 0x0004_0001_0000_0000);
-        res.set_version_info(winres::VersionInfo::FILEVERSION, 0x0004_0001_0000_0000);
+        let major: u64 = std::env::var("CARGO_PKG_VERSION_MAJOR")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        let minor: u64 = std::env::var("CARGO_PKG_VERSION_MINOR")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        let patch: u64 = std::env::var("CARGO_PKG_VERSION_PATCH")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        let packed_ver = (major << 48) | (minor << 32) | (patch << 16);
+        res.set_version_info(winres::VersionInfo::PRODUCTVERSION, packed_ver);
+        res.set_version_info(winres::VersionInfo::FILEVERSION, packed_ver);
 
         if let Err(e) = res.compile() {
             eprintln!("cargo:warning=winres compile failed: {e}");
