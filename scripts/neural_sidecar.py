@@ -378,15 +378,19 @@ def _load_omnivoice(device: str) -> bool:
     global _tts_model, ACTIVE_BACKEND
     try:
         log.info("Attempting to load k2-fsa/OmniVoice on %s...", device)
+        import torch
         from omnivoice import OmniVoice
 
         checkpoint = os.environ.get("OMNIVOICE_CHECKPOINT", "k2-fsa/OmniVoice")
-        _tts_model = OmniVoice.from_pretrained(checkpoint, device_map=device)
+        load_kw: Dict[str, Any] = {"device_map": device, "load_asr": False}
+        if device == "cpu":
+            load_kw["dtype"] = torch.float32
+        _tts_model = OmniVoice.from_pretrained(checkpoint, **load_kw)
         ACTIVE_BACKEND = "omnivoice"
         log.info("k2-fsa/OmniVoice loaded successfully (646 languages supported)")
         return True
     except Exception as exc:
-        log.debug("OmniVoice not available: %s", exc)
+        log.warning("OmniVoice unavailable on %s: %s", device, exc)
         return False
 
 
@@ -1017,6 +1021,27 @@ def load_languages_catalog() -> List[Dict[str, Any]]:
     return []
 
 
+def _resolve_omnivoice_language(language: str, model: Any) -> Optional[str]:
+    """Map normalized BCP-47 tags like 'ml-IN' to OmniVoice LANG_IDS codes ('ml') when using real OmniVoice."""
+    mod = getattr(type(model), "__module__", "")
+    if not str(mod).startswith("omnivoice"):
+        return language
+    try:
+        from omnivoice.utils.lang_map import LANG_IDS, LANG_NAME_TO_ID
+
+        if language in LANG_IDS:
+            return language
+        base = language.split("-")[0]
+        if base in LANG_IDS:
+            return base
+        lower = language.lower()
+        if lower in LANG_NAME_TO_ID:
+            return LANG_NAME_TO_ID[lower]
+    except Exception as exc:
+        log.warning("Failed resolving OmniVoice language '%s': %s", language, exc)
+    return language
+
+
 def synthesize(body: Dict[str, Any]) -> Tuple[bytes, int]:
     text = str(body.get("text", "")).strip()
     if not text:
@@ -1061,9 +1086,10 @@ def synthesize(body: Dict[str, Any]) -> Tuple[bytes, int]:
             cleaned_wav_bytes = b""
 
         if ACTIVE_BACKEND == "omnivoice":
+            ov_lang = _resolve_omnivoice_language(language, _tts_model)
             kw: Dict[str, Any] = {
                 "text": text,
-                "language": language,
+                "language": ov_lang,
                 "num_step": refinement_steps,
                 "speed": speed,
             }

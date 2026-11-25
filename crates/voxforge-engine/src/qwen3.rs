@@ -137,7 +137,7 @@ impl Qwen3TtsEngine {
             clone_count: AtomicUsize::new(0),
             endpoint_url,
             client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(60))
+                .timeout(std::time::Duration::from_secs(180))
                 .build()
                 .unwrap_or_default(),
             cloned_profiles: Arc::new(RwLock::new(profiles_map)),
@@ -2262,7 +2262,7 @@ pub async fn transcribe_via_sidecar(
     };
 
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
+        .timeout(std::time::Duration::from_secs(45))
         .build()
         .ok()?;
 
