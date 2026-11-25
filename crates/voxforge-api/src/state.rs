@@ -12,6 +12,7 @@ use voxforge_router::VoiceRouter;
 use voxforge_worker::{WorkerClient, WorkerPool};
 
 use crate::metrics::MetricsCollector;
+use crate::middleware::RateLimiter;
 use crate::routes::voice_ci::ProfileStore;
 
 #[derive(Clone)]
@@ -32,6 +33,7 @@ pub struct AppState {
     pub pipeline_executor: Arc<PipelineExecutor>,
     pub api_key: Option<String>,
     pub metrics: Arc<MetricsCollector>,
+    pub rate_limiter: RateLimiter,
     /// Pre-built MCP server — shared across all requests to avoid per-request engine re-registration.
     pub mcp_server: Arc<McpServer>,
 }
@@ -57,6 +59,7 @@ impl AppState {
         let voice_ci_store = ProfileStore::new();
         let worker_pool = Arc::new(WorkerPool::new());
         let worker_client = Arc::new(WorkerClient::new());
+        let rate_limiter = RateLimiter::from_env();
 
         // Build the MCP server once and share it across all HTTP requests via Arc.
         // Previously, mcp_http.rs constructed a new McpServer on EVERY request, which
@@ -90,7 +93,14 @@ impl AppState {
             pipeline_executor,
             api_key,
             metrics,
+            rate_limiter,
             mcp_server,
         }
+    }
+
+    /// Override the rate limiter threshold (e.g. for deterministic testing).
+    pub fn with_rate_limiter(mut self, rate_limiter: RateLimiter) -> Self {
+        self.rate_limiter = rate_limiter;
+        self
     }
 }

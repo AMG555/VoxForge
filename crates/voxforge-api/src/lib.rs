@@ -54,6 +54,10 @@ pub fn create_app(state: AppState) -> Router {
             state.clone(),
             middleware::auth_middleware,
         ))
+        .layer(from_fn_with_state(
+            state.clone(),
+            middleware::rate_limit_middleware,
+        ))
         .layer(from_fn(middleware::security_headers))
         .layer(from_fn_with_state(
             state.clone(),
@@ -1613,12 +1617,8 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_url_ssrf_block_and_cloned_sts() {
         let state = setup_test_state(None).await;
-        let wav = voxforge_audio::WavEncoder::encode_pcm16_to_wav(
-            &[300i16; 4800],
-            24000,
-            1,
-        )
-        .unwrap();
+        let wav =
+            voxforge_audio::WavEncoder::encode_pcm16_to_wav(&[300i16; 4800], 24000, 1).unwrap();
         let wav_b64 = routes::cloning::base64_encode(&wav);
 
         state
@@ -1698,5 +1698,52 @@ mod tests {
             .unwrap();
         let unauth_res = protected_app.oneshot(unauth_req).await.unwrap();
         assert_eq!(unauth_res.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiting_middleware_enforces_limit_and_exempts_health() {
+        let state = setup_test_state(None)
+            .await
+            .with_rate_limiter(middleware::RateLimiter::new(2));
+        let app = create_app(state);
+
+        for _ in 0..2 {
+            let req = Request::builder()
+                .uri("/v1/models")
+                .header("x-forwarded-for", "203.0.113.10")
+                .body(Body::empty())
+                .unwrap();
+            let res = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(res.status(), StatusCode::OK);
+            assert_eq!(res.headers().get("x-ratelimit-limit").unwrap(), "2");
+        }
+
+        // 3rd request in same window must return 429 Too Many Requests
+        let limited_req = Request::builder()
+            .uri("/v1/models")
+            .header("x-forwarded-for", "203.0.113.10")
+            .body(Body::empty())
+            .unwrap();
+        let limited_res = app.clone().oneshot(limited_req).await.unwrap();
+        assert_eq!(limited_res.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(limited_res.headers().get("retry-after").is_some());
+
+        // Different IP gets its own fresh bucket
+        let other_req = Request::builder()
+            .uri("/v1/models")
+            .header("x-forwarded-for", "203.0.113.11")
+            .body(Body::empty())
+            .unwrap();
+        let other_res = app.clone().oneshot(other_req).await.unwrap();
+        assert_eq!(other_res.status(), StatusCode::OK);
+
+        // Health endpoint remains exempt even after IP exhausted /v1 bucket
+        let health_req = Request::builder()
+            .uri("/health")
+            .header("x-forwarded-for", "203.0.113.10")
+            .body(Body::empty())
+            .unwrap();
+        let health_res = app.oneshot(health_req).await.unwrap();
+        assert_eq!(health_res.status(), StatusCode::OK);
     }
 }
