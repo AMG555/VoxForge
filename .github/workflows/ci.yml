@@ -11,7 +11,7 @@ env:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }})
+    name: Rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -31,10 +31,63 @@ jobs:
 
       - name: Check Formatting
         run: cargo fmt --all --check
-        continue-on-error: true
 
       - name: Run Clippy Linter
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Run Workspace Tests
         run: cargo test --workspace --verbose
+
+  ui-and-tooling:
+    name: UI, NPX Runner & Python Sidecar
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI Dependencies
+        run: npm --prefix ui ci
+
+      - name: TypeScript Typecheck
+        run: npm --prefix ui run lint
+
+      - name: Build Web UI
+        run: npm --prefix ui run build
+
+      - name: Verify NPX Runner Syntax
+        run: node -c packages/voxforge/bin/voxforge.js
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Neural Sidecar Tests
+        run: |
+          pip install --quiet pytest
+          python -m pytest scripts/test_neural_sidecar.py -v
+
+  docker-image:
+    name: Docker Container Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Production Image (Dry Run)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
