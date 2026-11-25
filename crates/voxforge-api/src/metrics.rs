@@ -19,8 +19,14 @@ impl MetricsCollector {
 
     pub async fn record_request(&self, endpoint: &str, status: u16) {
         let mut map = self.requests_total.write().await;
-        let counter = map.entry((endpoint.to_string(), status)).or_insert(0);
-        *counter += 1;
+        let key = (endpoint.to_string(), status);
+        if map.contains_key(&key) || map.len() < 1024 {
+            let counter = map.entry(key).or_insert(0);
+            *counter += 1;
+        } else {
+            let overflow = map.entry(("__other__".to_string(), status)).or_insert(0);
+            *overflow += 1;
+        }
     }
 
     pub fn record_synthesis(&self, duration_ms: u64, samples_count: usize) {
@@ -56,9 +62,14 @@ impl MetricsCollector {
             out.push_str("voxforge_requests_total{endpoint=\"none\",status=\"200\"} 0\n");
         } else {
             for ((ep, status), count) in req_map.iter() {
+                let safe_ep = ep
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n")
+                    .replace('\r', "");
                 out.push_str(&format!(
                     "voxforge_requests_total{{endpoint=\"{}\",status=\"{}\"}} {}\n",
-                    ep, status, count
+                    safe_ep, status, count
                 ));
             }
         }
