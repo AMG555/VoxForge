@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   voxforge-daemon:
     build:
@@ -13,12 +11,15 @@ services:
       - VOXFORGE_PORT=8080
       - VOXFORGE_HOST=0.0.0.0
       - VOXFORGE_API_KEY=${VOXFORGE_API_KEY:-}
+      - VOXFORGE_ALLOWED_HOSTS=${VOXFORGE_ALLOWED_HOSTS:-}
+      - VOXFORGE_ALLOWED_ORIGINS=${VOXFORGE_ALLOWED_ORIGINS:-}
+      - VOXFORGE_RATE_LIMIT_RPM=${VOXFORGE_RATE_LIMIT_RPM:-600}
       - RUST_LOG=info
     volumes:
       - voxforge-data:/app/data
       - voxforge-models:/app/models
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -27,6 +28,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: voxforge-postgres
+    profiles: ["db"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-voxforge}

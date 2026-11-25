@@ -1,6 +1,9 @@
 target/
 ui/node_modules/
 ui/dist/
+crates/voxforge-api/ui_dist/
+packages/
+verify/
 .git/
 .github/
 *.md
@@ -10,3 +13,6 @@ dist/
 .env
 .env.*
 *.log
+*.wav
+*.mp3
+*.onnx
