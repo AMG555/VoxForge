@@ -71,7 +71,7 @@ jobs:
 
       - name: Run Neural Sidecar Tests
         run: |
-          pip install --quiet pytest
+          pip install --quiet pytest numpy
           python -m pytest scripts/test_neural_sidecar.py -v
 
   docker-image:

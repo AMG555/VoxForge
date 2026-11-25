@@ -1,7 +1,6 @@
 # VoxForge .gitignore
 target/
 **/*.rs.bk
-Cargo.lock
 *.pdb
 
 # Dependencies
