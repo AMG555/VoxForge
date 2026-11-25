@@ -6,7 +6,7 @@
 
 **Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
 
-[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.6.0_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.6.0-20bf6b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
 [![Release](https://img.shields.io/badge/Release-v0.6.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
 [![Status](https://img.shields.io/badge/Status-Production_Ready_v0.6.0-brightgreen.svg)](docs/architecture.md)
@@ -18,7 +18,7 @@
 
 *An open-source, private, self-hosted neural speech workstation. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
 
-[Download .exe](#-direct-downloads--instant-setup) • [Features](#-key-capabilities) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
+[Downloads](#-direct-downloads--instant-setup) • [Features](#-key-capabilities) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
 </div>
 
