@@ -2,11 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use axum::{
-    extract::Query,
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::Query, http::StatusCode, Json};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -151,7 +147,10 @@ pub fn parse_checksums_txt(content: &str, asset_name: &str) -> Option<String> {
 }
 
 /// Map runtime OS/CPU architecture to release asset preference list.
-pub fn resolve_platform_asset_candidates(os: &str, arch: &str) -> (&'static str, &'static [&'static str]) {
+pub fn resolve_platform_asset_candidates(
+    os: &str,
+    arch: &str,
+) -> (&'static str, &'static [&'static str]) {
     match (os, arch) {
         ("windows", "x86_64" | "aarch64") => (
             "voxforge-windows-x86_64.exe",
@@ -185,12 +184,11 @@ pub fn detect_install_mode(exe_path: &Path) -> (&'static str, bool) {
         return ("cargo_dev", false);
     }
 
-    let parent_writable = exe_path
-        .parent()
-        .map(is_dir_writable)
-        .unwrap_or(false);
+    let parent_writable = exe_path.parent().map(is_dir_writable).unwrap_or(false);
 
-    if cfg!(windows) && (norm.contains("/program files/") || norm.ends_with("/voxforge/voxforge.exe")) {
+    if cfg!(windows)
+        && (norm.contains("/program files/") || norm.ends_with("/voxforge/voxforge.exe"))
+    {
         return ("windows_installer", parent_writable);
     }
 
@@ -201,7 +199,10 @@ fn is_dir_writable(dir: &Path) -> bool {
     if !dir.exists() {
         return false;
     }
-    let probe = dir.join(format!(".voxforge_write_probe_{}", uuid::Uuid::new_v4().simple()));
+    let probe = dir.join(format!(
+        ".voxforge_write_probe_{}",
+        uuid::Uuid::new_v4().simple()
+    ));
     match std::fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -224,7 +225,8 @@ pub fn is_trusted_release_download_url(download_url: &str, api_url: &str) -> boo
     let path = parsed.path();
 
     if parsed.scheme() == "https"
-        && ((host.eq_ignore_ascii_case("github.com") && path.starts_with("/AMG555/VoxForge/releases/"))
+        && ((host.eq_ignore_ascii_case("github.com")
+            && path.starts_with("/AMG555/VoxForge/releases/"))
             || host.eq_ignore_ascii_case("objects.githubusercontent.com")
             || host.eq_ignore_ascii_case("release-assets.githubusercontent.com"))
     {
@@ -387,15 +389,22 @@ pub async fn check_for_updates_from_url(api_url: &str) -> UpdateCheckResponse {
         }
     };
 
-    if http_res.status() == StatusCode::FORBIDDEN || http_res.status() == StatusCode::TOO_MANY_REQUESTS {
+    if http_res.status() == StatusCode::FORBIDDEN
+        || http_res.status() == StatusCode::TOO_MANY_REQUESTS
+    {
         resp.check_status = "rate_limited".to_string();
-        resp.error = Some("GitHub API rate limit reached. Try again later or open Releases directly.".to_string());
+        resp.error = Some(
+            "GitHub API rate limit reached. Try again later or open Releases directly.".to_string(),
+        );
         return resp;
     }
 
     if !http_res.status().is_success() {
         resp.check_status = "offline".to_string();
-        resp.error = Some(format!("Release server returned HTTP {}", http_res.status()));
+        resp.error = Some(format!(
+            "Release server returned HTTP {}",
+            http_res.status()
+        ));
         return resp;
     }
 
@@ -412,7 +421,10 @@ pub async fn check_for_updates_from_url(api_url: &str) -> UpdateCheckResponse {
     resp.latest_tag = Some(release.tag_name.clone());
     resp.latest_version = Some(clean_latest.clone());
     resp.update_available = is_newer_version(&resp.current_version, &clean_latest);
-    resp.release_name = release.name.clone().or_else(|| Some(release.tag_name.clone()));
+    resp.release_name = release
+        .name
+        .clone()
+        .or_else(|| Some(release.tag_name.clone()));
     if let Some(url) = release.html_url {
         resp.release_url = url;
     }
@@ -447,13 +459,16 @@ pub async fn check_for_updates_from_url(api_url: &str) -> UpdateCheckResponse {
 }
 
 /// Download the latest verified release binary, verify SHA-256 and execute health check, then swap atomically.
-pub async fn download_verify_and_install_update() -> Result<UpdateApplyResponse, (StatusCode, String)> {
+pub async fn download_verify_and_install_update(
+) -> Result<UpdateApplyResponse, (StatusCode, String)> {
     let api_url = release_api_url();
     let check = check_for_updates(true).await;
     if check.check_status != "ok" {
         return Err((
             StatusCode::BAD_GATEWAY,
-            check.error.unwrap_or_else(|| "Release lookup failed".to_string()),
+            check
+                .error
+                .unwrap_or_else(|| "Release lookup failed".to_string()),
         ));
     }
 
@@ -493,10 +508,7 @@ pub async fn download_verify_and_install_update() -> Result<UpdateApplyResponse,
     }
 
     if !check.can_self_update {
-        return Err((
-            StatusCode::FORBIDDEN,
-            check.update_hint,
-        ));
+        return Err((StatusCode::FORBIDDEN, check.update_hint));
     }
 
     let asset_url = check.asset_url.clone().ok_or_else(|| {
@@ -531,13 +543,19 @@ pub async fn download_verify_and_install_update() -> Result<UpdateApplyResponse,
         .user_agent(concat!("VoxForge/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(180))
         .build()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("HTTP client error: {e}")))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("HTTP client error: {e}"),
+            )
+        })?;
 
-    let mut resp = client
-        .get(&asset_url)
-        .send()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Failed downloading release binary: {e}")))?;
+    let mut resp = client.get(&asset_url).send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Failed downloading release binary: {e}"),
+        )
+    })?;
 
     if !resp.status().is_success() {
         return Err((
@@ -547,11 +565,12 @@ pub async fn download_verify_and_install_update() -> Result<UpdateApplyResponse,
     }
 
     let mut bytes = Vec::new();
-    while let Some(chunk) = resp
-        .chunk()
-        .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Stream download failed: {e}")))?
-    {
+    while let Some(chunk) = resp.chunk().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Stream download failed: {e}"),
+        )
+    })? {
         if bytes.len() + chunk.len() > MAX_UPDATE_BINARY_BYTES {
             return Err((
                 StatusCode::PAYLOAD_TOO_LARGE,
@@ -572,8 +591,12 @@ pub async fn download_verify_and_install_update() -> Result<UpdateApplyResponse,
         ));
     }
 
-    let exe_path = std::env::current_exe()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Cannot locate executable: {e}")))?;
+    let exe_path = std::env::current_exe().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Cannot locate executable: {e}"),
+        )
+    })?;
 
     apply_binary_bytes_atomically(&exe_path, &bytes)
         .await
@@ -611,11 +634,10 @@ async fn apply_binary_bytes_atomically(exe_path: &Path, bytes: &[u8]) -> Result<
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755))
-            .map_err(|e| {
-                let _ = std::fs::remove_file(&staged);
-                format!("Failed setting executable permissions: {e}")
-            })?;
+        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).map_err(|e| {
+            let _ = std::fs::remove_file(&staged);
+            format!("Failed setting executable permissions: {e}")
+        })?;
     }
 
     // Verify downloaded binary executes cleanly before replacing active binary.
@@ -825,10 +847,8 @@ f82d8e7479d0c4d0a55eb522abc4eed38bdc926a6f56c1f46c37ae59e3f79f0f  voxforge-windo
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let base = format!("http://{addr}");
-        let (primary, _) = resolve_platform_asset_candidates(
-            std::env::consts::OS,
-            std::env::consts::ARCH,
-        );
+        let (primary, _) =
+            resolve_platform_asset_candidates(std::env::consts::OS, std::env::consts::ARCH);
         let expected_hash = "a".repeat(64);
         let sums_body = format!("{expected_hash}  {primary}\n");
 

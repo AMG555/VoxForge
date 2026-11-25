@@ -320,13 +320,13 @@ impl McpServer {
                     .and_then(|i| i.as_str())
                     .map(|s| s.to_string());
                 let seed = args.get("seed").and_then(|s| s.as_u64());
-                let precision = args
-                    .get("precision")
-                    .and_then(|p| p.as_u64())
-                    .and_then(|v| match v {
-                        16 | 24 | 32 => Some(v as u16),
-                        _ => None,
-                    });
+                let precision =
+                    args.get("precision")
+                        .and_then(|p| p.as_u64())
+                        .and_then(|v| match v {
+                            16 | 24 | 32 => Some(v as u16),
+                            _ => None,
+                        });
                 let output_file = args.get("output_file").and_then(|f| f.as_str());
                 let output_mode = args.get("output_mode").and_then(|m| m.as_str());
 
@@ -375,21 +375,22 @@ impl McpServer {
                         match engine.synthesize_cloned_hq(&synth_req).await {
                             Ok((chunk, opt_f32)) => {
                                 let bits = precision.unwrap_or(16);
-                                let wav_bytes = if let (Some(f32_buf), true) = (opt_f32.as_ref(), bits > 16) {
-                                    WavEncoder::encode_f32_to_wav_with_precision(
-                                        f32_buf,
-                                        chunk.sample_rate,
-                                        1,
-                                        bits,
-                                    )
-                                } else {
-                                    WavEncoder::encode_pcm_to_wav_with_precision(
-                                        &chunk.pcm_data,
-                                        chunk.sample_rate,
-                                        1,
-                                        bits,
-                                    )
-                                };
+                                let wav_bytes =
+                                    if let (Some(f32_buf), true) = (opt_f32.as_ref(), bits > 16) {
+                                        WavEncoder::encode_f32_to_wav_with_precision(
+                                            f32_buf,
+                                            chunk.sample_rate,
+                                            1,
+                                            bits,
+                                        )
+                                    } else {
+                                        WavEncoder::encode_pcm_to_wav_with_precision(
+                                            &chunk.pcm_data,
+                                            chunk.sample_rate,
+                                            1,
+                                            bits,
+                                        )
+                                    };
                                 let wav_bytes = match wav_bytes {
                                     Ok(b) => b,
                                     Err(e) => return ToolCallResult::error(e.to_string()),
@@ -1328,7 +1329,10 @@ impl McpServer {
             }
 
             "parse_manuscript" => {
-                let text = args.get("manuscript_text").and_then(|t| t.as_str()).unwrap_or("");
+                let text = args
+                    .get("manuscript_text")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("");
                 let title = args
                     .get("title")
                     .and_then(|t| t.as_str())
@@ -1346,11 +1350,10 @@ impl McpServer {
                     return ToolCallResult::error("Parameter 'manuscript_text' cannot be empty");
                 }
 
-                let chapters = voxforge_pipeline::checkpoint::JobCheckpointManifest::parse_manuscript(
-                    text,
-                    voice,
-                    speed,
-                );
+                let chapters =
+                    voxforge_pipeline::checkpoint::JobCheckpointManifest::parse_manuscript(
+                        text, voice, speed,
+                    );
                 let total_words: usize = chapters
                     .iter()
                     .map(|c| c.text.split_whitespace().count())
@@ -1491,7 +1494,10 @@ mod tests {
                 }
             }
         });
-        let resp_str = server.handle_message(&manuscript_call.to_string()).await.unwrap();
+        let resp_str = server
+            .handle_message(&manuscript_call.to_string())
+            .await
+            .unwrap();
         let resp: serde_json::Value = serde_json::from_str(&resp_str).unwrap();
         assert_eq!(resp["id"], 13);
         assert_eq!(resp["result"]["isError"], false);

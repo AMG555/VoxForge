@@ -281,9 +281,7 @@ mod tests {
         assert!(chunks.len() >= 2);
         // Should never split mid-"Dr." or mid-"[pause 500ms]"
         assert!(!chunks.iter().any(|c| c.ends_with("Dr.")));
-        assert!(chunks
-            .iter()
-            .any(|c| c.contains("[pause 500ms]")));
+        assert!(chunks.iter().any(|c| c.contains("[pause 500ms]")));
         assert!(!chunks.iter().any(|c| c.ends_with("[pause")));
     }
 
@@ -296,6 +294,9 @@ mod tests {
 
         let hi = "यह पहला हिंदी वाक्य है जिसकी लंबाई पर्याप्त है। यह दूसरा वाक्य है जो स्पष्ट सुनाई देगा।";
         let hi_chunks = chunk_text(hi, 65);
-        assert!(hi_chunks.len() >= 2, "Expected danda split, got {hi_chunks:?}");
+        assert!(
+            hi_chunks.len() >= 2,
+            "Expected danda split, got {hi_chunks:?}"
+        );
     }
 }

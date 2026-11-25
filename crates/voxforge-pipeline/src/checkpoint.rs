@@ -207,7 +207,8 @@ impl JobCheckpointManifest {
 
                 if !chapter_text.is_empty() {
                     let index = chapters.len();
-                    let content_hash = Self::compute_hash(&chapter_text, default_voice, default_speed);
+                    let content_hash =
+                        Self::compute_hash(&chapter_text, default_voice, default_speed);
                     chapters.push(ChapterTask {
                         index,
                         title: title.clone(),

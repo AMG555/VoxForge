@@ -298,8 +298,12 @@ mod tests {
         assert_eq!(parts.len(), 2);
         assert_eq!(parts[0].len(), 16);
         assert_eq!(parts[1].len(), 64);
-        assert!(parts[0].chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
-        assert!(parts[1].chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert!(parts[0]
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert!(parts[1]
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
 
         // Golden vector verification for deterministic timestamp 1700000000.0
         let golden = generate_sec_ms_gec_at(1700000000.0);

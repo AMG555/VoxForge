@@ -188,14 +188,18 @@ impl TextNormalizer {
                     s = Self::strip_comma_separators(&s);
                     s = crate::number_words_ur::replace_numbers_urdu(&s);
                 }
-                "de" | "deu" | "es" | "spa" | "fr" | "fra" | "pt" | "por" | "it" | "ita"
-                | "nl" | "nld" | "pl" | "pol" | "ru" | "rus" => {
-                    s = Self::normalize_tilde_ranges(&s, match base_lang.as_str() {
-                        "de" | "deu" => "bis",
-                        "fr" | "fra" => "à",
-                        "it" | "ita" => "a",
-                        _ => "a",
-                    }, "");
+                "de" | "deu" | "es" | "spa" | "fr" | "fra" | "pt" | "por" | "it" | "ita" | "nl"
+                | "nld" | "pl" | "pol" | "ru" | "rus" => {
+                    s = Self::normalize_tilde_ranges(
+                        &s,
+                        match base_lang.as_str() {
+                            "de" | "deu" => "bis",
+                            "fr" | "fra" => "à",
+                            "it" | "ita" => "a",
+                            _ => "a",
+                        },
+                        "",
+                    );
                     s = Self::expand_language_abbreviations(&s, &base_lang);
                     s = Self::normalize_european_decimals(&s);
                     s = Self::normalize_currency_amounts(&s);
@@ -276,9 +280,8 @@ impl TextNormalizer {
             .replace("&gt;", " ");
 
         // Strip markdown emphasis without damaging snake_case identifiers
-        static RE_MD_BOLD: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"\*\*([^*]+)\*\*|__([^_]+)__").expect("valid bold regex")
-        });
+        static RE_MD_BOLD: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\*\*([^*]+)\*\*|__([^_]+)__").expect("valid bold regex"));
         static RE_MD_ITALIC: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(r"(?m)(^|\s)\*([^*\n]+)\*($|\s|[.,!?;:])|(^|\s)_([^_\n]+)_($|\s|[.,!?;:])")
                 .expect("valid italic regex")
@@ -289,7 +292,11 @@ impl TextNormalizer {
 
         let s = RE_MD_BOLD
             .replace_all(&decoded, |c: &regex::Captures<'_>| {
-                c.get(1).or_else(|| c.get(2)).map(|m| m.as_str()).unwrap_or("").to_string()
+                c.get(1)
+                    .or_else(|| c.get(2))
+                    .map(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string()
             })
             .to_string();
         let s = RE_MD_ITALIC

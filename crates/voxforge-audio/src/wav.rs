@@ -175,7 +175,11 @@ impl WavEncoder {
                     ))
                 })?;
                 for &sample in samples {
-                    let finite = if sample.is_finite() { sample.clamp(-1.0, 1.0) } else { 0.0 };
+                    let finite = if sample.is_finite() {
+                        sample.clamp(-1.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     let s24 = (finite * 8_388_607.0).round() as i32;
                     writer.write_sample(s24).map_err(|e| {
                         VoxForgeError::AudioProcessing(format!(
@@ -202,7 +206,11 @@ impl WavEncoder {
                     ))
                 })?;
                 for &sample in samples {
-                    let finite = if sample.is_finite() { sample.clamp(-1.0, 1.0) } else { 0.0 };
+                    let finite = if sample.is_finite() {
+                        sample.clamp(-1.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     writer.write_sample(finite).map_err(|e| {
                         VoxForgeError::AudioProcessing(format!(
                             "Failed to write 32-bit float sample: {}",
@@ -228,7 +236,11 @@ impl WavEncoder {
                     VoxForgeError::AudioProcessing(format!("Failed to init WAV writer: {}", e))
                 })?;
                 for &sample in samples {
-                    let finite = if sample.is_finite() { sample.clamp(-1.0, 1.0) } else { 0.0 };
+                    let finite = if sample.is_finite() {
+                        sample.clamp(-1.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     let s16 = (finite * 32767.0).round() as i16;
                     writer.write_sample(s16).map_err(|e| {
                         VoxForgeError::AudioProcessing(format!("Failed to write sample: {}", e))
@@ -350,7 +362,11 @@ impl WavEncoder {
                 .chunks_exact(channels)
                 .map(|frame| {
                     let s = frame[loudest_ch];
-                    if s.is_finite() { s } else { 0.0 }
+                    if s.is_finite() {
+                        s
+                    } else {
+                        0.0
+                    }
                 })
                 .collect();
         }
@@ -454,7 +470,8 @@ mod tests {
     fn test_decode_wav_to_mono_pcm16_stereo_downmix() {
         // Interleaved stereo samples: L=1000, R=3000 -> avg 2000; L=-4000, R=-2000 -> avg -3000
         let stereo_samples: Vec<i16> = vec![1000, 3000, -4000, -2000];
-        let bytes = WavEncoder::encode_pcm_to_wav_with_precision(&stereo_samples, 24000, 2, 16).unwrap();
+        let bytes =
+            WavEncoder::encode_pcm_to_wav_with_precision(&stereo_samples, 24000, 2, 16).unwrap();
         let (mono, sr) = WavEncoder::decode_wav_to_mono_pcm16(&bytes).unwrap();
         assert_eq!(sr, 24000);
         assert_eq!(mono.len(), 2);
@@ -473,14 +490,18 @@ mod tests {
         let mono = WavEncoder::downmix_interleaved_to_mono(&inverted, 2);
         assert_eq!(mono.len(), 100);
         let peak = mono.iter().map(|s| s.abs()).max().unwrap_or(0);
-        assert!(peak > 10000, "Out-of-phase stereo should preserve signal energy, got peak {peak}");
+        assert!(
+            peak > 10000,
+            "Out-of-phase stereo should preserve signal energy, got peak {peak}"
+        );
     }
 
     #[test]
     fn test_f32_24bit_and_32bit_roundtrip() {
         let original: Vec<f32> = vec![0.0, 0.12345, -0.54321, 0.87654, -0.25];
         for depth in [24u16, 32u16] {
-            let wav = WavEncoder::encode_f32_to_wav_with_precision(&original, 24000, 1, depth).unwrap();
+            let wav =
+                WavEncoder::encode_f32_to_wav_with_precision(&original, 24000, 1, depth).unwrap();
             let (decoded, sr) = WavEncoder::decode_wav_to_mono_f32(&wav).unwrap();
             assert_eq!(sr, 24000);
             assert_eq!(decoded.len(), original.len());

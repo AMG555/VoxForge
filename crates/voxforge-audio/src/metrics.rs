@@ -288,8 +288,7 @@ impl AudioAnalyzer {
                 consecutive_silent_frames += 1;
             } else {
                 if consecutive_silent_frames > 0 {
-                    let silence_duration =
-                        (consecutive_silent_frames * frame_len / ch) as f64 / sr;
+                    let silence_duration = (consecutive_silent_frames * frame_len / ch) as f64 / sr;
                     // Flag silence if > 850ms
                     if silence_duration >= 0.85 && anomalies.len() < max_anomalies {
                         let ts = (silence_start_sample / ch) as f64 / sr;

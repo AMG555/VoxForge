@@ -69,8 +69,10 @@ fn decode_audio(payload: &str) -> Result<(Vec<i16>, u32), String> {
         payload.trim()
     };
 
-    let bytes = decode_b64_bytes(clean)
-        .or_else(|_| hex::decode(clean).map_err(|_| "Invalid audio payload: expected valid base64 or hex encoding".to_string()))?;
+    let bytes = decode_b64_bytes(clean).or_else(|_| {
+        hex::decode(clean)
+            .map_err(|_| "Invalid audio payload: expected valid base64 or hex encoding".to_string())
+    })?;
 
     let is_wav = bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE";
     let (samples, sr, _) = decode_b64_to_pcm(payload)?;
@@ -120,46 +122,45 @@ pub async fn speech_to_speech(
 
     // 1. Transcribe source speech (live Whisper sidecar first, registry ASR fallback)
     let source_duration_sec = pcm_samples.len() as f64 / sample_rate.max(1) as f64;
-    let (raw_text, measured_duration) =
-        if let Some(neural_text) = crate::routes::asr::try_sidecar_transcribe(
+    let (raw_text, measured_duration) = if let Some(neural_text) =
+        crate::routes::asr::try_sidecar_transcribe(
             &payload.audio_base64,
             payload.language.as_deref(),
         )
         .await
-        {
-            (neural_text, source_duration_sec)
-        } else {
-            let asr_engine = state.asr_registry.default_engine().await.ok_or_else(|| {
+    {
+        (neural_text, source_duration_sec)
+    } else {
+        let asr_engine = state.asr_registry.default_engine().await.ok_or_else(|| {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/no-asr-engine".to_string(),
+                title: "No Default ASR Engine".to_string(),
+                status: 500,
+                detail: "No default speech recognition engine registered".to_string(),
+                instance: "/v1/audio/speech-to-speech".to_string(),
+            };
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+        })?;
+
+        let opts = TranscriptionOptions {
+            language: payload.language.clone(),
+            ..TranscriptionOptions::default()
+        };
+        let transcription = asr_engine
+            .transcribe(&pcm_samples, sample_rate, &opts)
+            .await
+            .map_err(|e| {
                 let err = ProblemDetails {
-                    problem_type: "https://voxforge.org/errors/no-asr-engine".to_string(),
-                    title: "No Default ASR Engine".to_string(),
-                    status: 500,
-                    detail: "No default speech recognition engine registered".to_string(),
+                    problem_type: "https://voxforge.org/errors/transcription-failure".to_string(),
+                    title: "ASR Transcription Failed".to_string(),
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    detail: format!("Failed to transcribe input voice: {}", e),
                     instance: "/v1/audio/speech-to-speech".to_string(),
                 };
                 (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
             })?;
-
-            let opts = TranscriptionOptions {
-                language: payload.language.clone(),
-                ..TranscriptionOptions::default()
-            };
-            let transcription = asr_engine
-                .transcribe(&pcm_samples, sample_rate, &opts)
-                .await
-                .map_err(|e| {
-                    let err = ProblemDetails {
-                        problem_type: "https://voxforge.org/errors/transcription-failure"
-                            .to_string(),
-                        title: "ASR Transcription Failed".to_string(),
-                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                        detail: format!("Failed to transcribe input voice: {}", e),
-                        instance: "/v1/audio/speech-to-speech".to_string(),
-                    };
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
-                })?;
-            (transcription.text, transcription.duration_seconds as f64)
-        };
+        (transcription.text, transcription.duration_seconds as f64)
+    };
 
     let text = raw_text.trim();
     if text.is_empty() {
@@ -192,75 +193,63 @@ pub async fn speech_to_speech(
     let prec = payload.precision.unwrap_or(16);
 
     // 3. Target cloned profile path OR standard registry voice
-    let (target_voice_id, wav_bytes) =
-        if let Some(profile) = state.voice_profiles.find(&payload.target_voice).await {
-            let engine = match state.engine_registry.get(&profile.engine_id).await {
-                Some(e) => Some(e),
-                None => state.engine_registry.get("qwen3-tts").await,
+    let (target_voice_id, wav_bytes) = if let Some(profile) =
+        state.voice_profiles.find(&payload.target_voice).await
+    {
+        let engine = match state.engine_registry.get(&profile.engine_id).await {
+            Some(e) => Some(e),
+            None => state.engine_registry.get("qwen3-tts").await,
+        };
+        if let Some(eng) = engine.filter(|e| e.supports_cloning()) {
+            let norm_lang = eff_lang_opt.as_deref().or(Some(profile.language.as_str()));
+            let cloned_req = ClonedSynthesisRequest {
+                text: state.pronunciation.process_with_language(text, norm_lang),
+                profile: profile.clone(),
+                speed: target_speed,
+                pitch: 0.0,
+                format: payload.response_format,
+                language: eff_lang_opt.clone(),
+                instruct: payload.instruct.clone(),
+                num_step: None,
+                seed: payload.seed,
+                precision: payload.precision,
             };
-            if let Some(eng) = engine.filter(|e| e.supports_cloning()) {
-                let norm_lang = eff_lang_opt
-                    .as_deref()
-                    .or(Some(profile.language.as_str()));
-                let cloned_req = ClonedSynthesisRequest {
-                    text: state.pronunciation.process_with_language(text, norm_lang),
-                    profile: profile.clone(),
-                    speed: target_speed,
-                    pitch: 0.0,
-                    format: payload.response_format,
-                    language: eff_lang_opt.clone(),
-                    instruct: payload.instruct.clone(),
-                    num_step: None,
-                    seed: payload.seed,
-                    precision: payload.precision,
+            let (chunk, opt_f32) = eng.synthesize_cloned_hq(&cloned_req).await.map_err(|e| {
+                let err = ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/synthesis-failure".to_string(),
+                    title: "Voice Conversion Synthesis Failed".to_string(),
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    detail: e.to_string(),
+                    instance: "/v1/audio/speech-to-speech".to_string(),
                 };
-                let (chunk, opt_f32) = eng.synthesize_cloned_hq(&cloned_req).await.map_err(|e| {
-                    let err = ProblemDetails {
-                        problem_type: "https://voxforge.org/errors/synthesis-failure".to_string(),
-                        title: "Voice Conversion Synthesis Failed".to_string(),
-                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                        detail: e.to_string(),
-                        instance: "/v1/audio/speech-to-speech".to_string(),
-                    };
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
-                })?;
-                let bytes = if let (Some(f32_buf), true) = (opt_f32.as_ref(), prec > 16) {
-                    WavEncoder::encode_f32_to_wav_with_precision(
-                        f32_buf,
-                        chunk.sample_rate,
-                        chunk.channels,
-                        prec,
-                    )
-                } else {
-                    WavEncoder::encode_pcm_to_wav_with_precision(
-                        &chunk.pcm_data,
-                        chunk.sample_rate,
-                        chunk.channels,
-                        prec,
-                    )
-                }
-                .map_err(|e| {
-                    let err = ProblemDetails {
-                        problem_type: "https://voxforge.org/errors/encoding-failure".to_string(),
-                        title: "Audio Encoding Error".to_string(),
-                        status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                        detail: e.to_string(),
-                        instance: "/v1/audio/speech-to-speech".to_string(),
-                    };
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
-                })?;
-                (profile.id, bytes)
-            } else {
-                synthesize_standard_sts(
-                    &state,
-                    &payload,
-                    text,
-                    target_speed,
-                    eff_lang_opt.as_deref(),
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+            })?;
+            let bytes = if let (Some(f32_buf), true) = (opt_f32.as_ref(), prec > 16) {
+                WavEncoder::encode_f32_to_wav_with_precision(
+                    f32_buf,
+                    chunk.sample_rate,
+                    chunk.channels,
                     prec,
                 )
-                .await?
+            } else {
+                WavEncoder::encode_pcm_to_wav_with_precision(
+                    &chunk.pcm_data,
+                    chunk.sample_rate,
+                    chunk.channels,
+                    prec,
+                )
             }
+            .map_err(|e| {
+                let err = ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/encoding-failure".to_string(),
+                    title: "Audio Encoding Error".to_string(),
+                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    detail: e.to_string(),
+                    instance: "/v1/audio/speech-to-speech".to_string(),
+                };
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+            })?;
+            (profile.id, bytes)
         } else {
             synthesize_standard_sts(
                 &state,
@@ -271,7 +260,18 @@ pub async fn speech_to_speech(
                 prec,
             )
             .await?
-        };
+        }
+    } else {
+        synthesize_standard_sts(
+            &state,
+            &payload,
+            text,
+            target_speed,
+            eff_lang_opt.as_deref(),
+            prec,
+        )
+        .await?
+    };
 
     let mut response = Response::builder()
         .status(StatusCode::OK)

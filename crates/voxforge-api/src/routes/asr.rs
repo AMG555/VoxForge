@@ -368,10 +368,7 @@ fn decode_audio_input(payload: &TranscriptionRequestPayload) -> Result<(Vec<i16>
 
 /// Probe and invoke the local neural Whisper sidecar `/transcribe` endpoint if live.
 /// Never falls back to synthetic placeholder strings so callers only receive real transcripts.
-pub async fn try_sidecar_transcribe(
-    audio_base64: &str,
-    language: Option<&str>,
-) -> Option<String> {
+pub async fn try_sidecar_transcribe(audio_base64: &str, language: Option<&str>) -> Option<String> {
     voxforge_engine::qwen3::transcribe_via_sidecar(audio_base64, language).await
 }
 

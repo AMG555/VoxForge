@@ -188,7 +188,9 @@ pub async fn dub_script(
                         .map(voxforge_engine::qwen3::normalize_language_code);
                     let norm_lang = eff_lang.as_deref().or(Some(profile.language.as_str()));
                     let req = voxforge_core::models::ClonedSynthesisRequest {
-                        text: state.pronunciation.process_with_language(&line.text, norm_lang),
+                        text: state
+                            .pronunciation
+                            .process_with_language(&line.text, norm_lang),
                         profile: profile.clone(),
                         speed,
                         pitch,

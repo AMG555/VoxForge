@@ -216,7 +216,9 @@ pub async fn parse_manuscript_handler(
                 problem_type: "https://voxforge.org/errors/payload-too-large".to_string(),
                 title: "Manuscript Payload Too Large".to_string(),
                 status: 413,
-                detail: "Manuscript payload exceeds maximum permitted size of 10MB (~2,000,000 words)".to_string(),
+                detail:
+                    "Manuscript payload exceeds maximum permitted size of 10MB (~2,000,000 words)"
+                        .to_string(),
                 instance: "/v1/jobs/parse-manuscript".to_string(),
             }),
         ));
@@ -224,7 +226,9 @@ pub async fn parse_manuscript_handler(
 
     let default_voice = body.default_voice.as_deref().unwrap_or("en-US-AriaNeural");
     let default_speed = body.default_speed.unwrap_or(1.0).clamp(0.5, 2.5);
-    let title = body.title.unwrap_or_else(|| "Untitled Audiobook".to_string());
+    let title = body
+        .title
+        .unwrap_or_else(|| "Untitled Audiobook".to_string());
 
     let chapters = JobCheckpointManifest::parse_manuscript(
         &body.manuscript_text,
@@ -242,7 +246,12 @@ pub async fn parse_manuscript_handler(
         let work_dir = get_work_dir(&job_id);
         let mut m = JobCheckpointManifest::new(job_id, "audiobook".to_string(), title.clone());
         for ch in &chapters {
-            m.add_chapter(ch.title.clone(), ch.text.clone(), ch.voice_id.clone(), ch.speed);
+            m.add_chapter(
+                ch.title.clone(),
+                ch.text.clone(),
+                ch.voice_id.clone(),
+                ch.speed,
+            );
         }
         let _ = m.save_to_dir(&work_dir);
         Some(m)

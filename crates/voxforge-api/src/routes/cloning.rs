@@ -165,18 +165,21 @@ pub async fn clone_voice(
 
     if body.reference_audio_base64.is_none() && body.reference_audio_path.is_none() {
         if let Some(ref raw_url) = body.reference_audio_url {
-            let fetched = fetch_remote_audio(raw_url).await.map_err(|(status, detail)| {
-                (
-                    status,
-                    Json(ProblemDetails {
-                        problem_type: "https://voxforge.org/errors/url-fetch-failed".to_string(),
-                        title: "Remote Audio Fetch Failed".to_string(),
-                        status: status.as_u16(),
-                        detail,
-                        instance: "/v1/voices/clone".to_string(),
-                    }),
-                )
-            })?;
+            let fetched = fetch_remote_audio(raw_url)
+                .await
+                .map_err(|(status, detail)| {
+                    (
+                        status,
+                        Json(ProblemDetails {
+                            problem_type: "https://voxforge.org/errors/url-fetch-failed"
+                                .to_string(),
+                            title: "Remote Audio Fetch Failed".to_string(),
+                            status: status.as_u16(),
+                            detail,
+                            instance: "/v1/voices/clone".to_string(),
+                        }),
+                    )
+                })?;
             body.reference_audio_base64 = Some(fetched.audio_base64);
             body.metadata
                 .entry("source_url".to_string())
@@ -226,14 +229,15 @@ pub async fn clone_voice(
         .unwrap_or(true);
     if needs_transcript {
         if let Some(ref b64) = body.reference_audio_base64 {
-            let lang_hint = if body.language.trim().is_empty()
-                || body.language.eq_ignore_ascii_case("AUTO")
+            let lang_hint =
+                if body.language.trim().is_empty() || body.language.eq_ignore_ascii_case("AUTO") {
+                    None
+                } else {
+                    Some(body.language.as_str())
+                };
+            if let Some(transcript) =
+                crate::routes::asr::try_sidecar_transcribe(b64, lang_hint).await
             {
-                None
-            } else {
-                Some(body.language.as_str())
-            };
-            if let Some(transcript) = crate::routes::asr::try_sidecar_transcribe(b64, lang_hint).await {
                 body.reference_transcript = Some(transcript);
             }
         }
@@ -395,8 +399,16 @@ pub(crate) fn base64_encode(data: &[u8]) -> String {
     let mut i = 0;
     while i < data.len() {
         let b0 = data[i] as u32;
-        let b1 = if i + 1 < data.len() { data[i + 1] as u32 } else { 0 };
-        let b2 = if i + 2 < data.len() { data[i + 2] as u32 } else { 0 };
+        let b1 = if i + 1 < data.len() {
+            data[i + 1] as u32
+        } else {
+            0
+        };
+        let b2 = if i + 2 < data.len() {
+            data[i + 2] as u32
+        } else {
+            0
+        };
         let triple = (b0 << 16) | (b1 << 8) | b2;
         out.push(CHARSET[((triple >> 18) & 0x3F) as usize] as char);
         out.push(CHARSET[((triple >> 12) & 0x3F) as usize] as char);
@@ -606,11 +618,17 @@ pub(crate) async fn validate_remote_url(
         ));
     }
 
-    let port = parsed
-        .port_or_known_default()
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "URL port could not be determined".to_string()))?;
+    let port = parsed.port_or_known_default().ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            "URL port could not be determined".to_string(),
+        )
+    })?;
 
-    if let Ok(ip) = host.trim_matches(|c| c == '[' || c == ']').parse::<std::net::IpAddr>() {
+    if let Ok(ip) = host
+        .trim_matches(|c| c == '[' || c == ']')
+        .parse::<std::net::IpAddr>()
+    {
         if !is_public_ip(ip) {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -622,7 +640,12 @@ pub(crate) async fn validate_remote_url(
 
     let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, port))
         .await
-        .map_err(|e| (StatusCode::BAD_GATEWAY, format!("DNS resolution failed for '{host}': {e}")))?
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("DNS resolution failed for '{host}': {e}"),
+            )
+        })?
         .collect();
 
     if addrs.is_empty() {
@@ -665,7 +688,8 @@ fn looks_like_audio_bytes(bytes: &[u8], content_type: &str) -> bool {
 }
 
 async fn transcode_bytes_to_wav24k(bytes: &[u8], ext_hint: &str) -> Option<Vec<u8>> {
-    let tmp_dir = std::env::temp_dir().join(format!("voxforge_url_{}", uuid::Uuid::new_v4().simple()));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("voxforge_url_{}", uuid::Uuid::new_v4().simple()));
     std::fs::create_dir_all(&tmp_dir).ok()?;
     let _guard = TempDirGuard(tmp_dir.clone());
 
@@ -674,18 +698,23 @@ async fn transcode_bytes_to_wav24k(bytes: &[u8], ext_hint: &str) -> Option<Vec<u
     tokio::fs::write(&in_path, bytes).await.ok()?;
 
     let mut cmd = tokio::process::Command::new("ffmpeg");
-    cmd.args([
-        "-y",
-        "-v",
-        "error",
-        "-i",
-    ])
-    .arg(&in_path)
-    .args(["-vn", "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", "-f", "wav"])
-    .arg(&out_path)
-    .stdin(std::process::Stdio::null())
-    .stdout(std::process::Stdio::null())
-    .stderr(std::process::Stdio::piped());
+    cmd.args(["-y", "-v", "error", "-i"])
+        .arg(&in_path)
+        .args([
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "wav",
+        ])
+        .arg(&out_path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped());
 
     let status = tokio::time::timeout(std::time::Duration::from_secs(20), cmd.output())
         .await
@@ -703,7 +732,8 @@ async fn transcode_bytes_to_wav24k(bytes: &[u8], ext_hint: &str) -> Option<Vec<u
 }
 
 async fn extract_audio_with_ytdlp(safe_url: &str) -> Result<Vec<u8>, String> {
-    let tmp_dir = std::env::temp_dir().join(format!("voxforge_ytdlp_{}", uuid::Uuid::new_v4().simple()));
+    let tmp_dir =
+        std::env::temp_dir().join(format!("voxforge_ytdlp_{}", uuid::Uuid::new_v4().simple()));
     std::fs::create_dir_all(&tmp_dir)
         .map_err(|e| format!("Failed creating temporary extraction directory: {e}"))?;
     let _guard = TempDirGuard(tmp_dir.clone());
@@ -748,7 +778,11 @@ async fn extract_audio_with_ytdlp(safe_url: &str) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed inspecting extracted audio: {e}"))?;
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()).eq_some_ignore_ascii_case("wav") {
+        if path
+            .extension()
+            .and_then(|s| s.to_str())
+            .eq_some_ignore_ascii_case("wav")
+        {
             let bytes = tokio::fs::read(&path)
                 .await
                 .map_err(|e| format!("Failed reading extracted WAV: {e}"))?;
@@ -786,7 +820,12 @@ pub(crate) async fn fetch_remote_audio(
             .user_agent(concat!("VoxForge/", env!("CARGO_PKG_VERSION")))
             .resolve_to_addrs(&host, &addrs)
             .build()
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("HTTP client error: {e}")))?;
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("HTTP client error: {e}"),
+                )
+            })?;
 
         let mut resp = client
             .get(current_url.clone())
@@ -799,10 +838,18 @@ pub(crate) async fn fetch_remote_audio(
                 .headers()
                 .get(reqwest::header::LOCATION)
                 .and_then(|v| v.to_str().ok())
-                .ok_or_else(|| (StatusCode::BAD_GATEWAY, "Redirect without Location header".to_string()))?;
-            let next = current_url
-                .join(loc)
-                .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Invalid redirect URL: {e}")))?;
+                .ok_or_else(|| {
+                    (
+                        StatusCode::BAD_GATEWAY,
+                        "Redirect without Location header".to_string(),
+                    )
+                })?;
+            let next = current_url.join(loc).map_err(|e| {
+                (
+                    StatusCode::BAD_GATEWAY,
+                    format!("Invalid redirect URL: {e}"),
+                )
+            })?;
             let (validated, next_addrs) = validate_remote_url(next.as_str()).await?;
             current_url = validated;
             addrs = next_addrs;
@@ -833,11 +880,12 @@ pub(crate) async fn fetch_remote_audio(
             .to_string();
 
         let mut buf = Vec::new();
-        while let Some(chunk) = resp
-            .chunk()
-            .await
-            .map_err(|e| (StatusCode::BAD_GATEWAY, format!("Error reading stream: {e}")))?
-        {
+        while let Some(chunk) = resp.chunk().await.map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Error reading stream: {e}"),
+            )
+        })? {
             if buf.len() + chunk.len() > MAX_REMOTE_AUDIO_BYTES {
                 return Err((
                     StatusCode::PAYLOAD_TOO_LARGE,
@@ -852,7 +900,10 @@ pub(crate) async fn fetch_remote_audio(
     }
 
     let (bytes, content_type, resolved_url) = final_bytes.ok_or_else(|| {
-        (StatusCode::BAD_GATEWAY, "Too many HTTP redirects".to_string())
+        (
+            StatusCode::BAD_GATEWAY,
+            "Too many HTTP redirects".to_string(),
+        )
     })?;
 
     let mut filename = current_url
@@ -911,18 +962,20 @@ pub(crate) async fn fetch_remote_audio(
 pub async fn fetch_reference_url(
     Json(body): Json<FetchAudioUrlRequest>,
 ) -> Result<Json<FetchAudioUrlResponse>, (StatusCode, Json<ProblemDetails>)> {
-    let res = fetch_remote_audio(&body.url).await.map_err(|(status, detail)| {
-        (
-            status,
-            Json(ProblemDetails {
-                problem_type: "https://voxforge.org/errors/url-fetch-failed".to_string(),
-                title: "Remote Audio Fetch Failed".to_string(),
-                status: status.as_u16(),
-                detail,
-                instance: "/v1/voices/fetch-url".to_string(),
-            }),
-        )
-    })?;
+    let res = fetch_remote_audio(&body.url)
+        .await
+        .map_err(|(status, detail)| {
+            (
+                status,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/url-fetch-failed".to_string(),
+                    title: "Remote Audio Fetch Failed".to_string(),
+                    status: status.as_u16(),
+                    detail,
+                    instance: "/v1/voices/fetch-url".to_string(),
+                }),
+            )
+        })?;
     Ok(Json(res))
 }
 

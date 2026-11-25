@@ -382,8 +382,8 @@ impl SilenceTrimmer {
         if samples.len() < 4 || sample_rate == 0 || fade_ms <= 0.0 {
             return;
         }
-        let fade_len = ((sample_rate as f32 * fade_ms / 1000.0).round() as usize)
-            .clamp(2, samples.len());
+        let fade_len =
+            ((sample_rate as f32 * fade_ms / 1000.0).round() as usize).clamp(2, samples.len());
         let start = samples.len() - fade_len;
         let denom = (fade_len - 1) as f32;
         for (idx, sample) in samples[start..].iter_mut().enumerate() {

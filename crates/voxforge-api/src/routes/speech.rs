@@ -447,7 +447,9 @@ pub async fn synthesize_speech(
                 let mut channels = 1;
 
                 for chunk_text in chunks {
-                    let norm_lang = effective_lang.as_deref().or(Some(profile.language.as_str()));
+                    let norm_lang = effective_lang
+                        .as_deref()
+                        .or(Some(profile.language.as_str()));
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
                         text: state
                             .pronunciation
@@ -463,17 +465,21 @@ pub async fn synthesize_speech(
                         precision: payload.precision,
                     };
                     let (chunk, opt_f32) =
-                        engine.synthesize_cloned_hq(&cloned_req).await.map_err(|e| {
-                            let err = ProblemDetails {
-                                problem_type: "https://voxforge.org/errors/cloned-synthesis-failure"
-                                    .to_string(),
-                                title: "Cloned Synthesis Error".to_string(),
-                                status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                detail: e.to_string(),
-                                instance: "/v1/audio/speech".to_string(),
-                            };
-                            (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
-                        })?;
+                        engine
+                            .synthesize_cloned_hq(&cloned_req)
+                            .await
+                            .map_err(|e| {
+                                let err = ProblemDetails {
+                                    problem_type:
+                                        "https://voxforge.org/errors/cloned-synthesis-failure"
+                                            .to_string(),
+                                    title: "Cloned Synthesis Error".to_string(),
+                                    status: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                                    detail: e.to_string(),
+                                    instance: "/v1/audio/speech".to_string(),
+                                };
+                                (StatusCode::INTERNAL_SERVER_ERROR, Json(err))
+                            })?;
                     sample_rate = chunk.sample_rate;
                     channels = chunk.channels;
                     pcm_chunks.push(chunk.pcm_data);
@@ -493,8 +499,7 @@ pub async fn synthesize_speech(
                     let final_f32 = if f32_chunks.len() == 1 {
                         f32_chunks.remove(0)
                     } else {
-                        let slices: Vec<&[f32]> =
-                            f32_chunks.iter().map(|v| v.as_slice()).collect();
+                        let slices: Vec<&[f32]> = f32_chunks.iter().map(|v| v.as_slice()).collect();
                         AudioMerger::concatenate_f32_with_equal_power_crossfade(
                             &slices,
                             sample_rate,
@@ -520,10 +525,9 @@ pub async fn synthesize_speech(
                     })?;
 
                     let mut response = Response::new(Body::from(wav_bytes));
-                    response.headers_mut().insert(
-                        header::CONTENT_TYPE,
-                        HeaderValue::from_static("audio/wav"),
-                    );
+                    response
+                        .headers_mut()
+                        .insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/wav"));
                     return Ok(response);
                 }
 

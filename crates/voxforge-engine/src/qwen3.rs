@@ -705,16 +705,15 @@ impl TtsEngine for Qwen3TtsEngine {
         let (pcm, ref_features) = if let Some(ref b64) = request.reference_audio_base64 {
             let bytes = decode_audio_payload(b64);
             let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
-                    .unwrap_or_else(|_| {
-                        (
-                            bytes
-                                .chunks_exact(2)
-                                .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                                .collect(),
-                            24000,
-                        )
-                    })
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes).unwrap_or_else(|_| {
+                    (
+                        bytes
+                            .chunks_exact(2)
+                            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                            .collect(),
+                        24000,
+                    )
+                })
             } else {
                 (
                     bytes
@@ -777,16 +776,15 @@ impl TtsEngine for Qwen3TtsEngine {
                 VoxForgeError::Config(format!("Failed reading reference audio file: {e}"))
             })?;
             let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
-                    .unwrap_or_else(|_| {
-                        (
-                            bytes
-                                .chunks_exact(2)
-                                .map(|c| i16::from_le_bytes([c[0], c[1]]))
-                                .collect(),
-                            24000,
-                        )
-                    })
+                voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes).unwrap_or_else(|_| {
+                    (
+                        bytes
+                            .chunks_exact(2)
+                            .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                            .collect(),
+                        24000,
+                    )
+                })
             } else {
                 (
                     bytes
@@ -1074,8 +1072,7 @@ impl TtsEngine for Qwen3TtsEngine {
         // Decode and extract embedding from the new sample
         let bytes = decode_audio_payload(new_reference_audio_base64);
         let (raw_samples, sr): (Vec<i16>, u32) = if bytes.starts_with(b"RIFF") {
-            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
-                .unwrap_or_default()
+            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes).unwrap_or_default()
         } else {
             (
                 bytes
@@ -1264,7 +1261,9 @@ impl Qwen3TtsEngine {
                                     Err(err) => {
                                         tracing::warn!(url = %url, error = %err, "Failed to decode sidecar RIFF WAV; trying PCM16 decoder");
                                         if let Ok((pcm, sr)) =
-                                            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(&bytes)
+                                            voxforge_audio::WavEncoder::decode_wav_to_mono_pcm16(
+                                                &bytes,
+                                            )
                                         {
                                             return Ok((
                                                 AudioChunk {
@@ -1445,11 +1444,8 @@ impl Qwen3TtsEngine {
             Gender::Female
         };
 
-        let fallback_voice = resolve_cross_lingual_base_voice(
-            Some(&acoustic_gender),
-            &request.text,
-            &target_lang,
-        );
+        let fallback_voice =
+            resolve_cross_lingual_base_voice(Some(&acoustic_gender), &request.text, &target_lang);
 
         // 5. Calculate pitch delta matching the cloned speaker's exact fundamental pitch
         let mut pitch_offset = request.pitch;
@@ -1675,7 +1671,12 @@ impl Qwen3TtsEngine {
         voxforge_audio::PhraseLeveler::process(&mut chunk.pcm_data, chunk.sample_rate);
 
         // 11b. Studio peak normalization & brickwall limiting (look-ahead, 5ms, 40ms release)
-        let max_amp = chunk.pcm_data.iter().map(|&s| s.unsigned_abs() as u32).max().unwrap_or(0) as f32;
+        let max_amp = chunk
+            .pcm_data
+            .iter()
+            .map(|&s| s.unsigned_abs() as u32)
+            .max()
+            .unwrap_or(0) as f32;
         if max_amp > 100.0 && max_amp < 28000.0 {
             let gain = (28000.0 / max_amp).min(1.6);
             for s in &mut chunk.pcm_data {
@@ -2241,10 +2242,7 @@ fn auto_detect_local_port(port: u16) -> bool {
 
 /// Probe and invoke the local neural Whisper sidecar `/transcribe` endpoint if live.
 /// Returns `None` without fabricated placeholder text when offline or unavailable.
-pub async fn transcribe_via_sidecar(
-    audio_base64: &str,
-    language: Option<&str>,
-) -> Option<String> {
+pub async fn transcribe_via_sidecar(audio_base64: &str, language: Option<&str>) -> Option<String> {
     if audio_base64.trim().is_empty() {
         return None;
     }

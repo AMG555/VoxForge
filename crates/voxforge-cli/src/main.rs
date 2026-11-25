@@ -960,7 +960,10 @@ async fn run_update(args: UpdateArgs) -> Result<()> {
         status.latest_version.as_deref().unwrap_or("unknown"),
         status.check_status
     );
-    println!("  Platform:   {}/{} ({})", status.platform, status.arch, status.install_mode);
+    println!(
+        "  Platform:   {}/{} ({})",
+        status.platform, status.arch, status.install_mode
+    );
 
     if let Some(ref err) = status.error {
         anyhow::bail!("Update check failed: {err}");
@@ -989,7 +992,10 @@ async fn run_update(args: UpdateArgs) -> Result<()> {
 
     if !args.yes {
         use std::io::{self, Write};
-        print!("Download, verify SHA-256, and install VoxForge v{}? [y/N]: ", status.latest_version.as_deref().unwrap_or("latest"));
+        print!(
+            "Download, verify SHA-256, and install VoxForge v{}? [y/N]: ",
+            status.latest_version.as_deref().unwrap_or("latest")
+        );
         io::stdout().flush()?;
         let mut line = String::new();
         io::stdin().read_line(&mut line)?;

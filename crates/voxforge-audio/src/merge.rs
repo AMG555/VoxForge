@@ -221,8 +221,16 @@ impl AudioMerger {
             for i in 0..actual_fade {
                 let t = i as f32 / actual_fade as f32;
                 let angle = t * half_pi;
-                let a = if a_tail[i].is_finite() { a_tail[i] } else { 0.0 };
-                let b = if b_head[i].is_finite() { b_head[i] } else { 0.0 };
+                let a = if a_tail[i].is_finite() {
+                    a_tail[i]
+                } else {
+                    0.0
+                };
+                let b = if b_head[i].is_finite() {
+                    b_head[i]
+                } else {
+                    0.0
+                };
                 out.push((a * angle.cos() + b * angle.sin()).clamp(-1.0, 1.0));
             }
 
@@ -425,7 +433,8 @@ mod tests {
         let sr = 24_000u32;
         let seg_a = vec![0.4f32; 2400];
         let seg_b = vec![0.4f32; 2400];
-        let out = AudioMerger::concatenate_f32_with_equal_power_crossfade(&[&seg_a, &seg_b], sr, 20);
+        let out =
+            AudioMerger::concatenate_f32_with_equal_power_crossfade(&[&seg_a, &seg_b], sr, 20);
         // fade_len = 480 samples -> total = 2400 + 2400 - 480 = 4320
         assert_eq!(out.len(), 4320);
         assert!(out.iter().all(|&s| s.is_finite() && s.abs() <= 1.0));
