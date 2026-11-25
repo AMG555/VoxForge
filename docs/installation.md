@@ -239,11 +239,17 @@ To launch VoxForge with dedicated offline neural containers:
 docker compose -f docker-compose.neural.yml up -d
 ```
 
-### 4.2 Standard Database Stack (`docker-compose.yml`)
-To launch VoxForge with dedicated PostgreSQL storage:
+### 4.2 Standalone Container & Optional PostgreSQL (`docker-compose.yml`)
+Launch VoxForge as a self-contained non-root container:
 
 ```bash
 docker compose up -d
+```
+
+To also launch an accompanying PostgreSQL service:
+
+```bash
+docker compose --profile db up -d
 ```
 
 ---

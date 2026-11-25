@@ -59,6 +59,7 @@ VoxForge adheres to an enterprise security baseline:
 - **Request Body Limits:** Enforced 2MB maximum payload limit (`DefaultBodyLimit::max(2 * 1024 * 1024)`) across all API routes to prevent memory exhaustion.
 - **Input Text Bounding:** Synthesis requests are capped at 10,000 characters per request, returning RFC 7807 `ProblemDetails` with HTTP 422 Unprocessable Entity if violated.
 - **Speed & Pitch Bounds:** Floating-point parameters are strictly clamped (`speed`: 0.25 to 4.0; `pitch`: -50.0 to 50.0 st) to prevent NaN/infinite filter instability.
+- **Per-Client Token-Bucket Rate Limiting:** API (`/v1/*`) and MCP (`/mcp`) routes enforce configurable per-client rate limiting via `VOXFORGE_RATE_LIMIT_RPM` (default: 600 requests/minute, returning HTTP `429 Too Many Requests` with `Retry-After` and RFC 7807 `ProblemDetails`), with bounded bucket cardinality (4,096 keys) to prevent memory exhaustion floods. Health endpoints remain exempt.
 - **Circuit Breakers:** Upstream routing failures trigger an automated circuit breaker after 5 consecutive errors, protecting against thread pool depletion and cascading network delays.
 
 ### 4. Constant-Time Authentication Verification (CWE-208)
