@@ -44,7 +44,7 @@ pub async fn scalar_docs_html() -> impl IntoResponse {
     <script
       id="api-reference"
       data-url="/openapi.json"
-      data-configuration='{"theme":"purple","layout":"modern","darkMode":true,"showSidebar":true}'
+      data-configuration='{"theme":"purple","layout":"modern","darkMode":true,"showSidebar":true,"showDeveloperTools":"never","withDefaultFonts":false,"telemetry":false}'
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
   </body>
