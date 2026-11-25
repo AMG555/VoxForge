@@ -132,12 +132,18 @@ impl Qwen3TtsEngine {
         let sidecar_cache =
             std::sync::RwLock::new(Some((std::time::Instant::now(), endpoint_url.clone())));
 
+        let sidecar_timeout_secs = std::env::var("VOXFORGE_SIDECAR_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&s| s >= 10)
+            .unwrap_or(600);
+
         Self {
             sample_rate,
             clone_count: AtomicUsize::new(0),
             endpoint_url,
             client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(180))
+                .timeout(std::time::Duration::from_secs(sidecar_timeout_secs))
                 .build()
                 .unwrap_or_default(),
             cloned_profiles: Arc::new(RwLock::new(profiles_map)),
@@ -295,7 +301,7 @@ impl Qwen3TtsEngine {
             if stride < len {
                 let mut diff_sum = 0.0f64;
                 for j in stride..len {
-                    let diff = (conditioned[j] - conditioned[j - stride]) as f64;
+                    let diff = (conditioned[j] as f64) - (conditioned[j - stride] as f64);
                     diff_sum += diff * diff;
                 }
                 *power_slot = ((diff_sum / total_energy) * 10.0).clamp(0.0, 2.0) as f32;
@@ -2931,5 +2937,15 @@ mod sentence_splitter_tests {
             "Double newline must create at least 2 chunks, got: {:?}",
             result
         );
+    }
+
+    #[test]
+    fn test_extract_speaker_embedding_full_scale_no_overflow() {
+        let pcm: Vec<i16> = (0..4800)
+            .map(|i| if i % 2 == 0 { i16::MAX } else { i16::MIN })
+            .collect();
+        let emb = Qwen3TtsEngine::extract_speaker_embedding(&pcm);
+        assert_eq!(emb.len(), 512);
+        assert!(emb.iter().all(|v| v.is_finite()));
     }
 }

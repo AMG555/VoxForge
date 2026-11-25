@@ -1,6 +1,6 @@
 {
   "name": "voxforge",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Hardware-adaptive neural speech synthesis workstation, voice cloning & visual pipeline engine",
   "main": "packages/voxforge/bin/voxforge.js",
   "bin": {

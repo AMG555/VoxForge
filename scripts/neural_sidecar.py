@@ -373,6 +373,21 @@ def transcribe_reference_audio(
 # ---------------------------------------------------------------------------
 
 
+_OMNIVOICE_OFFLOAD_DIR: Optional[Path] = None
+
+
+def _get_offload_dir() -> str:
+    global _OMNIVOICE_OFFLOAD_DIR
+    if _OMNIVOICE_OFFLOAD_DIR is None:
+        import atexit
+        import shutil
+
+        tmp = Path(tempfile.mkdtemp(prefix="voxforge_ov_offload_"))
+        _OMNIVOICE_OFFLOAD_DIR = tmp
+        atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
+    return str(_OMNIVOICE_OFFLOAD_DIR)
+
+
 def _load_omnivoice(device: str) -> bool:
     """Load k2-fsa/OmniVoice (646 languages, diffusion flow matching)."""
     global _tts_model, ACTIVE_BACKEND
@@ -382,13 +397,55 @@ def _load_omnivoice(device: str) -> bool:
         from omnivoice import OmniVoice
 
         checkpoint = os.environ.get("OMNIVOICE_CHECKPOINT", "k2-fsa/OmniVoice")
-        load_kw: Dict[str, Any] = {"device_map": device, "load_asr": False}
+        env_dtype = os.environ.get("VOXFORGE_OMNIVOICE_DTYPE", "").strip().lower()
+        base_dtype = torch.float32 if env_dtype == "float32" else (torch.bfloat16 if device == "cpu" else None)
+
+        attempts: List[Dict[str, Any]] = []
+        primary: Dict[str, Any] = {
+            "device_map": device,
+            "load_asr": False,
+            "low_cpu_mem_usage": True,
+        }
+        if base_dtype is not None:
+            primary["dtype"] = base_dtype
+        attempts.append(primary)
+
         if device == "cpu":
-            load_kw["dtype"] = torch.float32
-        _tts_model = OmniVoice.from_pretrained(checkpoint, **load_kw)
-        ACTIVE_BACKEND = "omnivoice"
-        log.info("k2-fsa/OmniVoice loaded successfully (646 languages supported)")
-        return True
+            offload_kw: Dict[str, Any] = {
+                "device_map": "auto",
+                "max_memory": {"cpu": "2400MiB"},
+                "offload_folder": _get_offload_dir(),
+                "load_asr": False,
+                "low_cpu_mem_usage": True,
+                "dtype": base_dtype or torch.bfloat16,
+            }
+            attempts.append(offload_kw)
+
+        last_exc: Optional[Exception] = None
+        for idx, load_kw in enumerate(attempts):
+            try:
+                _tts_model = OmniVoice.from_pretrained(checkpoint, **load_kw)
+                ACTIVE_BACKEND = "omnivoice"
+                log.info(
+                    "k2-fsa/OmniVoice loaded successfully (%s, device_map=%s, 646 languages supported)",
+                    load_kw.get("dtype", "auto"),
+                    load_kw.get("device_map"),
+                )
+                return True
+            except Exception as attempt_exc:
+                last_exc = attempt_exc
+                gc.collect()
+                log.warning(
+                    "OmniVoice load attempt %d (device_map=%s, dtype=%s) failed: %s",
+                    idx + 1,
+                    load_kw.get("device_map"),
+                    load_kw.get("dtype", "auto"),
+                    attempt_exc,
+                )
+
+        if last_exc is not None:
+            raise last_exc
+        return False
     except Exception as exc:
         log.warning("OmniVoice unavailable on %s: %s", device, exc)
         return False
@@ -1110,10 +1167,10 @@ def synthesize(body: Dict[str, Any]) -> Tuple[bytes, int]:
 
                 if cached_prompt is not None:
                     kw["voice_clone_prompt"] = cached_prompt
-                    kw["ref_text"] = cleaned_transcript
                 else:
                     kw["ref_audio"] = tmp_path
-                    kw["ref_text"] = cleaned_transcript
+                    if cleaned_transcript is not None:
+                        kw["ref_text"] = cleaned_transcript
 
             res = _tts_model.generate(**kw)
             audio_f32 = _extract_audio_array(res)

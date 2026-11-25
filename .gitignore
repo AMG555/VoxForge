@@ -55,6 +55,11 @@ build_release.bat
 clean.bat
 *.exe
 
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # Agent context documents (auto-generated, not for version control)
 AGENTS.md
 

@@ -6,6 +6,26 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] — 2026-11-25
+
+### 🎙️ Voice Cloning & Multilingual Upgrade
+- **646-Language Cross-Lingual Cloning**: Full ISO 639-3 macrolanguage normalization (`arb`/`cmn`/`mal`/`hin`/etc.), 23 Unicode script detectors (`ml`, `hi`, `ta`, `te`, `kn`, `bn`, `gu`, `pa`, `ar`, `ja`, `zh`, `ko`, `ru`, `el`, `he`, `th`, `ka`, `hy`, `am`, `si`, `km`, `lo`, `my`), and UI `LanguageDialectBar` preserving active cloned speaker across target languages.
+- **Lossless 24/32-Bit Mastering & Sidecar Hardening**: Fixed speaker embedding integer overflow (`qwen3.rs`), repaired sidecar 80Hz high-pass filter, added phase-safe mono downmix, `-55 dBFS` silence floor protection, LRU prompt caching, CPU `bfloat16`/`float32` auto-fallback for OmniVoice, and `POST /v1/audio/transcriptions` + Clone Modal `"Auto-Transcribe Clip"` live Whisper integration.
+- **URL Reference Importing & Security**: Added SSRF-hardened `POST /v1/voices/fetch-url` (`is_public_ip`, DNS pinning, manual redirect validation, `yt-dlp`/`ffmpeg` extraction fallback) and `"Import URL"` source tab in Voice Cloning Studio.
+- **Full Endpoint Parity**: Upgraded `POST /v1/audio/speech-to-speech`, `POST /v1/audio/dub`, `/v1/audio/speech/stream`, and MCP `synthesize_speech` with `language`, `instruct`, `seed`, `precision`, and `synthesize_cloned_hq`.
+- **Native Verbalizers & Chunker**: Added native Malayalam (`ദശാംശം`, `ശതമാനം`, chillu sandhi) and Urdu number verbalizers plus bracket-safe dense-script sentence chunker.
+- **Diagnostics & UX**: Replaced silent synthesis fallback with visible UI error alerts and added live neural sidecar status indicator (`/health`).
+
+---
+
+## [0.4.1] — 2026-11-19
+
+### 🛠️ Studio & Installer Enhancements
+- Added standalone Windows Inno Setup wizard (`VoxForge_Setup_x64.exe`), macOS universal tarball, Linux binary, and turnkey one-line installers (`install.ps1` / `install.sh`).
+- Expanded VoiceBlend Studio, `.voxpersona` portability, and embedded React 19 UI workstation.
+
+---
+
 ## [0.3.1] — 2026-11-14
 
 ### 🚀 Performance & Memory

@@ -78,7 +78,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 28, className = '', showText 
               VOX<span className="text-amber-400">FORGE</span>
             </span>
             <span className="text-[9px] uppercase font-mono px-1 py-0.2 rounded bg-[#1A222D] text-[#94A3B8] border border-[#242E3D]">
-              v0.4.1
+              v0.5.0
             </span>
           </div>
           <span className="text-[9px] text-[#64748B] font-mono tracking-tight -mt-0.5">

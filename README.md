@@ -6,10 +6,10 @@
 
 **Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
 
-[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.4.1_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
-[![Release](https://img.shields.io/badge/Release-v0.4.1-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.5.0_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.5.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.4.1-brightgreen.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.5.0-brightgreen.svg)](docs/architecture.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![Frontend](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
@@ -25,7 +25,7 @@
 ---
 
 > [!NOTE]
-> **Project Status: Feature-Complete (v0.4.1 Stable)**  
+> **Project Status: Feature-Complete (v0.5.0 Stable)**  
 > All core features built, tested, and operational: multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests.
 
 > [!TIP]
