@@ -20,6 +20,7 @@ VoxForge is an open-source, modular, hardware-adaptive speech synthesis server, 
 | **NPM Launcher** | `npm start` | Uses `packages/voxforge/bin/voxforge.js` |
 | **MCP Server (Stdio)** | `cargo run -p voxforge-cli -- mcp` | Starts JSON-RPC 2.0 stdio server |
 | **Hardware Probe** | `cargo run --bin voxforge -- hardware` | Displays CPU SIMD & GPU compute tiers |
+| **Software Update** | `voxforge update --yes` | Checks GitHub Releases, verifies SHA-256, updates binary |
 | **Audio Synthesis** | `cargo run --bin voxforge -- synth "Hello" --voice en-US-AriaNeural --out test.wav` | Direct CLI synthesis |
 | **A/B Quality Test** | `cargo run --bin voxforge -- ab-test --iterations 3` | Measures RTF, SNR, loudness |
 | **Uninstall (Windows)** | `.\uninstall.bat` | Removes shortcuts, cleans PATH, removes binary |
@@ -45,7 +46,8 @@ VoxForge is an open-source, modular, hardware-adaptive speech synthesis server, 
 - **Voice Cloning**: `POST http://localhost:8080/v1/voices/clone`
 - **Voice Profiles CRUD**: `GET|POST /v1/voices`
 - **DAG Pipeline Execution**: `POST http://localhost:8080/v1/pipeline/execute`
-- **MCP HTTP Bridge**: `POST http://localhost:8080/v1/mcp`
+- **MCP HTTP Bridge**: `POST|GET http://localhost:8080/mcp`
+- **Release Update Check**: `GET http://localhost:8080/v1/system/update` (`POST /v1/system/update/apply`)
 - **Model Catalog**: `GET /v1/catalog/models`
 
 ## AI Agent Integration (MCP)
@@ -61,5 +63,5 @@ Add to agent `mcpServers` config:
   }
 }
 ```
-Exposes 14 tools (`synthesize_speech`, `clone_voice`, `transcribe_audio`, `execute_pipeline`, `list_voices`, etc.) and 4 resource streams (`voxforge://voices`, `voxforge://models`, etc.).
+Exposes 17 tools (`synthesize_speech`, `clone_voice`, `refine_voice`, `transcribe_audio`, `speech_to_speech`, `execute_pipeline`, `manage_pronunciation`, `refine_text`, `embed_watermark`, `verify_watermark`, `list_voices`, `list_models`, `install_model`, `benchmark_engine`, `get_cluster_status`, `check_audio`, `parse_manuscript`) and 4 resource streams (`voxforge://voices`, `voxforge://models`, `voxforge://hardware`, `voxforge://cluster`).
 

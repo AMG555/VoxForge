@@ -12,7 +12,7 @@ body:
     attributes:
       label: VoxForge Version / Commit
       description: What version or commit hash are you using?
-      placeholder: e.g. v0.1.0 or commit e4578d6
+      placeholder: e.g. v0.6.0 or commit e4578d6
     validations:
       required: true
   - type: dropdown

@@ -453,7 +453,7 @@ export const VoiceTipsModal: React.FC<VoiceTipsModalProps> = ({
         <div className="p-4 border-t border-[#242E3D] bg-[#121822] shrink-0 flex items-center justify-between">
           <div className="flex items-center space-x-2 text-xs text-[#94A3B8] font-mono">
             <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-            <span>VoxForge Biometric Audio Architecture v0.2.0</span>
+            <span>VoxForge Biometric Audio Architecture v{__APP_VERSION__}</span>
           </div>
           <button
             type="button"

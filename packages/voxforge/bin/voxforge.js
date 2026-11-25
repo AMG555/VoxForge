@@ -2,18 +2,26 @@
 
 /**
  * VoxForge Standalone Native Runner
- * Automatically resolves, downloads, and executes the platform-specific
- * VoxForge binary with embedded workstation UI and neural runtime.
+ * Automatically resolves, downloads, SHA-256 verifies, auto-refreshes,
+ * and executes the platform-specific VoxForge binary with stdio isolation
+ * for seamless Model Context Protocol (`npx github:AMG555/VoxForge mcp`) use.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const REPO = 'AMG555/VoxForge';
 const EXPLICIT_VERSION = process.env.VOXFORGE_VERSION || '';
+let PKG_VERSION = '0.6.0';
+try {
+  PKG_VERSION = require('../package.json').version || PKG_VERSION;
+} catch {
+  // Fallback when invoked detached
+}
 
 function getTargetInfo() {
   const platform = process.platform;
@@ -55,61 +63,124 @@ function getTargetInfo() {
   return { binaryName, osName, archName, ext };
 }
 
-function downloadBinary(url, destPath) {
+function fetchText(url) {
+  return new Promise((resolve, reject) => {
+    function makeRequest(currentUrl, hops = 0) {
+      if (hops > 5) return reject(new Error('Too many redirects'));
+      https
+        .get(currentUrl, { headers: { 'User-Agent': 'VoxForge-Runner' } }, (response) => {
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            makeRequest(response.headers.location, hops + 1);
+            return;
+          }
+          if (response.statusCode !== 200) {
+            reject(new Error(`HTTP ${response.statusCode}`));
+            return;
+          }
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => {
+            body += chunk;
+          });
+          response.on('end', () => resolve(body));
+        })
+        .on('error', reject);
+    }
+    makeRequest(url);
+  });
+}
+
+function downloadBinary(url, destPath, expectedSha256) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destPath);
-    console.log(`[voxforge] Downloading native workstation runtime from ${url}...`);
+    const hasher = crypto.createHash('sha256');
+    // Always log diagnostics to stderr so `voxforge mcp` stdio remains pure JSON-RPC 2.0
+    console.error(`[voxforge] Downloading native workstation runtime from ${url}...`);
 
-    function makeRequest(currentUrl) {
-      https.get(currentUrl, { headers: { 'User-Agent': 'VoxForge-Runner' } }, (response) => {
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          makeRequest(response.headers.location);
-          return;
-        }
-
-        if (response.statusCode !== 200) {
-          file.close();
-          fs.unlink(destPath, () => {});
-          reject(new Error(`Server returned HTTP ${response.statusCode}`));
-          return;
-        }
-
-        let downloadedBytes = 0;
-        const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-
-        response.on('data', (chunk) => {
-          downloadedBytes += chunk.length;
-          if (totalBytes > 0 && process.stdout.isTTY) {
-            const pct = Math.round((downloadedBytes / totalBytes) * 100);
-            process.stdout.write(`\r[voxforge] Downloading: ${pct}% (${(downloadedBytes / 1048576).toFixed(1)} MB)`);
-          }
-        });
-
-        response.pipe(file);
-
-        file.on('finish', () => {
-          file.close();
-          if (process.stdout.isTTY) process.stdout.write('\n');
-          console.log('[voxforge] Download completed successfully.');
-          resolve();
-        });
-      }).on('error', (err) => {
+    function makeRequest(currentUrl, hops = 0) {
+      if (hops > 5) {
         file.close();
         fs.unlink(destPath, () => {});
-        reject(err);
-      });
+        return reject(new Error('Too many redirects'));
+      }
+      https
+        .get(currentUrl, { headers: { 'User-Agent': 'VoxForge-Runner' } }, (response) => {
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            makeRequest(response.headers.location, hops + 1);
+            return;
+          }
+
+          if (response.statusCode !== 200) {
+            file.close();
+            fs.unlink(destPath, () => {});
+            reject(new Error(`Server returned HTTP ${response.statusCode}`));
+            return;
+          }
+
+          let downloadedBytes = 0;
+          const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+
+          response.on('data', (chunk) => {
+            downloadedBytes += chunk.length;
+            hasher.update(chunk);
+            if (totalBytes > 0 && process.stderr.isTTY) {
+              const pct = Math.round((downloadedBytes / totalBytes) * 100);
+              process.stderr.write(
+                `\r[voxforge] Downloading: ${pct}% (${(downloadedBytes / 1048576).toFixed(1)} MB)`
+              );
+            }
+          });
+
+          response.pipe(file);
+
+          file.on('finish', () => {
+            file.close();
+            if (process.stderr.isTTY) process.stderr.write('\n');
+            const actualSha = hasher.digest('hex').toLowerCase();
+            if (expectedSha256 && actualSha !== expectedSha256.toLowerCase()) {
+              fs.unlink(destPath, () => {});
+              reject(new Error(`SHA-256 verification failed: expected ${expectedSha256}, got ${actualSha}`));
+              return;
+            }
+            console.error(
+              expectedSha256
+                ? `[voxforge] Download & SHA-256 verification succeeded.`
+                : `[voxforge] Download completed successfully.`
+            );
+            resolve();
+          });
+        })
+        .on('error', (err) => {
+          file.close();
+          fs.unlink(destPath, () => {});
+          reject(err);
+        });
     }
 
     makeRequest(url);
   });
 }
 
+function parseChecksums(text) {
+  const map = new Map();
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const m = trimmed.match(/^([0-9a-fA-F]{64})\s+[*]?\.?\/?(.+)$/);
+    if (m) {
+      map.set(m[2].trim(), m[1].toLowerCase());
+    }
+  }
+  return map;
+}
+
 async function main() {
   const { binaryName, ext } = getTargetInfo();
   const cacheDir = path.join(os.homedir(), '.voxforge', 'bin');
   const binaryPath = path.join(cacheDir, `voxforge${ext}`);
+  const versionStampPath = path.join(cacheDir, '.version');
+  const desiredTag = EXPLICIT_VERSION || `v${PKG_VERSION}`;
 
-  // 1. Check if running inside or near repository with local build (release-small, release, or debug)
   const localCandidates = [
     path.resolve(__dirname, '../../../target/release-small', `voxforge${ext}`),
     path.resolve(__dirname, '../../../target/release', `voxforge${ext}`),
@@ -118,6 +189,7 @@ async function main() {
     path.resolve(process.cwd(), 'target/release', `voxforge${ext}`),
     path.resolve(process.cwd(), 'target/debug', `voxforge${ext}`),
   ];
+
   for (const candidate of localCandidates) {
     if (fs.existsSync(candidate)) {
       runBinary(candidate);
@@ -125,28 +197,54 @@ async function main() {
     }
   }
 
-  if (!fs.existsSync(binaryPath)) {
+  let cachedTag = '';
+  try {
+    if (fs.existsSync(versionStampPath)) {
+      cachedTag = fs.readFileSync(versionStampPath, 'utf8').trim();
+    }
+  } catch {
+    cachedTag = '';
+  }
+
+  const needsDownload = !fs.existsSync(binaryPath) || cachedTag !== desiredTag;
+
+  if (needsDownload) {
     fs.mkdirSync(cacheDir, { recursive: true });
 
     const candidateNames = [];
     if (process.platform === 'darwin') {
       candidateNames.push('voxforge-macos-universal', binaryName, 'voxforge-macos-arm64', 'voxforge-macos-x86_64');
     } else if (process.platform === 'linux') {
-      candidateNames.push(binaryName, 'voxforge-linux-x86_64');
+      candidateNames.push(binaryName);
     } else {
       candidateNames.push(binaryName, 'voxforge-windows-x86_64.exe', 'voxforge.exe');
     }
 
+    const baseReleaseUrl = EXPLICIT_VERSION
+      ? `https://github.com/${REPO}/releases/download/${EXPLICIT_VERSION}`
+      : `https://github.com/${REPO}/releases/latest/download`;
+
+    let checksums = new Map();
+    try {
+      const sumsText = await fetchText(`${baseReleaseUrl}/checksums.txt`);
+      checksums = parseChecksums(sumsText);
+    } catch {
+      // Optional if release has not finished uploading checksums
+    }
+
+    const tmpBinaryPath = `${binaryPath}.tmp`;
     let downloaded = false;
     for (const name of candidateNames) {
-      const downloadUrl = EXPLICIT_VERSION
-        ? `https://github.com/${REPO}/releases/download/${EXPLICIT_VERSION}/${name}`
-        : `https://github.com/${REPO}/releases/latest/download/${name}`;
+      const downloadUrl = `${baseReleaseUrl}/${name}`;
       try {
-        await downloadBinary(downloadUrl, binaryPath);
+        await downloadBinary(downloadUrl, tmpBinaryPath, checksums.get(name));
         if (process.platform !== 'win32') {
-          fs.chmodSync(binaryPath, 0o755);
+          fs.chmodSync(tmpBinaryPath, 0o755);
         }
+        if (fs.existsSync(binaryPath)) {
+          fs.unlinkSync(binaryPath);
+        }
+        fs.renameSync(tmpBinaryPath, binaryPath);
         if (process.platform === 'darwin') {
           try {
             const { execSync } = require('child_process');
@@ -155,18 +253,20 @@ async function main() {
             // Non-fatal if attribute not present
           }
         }
+        fs.writeFileSync(versionStampPath, desiredTag, 'utf8');
         downloaded = true;
         break;
       } catch (err) {
-        // Continue to next candidate
+        if (fs.existsSync(tmpBinaryPath)) {
+          fs.unlinkSync(tmpBinaryPath);
+        }
       }
     }
 
-    if (!downloaded) {
-      console.warn('[voxforge] Pre-built binary download not available from GitHub releases.');
-      console.log('[voxforge] Checking for local cargo installation...');
+    if (!downloaded && !fs.existsSync(binaryPath)) {
+      console.error('[voxforge] Pre-built binary download not available from GitHub releases.');
+      console.error('[voxforge] Checking for local cargo installation...');
 
-      // Fallback: Check if user has voxforge in PATH or cargo
       try {
         const check = spawn(process.platform === 'win32' ? 'where' : 'which', ['voxforge']);
         check.on('close', (code) => {
@@ -189,7 +289,6 @@ async function main() {
 
 function runBinary(executable) {
   let args = process.argv.slice(2);
-  // Default to serve --open if no arguments specified
   if (args.length === 0) {
     args = ['serve', '--open'];
   }

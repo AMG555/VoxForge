@@ -236,3 +236,42 @@ export interface BlendVoicesResponse {
   cosine_similarity_to_b: number;
 }
 
+export interface SystemUpdateInfo {
+  current_version: string;
+  latest_version?: string;
+  latest_tag?: string;
+  update_available: boolean;
+  check_status: 'ok' | 'disabled' | 'rate_limited' | 'offline' | string;
+  release_name?: string;
+  release_url: string;
+  release_notes?: string;
+  published_at?: string;
+  checked_at: string;
+  platform: string;
+  arch: string;
+  asset_name: string;
+  asset_url?: string;
+  asset_size_bytes?: number;
+  checksum_sha256?: string;
+  checksums_url?: string;
+  install_mode: 'cargo_dev' | 'windows_installer' | 'standalone_binary' | string;
+  executable_path: string;
+  can_self_update: boolean;
+  update_hint: string;
+  error?: string;
+}
+
+export interface SystemUpdateApplyResult {
+  status: 'applied' | 'up_to_date' | 'dev_build' | string;
+  previous_version: string;
+  new_version: string;
+  asset_name: string;
+  sha256_verified: boolean;
+  sha256: string;
+  executable_path: string;
+  restart_required: boolean;
+  restarting: boolean;
+  message: string;
+}
+
+

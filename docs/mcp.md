@@ -48,9 +48,9 @@ VoxForge supports two distinct MCP communication transports:
 
 ---
 
-## 2. Complete MCP Tool Registry (14 Tools)
+## 2. Complete MCP Tool Registry (17 Tools)
 
-VoxForge exposes 14 tools covering the full spectrum of speech engineering:
+VoxForge exposes 17 tools covering the full spectrum of speech engineering:
 
 ### 1. `synthesize_speech`
 Synthesizes speech using local neural TTS engines (Edge-TTS, Kokoro, Piper, Qwen3-TTS), upstream routers, or cloned voices.
@@ -168,6 +168,21 @@ Inspects local compute accelerators and active distributed cluster worker nodes.
 - **Inputs:** None.
 - **Output:** Host OS, CPU architecture, total RAM, GPU device list, active worker count, worker metrics.
 
+### 15. `refine_voice`
+Refines an existing cloned voice profile by incorporating an additional reference audio clip, updating the 512-D speaker embedding centroid and incrementing profile version.
+- **Inputs:** `profile_id` (*string, required*), `audio_path` / `audio_base64`, `transcript` (*string, optional*).
+- **Output:** Updated profile ID, sample count, and version.
+
+### 16. `check_audio`
+Scans a WAV or PCM recording for clipping runs, extended silence holes (>850ms), DC offset drift, and sudden volume jumps.
+- **Inputs:** `audio_path` or `audio_base64`.
+- **Output:** Signal metrics (peak/RMS dBFS, SNR estimate) and timestamped anomaly warnings.
+
+### 17. `parse_manuscript`
+Parses raw markdown books or long-form articles into structured chapters with word counts and duration estimates for audiobook production.
+- **Inputs:** `manuscript_text` (*string, required*), `title` (*string, optional*), `default_voice`, `default_speed`.
+- **Output:** Chapter list with word counts, SHA-256 hashes, and total duration estimates.
+
 ---
 
 ## 3. MCP Resources
@@ -231,17 +246,19 @@ The MCP implementation follows a defense-in-depth security model:
 }
 ```
 
-### B. Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json`)
+### B. Claude Desktop (`%APPDATA%\Claude\claude_desktop_config.json` / macOS `~/Library/Application Support/Claude/claude_desktop_config.json`)
+Zero-install via `npx` (downloads and verifies native binary automatically) or using the installed `voxforge` binary:
 ```json
 {
   "mcpServers": {
     "voxforge": {
-      "command": "d:\\PROJECTS\\AI_BASED_PROJECTS\\VoxForge\\target\\debug\\voxforge.exe",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["-y", "github:AMG555/VoxForge", "mcp"]
     }
   }
 }
 ```
+*If `voxforge` is already installed on your `PATH`, you can set `"command": "voxforge", "args": ["mcp"]` for instant zero-overhead startup.*
 
 ### C. Windsurf (`~/.codeium/windsurf/mcp_config.json`)
 ```json

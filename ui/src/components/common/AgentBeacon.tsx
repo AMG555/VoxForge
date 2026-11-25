@@ -1,17 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Radio, CheckCircle, ExternalLink, X } from 'lucide-react';
+import { Bot, Radio, CheckCircle, ExternalLink, X, Copy, Check } from 'lucide-react';
 
 interface AgentBeaconProps {
   serverUrl?: string;
 }
+
+type McpSnippetMode = 'cli' | 'npx' | 'http';
 
 export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [activeClient, setActiveClient] = useState<string>('Claude Desktop');
   const [showFlyout, setShowFlyout] = useState<boolean>(false);
   const [mcpHealth, setMcpHealth] = useState<'connected' | 'idle' | 'offline'>('idle');
+  const [snippetMode, setSnippetMode] = useState<McpSnippetMode>('npx');
+  const [copiedConfig, setCopiedConfig] = useState<boolean>(false);
 
-  // Listen to custom window events for MCP/agent activity or simulate active pulses
+  const origin =
+    serverUrl || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8080');
+
+  const configSnippets: Record<McpSnippetMode, string> = {
+    npx: JSON.stringify(
+      {
+        mcpServers: {
+          voxforge: {
+            command: 'npx',
+            args: ['-y', 'github:AMG555/VoxForge', 'mcp'],
+          },
+        },
+      },
+      null,
+      2
+    ),
+    cli: JSON.stringify(
+      {
+        mcpServers: {
+          voxforge: {
+            command: 'voxforge',
+            args: ['mcp'],
+          },
+        },
+      },
+      null,
+      2
+    ),
+    http: JSON.stringify(
+      {
+        mcpServers: {
+          voxforge: {
+            url: `${origin}/mcp`,
+          },
+        },
+      },
+      null,
+      2
+    ),
+  };
+
+  const handleCopyConfig = () => {
+    navigator.clipboard.writeText(configSnippets[snippetMode]).catch(() => {});
+    setCopiedConfig(true);
+    setTimeout(() => setCopiedConfig(false), 1800);
+  };
+
   useEffect(() => {
     const handleAgentStart = (e: any) => {
       setIsSpeaking(true);
@@ -25,7 +75,6 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
     window.addEventListener('voxforge:agent-start', handleAgentStart);
     window.addEventListener('voxforge:agent-end', handleAgentEnd);
 
-    // Initial MCP readiness ping
     const endpoint = serverUrl ? `${serverUrl}/mcp` : '/mcp';
     const token = typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -51,13 +100,14 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setShowFlyout(!showFlyout)}
         className={`flex items-center space-x-2 px-2.5 py-1 rounded-full text-xs font-mono transition-all duration-300 border ${
           isSpeaking
             ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)] animate-pulse'
             : 'bg-[#1A222D]/60 hover:bg-[#1A222D] border-[#242E3D] text-[#94A3B8] hover:text-white'
         }`}
-        title="Model Context Protocol (MCP) Streamable Agent Status"
+        title="Model Context Protocol (MCP) Streamable Agent Bridge (17 Tools)"
       >
         <span className="relative flex h-2 w-2">
           {isSpeaking && (
@@ -87,20 +137,25 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
               </span>
             </span>
           ) : (
-            <span>MCP Agent Beacon</span>
+            <span>MCP Bridge</span>
           )}
         </span>
       </button>
 
-      {/* Flyout Details Drawer */}
       {showFlyout && (
-        <div className="absolute right-0 mt-2 w-80 bg-[#121820] border border-[#242E3D] rounded-xl shadow-2xl p-4 z-50 text-white animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-96 bg-[#121820] border border-[#242E3D] rounded-xl shadow-2xl p-4 z-50 text-white">
           <div className="flex items-center justify-between pb-3 border-b border-[#242E3D]">
             <div className="flex items-center space-x-2">
               <Radio className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-bold tracking-wide uppercase">Agent Voice Bridge</span>
+              <div>
+                <span className="text-xs font-bold tracking-wide uppercase block">MCP Agent Bridge</span>
+                <span className="text-[10px] font-mono text-emerald-400">
+                  17 Tools · 4 Resources · 2 Prompts
+                </span>
+              </div>
             </div>
             <button
+              type="button"
               onClick={() => setShowFlyout(false)}
               className="text-[#94A3B8] hover:text-white p-1 rounded hover:bg-[#1A222D]"
             >
@@ -110,35 +165,71 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
 
           <div className="mt-3 space-y-3 text-xs">
             <div className="bg-[#0B0E14] p-2.5 rounded-lg border border-[#242E3D]">
-              <div className="text-[10px] text-[#94A3B8] font-mono uppercase mb-1">MCP Endpoint</div>
+              <div className="text-[10px] text-[#94A3B8] font-mono uppercase mb-1">Streamable HTTP / SSE Endpoint</div>
               <div className="font-mono text-amber-300 text-[11px] select-all flex items-center justify-between">
-                <span>{serverUrl ? `${serverUrl}/mcp` : `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp`}</span>
-                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                <span className="truncate mr-2">{`${origin}/mcp`}</span>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30 shrink-0">
                   HTTP + SSE
                 </span>
               </div>
             </div>
 
-            <div className="space-y-1.5 font-mono text-[11px]">
+            <div className="bg-[#0B0E14] p-2.5 rounded-lg border border-[#242E3D] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-[#94A3B8] font-mono uppercase">One-Click Client Config</span>
+                <button
+                  type="button"
+                  onClick={handleCopyConfig}
+                  className="inline-flex items-center space-x-1 text-[10px] font-mono text-amber-400 hover:text-amber-300"
+                >
+                  {copiedConfig ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedConfig ? 'Copied JSON' : 'Copy JSON'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { id: 'npx', label: 'Zero-Install' },
+                  { id: 'cli', label: 'Local CLI' },
+                  { id: 'http', label: 'HTTP URL' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSnippetMode(opt.id as McpSnippetMode)}
+                    className={`py-1 rounded text-[10px] font-mono border transition-colors ${
+                      snippetMode === opt.id
+                        ? 'bg-amber-500/15 border-amber-500/50 text-amber-300 font-semibold'
+                        : 'bg-[#121820] border-[#242E3D] text-[#94A3B8] hover:text-white'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <pre className="text-[10px] font-mono text-sky-300 bg-[#121820] p-2 rounded border border-[#242E3D] overflow-x-auto select-all">
+                {configSnippets[snippetMode]}
+              </pre>
+            </div>
+
+            <div className="space-y-1 font-mono text-[11px]">
               <div className="flex items-center justify-between text-[#94A3B8]">
-                <span>Status:</span>
+                <span>Transport:</span>
                 <span className="text-white flex items-center space-x-1">
                   <CheckCircle className="w-3 h-3 text-emerald-400 inline" />
-                  <span>Streamable JSON-RPC 2.0</span>
+                  <span>JSON-RPC 2.0 (stdio / HTTP)</span>
                 </span>
               </div>
               <div className="flex items-center justify-between text-[#94A3B8]">
-                <span>Header Binding:</span>
-                <span className="text-amber-400 font-mono">X-VoxForge-Client-Id</span>
-              </div>
-              <div className="flex items-center justify-between text-[#94A3B8]">
-                <span>Supported Clients:</span>
-                <span className="text-[#E2E8F0]">Cursor, Claude, Antigravity</span>
+                <span>Clients:</span>
+                <span className="text-[#E2E8F0]">Cursor, Claude, Antigravity, Windsurf</span>
               </div>
             </div>
 
             <div className="pt-2 border-t border-[#242E3D] flex items-center justify-between">
               <button
+                type="button"
                 onClick={() => {
                   setIsSpeaking(!isSpeaking);
                   if (!isSpeaking) setActiveClient('Cursor IDE');
@@ -154,7 +245,7 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
                 rel="noreferrer"
                 className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center space-x-1"
               >
-                <span>Docs</span>
+                <span>API Docs</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>

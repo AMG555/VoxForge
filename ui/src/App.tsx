@@ -8,7 +8,8 @@ import { HardwareInspector } from './components/telemetry/HardwareInspector';
 import { AbTestLab } from './components/qa/AbTestLab';
 import { ModelCatalog } from './components/catalog/ModelCatalog';
 import { DictationBar } from './components/dictation/DictationBar';
-import { HardwareInfo, Voice } from './types';
+import { UpdateCenter } from './components/common/UpdateCenter';
+import { HardwareInfo, SystemUpdateInfo, Voice } from './types';
 import { api } from './services/api';
 import { WorkflowStorage } from './services/workflowStorage';
 
@@ -19,6 +20,27 @@ export const App: React.FC = () => {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [isDictationOpen, setIsDictationOpen] = useState<boolean>(false);
   const [voiceLabInitialText, setVoiceLabInitialText] = useState<string>('');
+  const [updateInfo, setUpdateInfo] = useState<SystemUpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState<boolean>(false);
+
+  const refreshSystemUpdate = async (force = false) => {
+    setIsCheckingUpdates(true);
+    try {
+      const info = await api.checkSystemUpdate(force);
+      setUpdateInfo(info);
+    } catch {
+      // Non-fatal if server offline during local UI dev
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshSystemUpdate(false);
+    const timer = window.setInterval(() => refreshSystemUpdate(false), 30 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     // Fetch readiness / hardware profile
@@ -235,6 +257,11 @@ export const App: React.FC = () => {
         hardware={hardware}
         onToggleDictation={() => setIsDictationOpen(!isDictationOpen)}
         isDictationOpen={isDictationOpen}
+        updateInfo={updateInfo}
+        onOpenUpdateCenter={() => {
+          setIsUpdateModalOpen(true);
+          refreshSystemUpdate(false);
+        }}
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -261,9 +288,27 @@ export const App: React.FC = () => {
           />
         )}
         {activeTab === 'catalog' && <ModelCatalog />}
-        {activeTab === 'hardware' && <HardwareInspector hardware={hardware} onNavigateTab={setActiveTab} />}
+        {activeTab === 'hardware' && (
+          <HardwareInspector
+            hardware={hardware}
+            onNavigateTab={setActiveTab}
+            updateInfo={updateInfo}
+            onOpenUpdates={() => {
+              setIsUpdateModalOpen(true);
+              refreshSystemUpdate(true);
+            }}
+          />
+        )}
         {activeTab === 'qa' && <AbTestLab voices={voices} />}
       </main>
+
+      <UpdateCenter
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+        onRefresh={refreshSystemUpdate}
+        isChecking={isCheckingUpdates}
+      />
 
       {/* VoxForge Global Push-to-Talk Dictation Studio */}
       <DictationBar

@@ -1,6 +1,6 @@
 # VoxForge API Specification
 
-**Version:** 1.0.0  
+**Version:** 0.6.0  
 **OpenAPI Specification:** 3.1.0  
 **Protocol:** HTTPS / WSS  
 **Base URL:** `http://localhost:8080` (Default Local)

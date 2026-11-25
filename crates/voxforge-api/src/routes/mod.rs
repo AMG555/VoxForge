@@ -16,6 +16,7 @@ pub mod pronunciation;
 pub mod qa;
 pub mod refine;
 pub mod speech;
+pub mod system;
 pub mod telephony;
 pub mod voice_ci;
 pub mod voice_identity;
@@ -167,4 +168,8 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/audio/voice-conversion",
             post(conversion::speech_to_speech),
         )
+        // Enterprise software update check, SHA-256 verified self-update, and controlled restart
+        .route("/v1/system/update", get(system::get_update_status))
+        .route("/v1/system/update/apply", post(system::apply_update_handler))
+        .route("/v1/system/restart", post(system::restart_server_handler))
 }

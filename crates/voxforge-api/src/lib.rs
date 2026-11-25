@@ -1684,4 +1684,19 @@ mod tests {
             Some("cloned-sts-target")
         );
     }
+
+    #[tokio::test]
+    async fn test_system_update_routes_and_auth_enforcement() {
+        let protected_state = setup_test_state(Some("secret-admin-key".to_string())).await;
+        let protected_app = create_app(protected_state);
+
+        // Unauthorized request to /v1/system/update/apply must be rejected (401)
+        let unauth_req = Request::builder()
+            .method("POST")
+            .uri("/v1/system/update/apply")
+            .body(Body::empty())
+            .unwrap();
+        let unauth_res = protected_app.oneshot(unauth_req).await.unwrap();
+        assert_eq!(unauth_res.status(), StatusCode::UNAUTHORIZED);
+    }
 }

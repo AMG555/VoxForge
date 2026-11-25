@@ -1,10 +1,12 @@
 import React from 'react';
-import { Cpu, Server, Zap, CheckCircle2, Activity } from 'lucide-react';
-import { HardwareInfo } from '../../types';
+import { Cpu, Server, Zap, CheckCircle2, Activity, ShieldCheck, ArrowUpCircle } from 'lucide-react';
+import { HardwareInfo, SystemUpdateInfo } from '../../types';
 
 interface HardwareInspectorProps {
   hardware: HardwareInfo | null;
   onNavigateTab?: (tab: 'canvas' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
+  updateInfo?: SystemUpdateInfo | null;
+  onOpenUpdates?: () => void;
 }
 
 interface EngineDescriptor {
@@ -89,7 +91,12 @@ const ENGINE_DESCRIPTORS: Record<string, EngineDescriptor> = {
   },
 };
 
-export const HardwareInspector: React.FC<HardwareInspectorProps> = ({ hardware, onNavigateTab }) => {
+export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
+  hardware,
+  onNavigateTab,
+  updateInfo,
+  onOpenUpdates,
+}) => {
   const registeredEngines = hardware?.registered_engines || [
     'edge-tts',
     'piper-tts',
@@ -207,6 +214,45 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({ hardware, 
               );
             })}
           </div>
+        </div>
+
+        {/* Software Release & Enterprise Self-Update Card */}
+        <div className="bg-[#121820] border border-[#242E3D] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start space-x-3">
+            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-mono font-bold text-white uppercase">
+                  Release Channel & Binary Integrity
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#0B0E14] text-[#94A3B8] border border-[#242E3D]">
+                  v{updateInfo?.current_version || __APP_VERSION__}
+                </span>
+                {updateInfo?.update_available && updateInfo.latest_version && (
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                    v{updateInfo.latest_version} Available
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-[#94A3B8] font-mono mt-1">
+                {updateInfo?.update_hint ||
+                  'Checks GitHub Releases with SHA-256 digest verification and atomic executable swap.'}
+              </p>
+            </div>
+          </div>
+
+          {onOpenUpdates && (
+            <button
+              type="button"
+              onClick={onOpenUpdates}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded bg-[#1A222D] hover:bg-[#242E3D] border border-[#3B485C] text-xs font-mono text-amber-400 hover:text-amber-300 transition-colors shrink-0 self-start sm:self-auto"
+            >
+              <ArrowUpCircle className="w-4 h-4" />
+              <span>{updateInfo?.update_available ? 'Inspect & Install Update' : 'Check Releases'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

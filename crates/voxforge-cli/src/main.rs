@@ -60,6 +60,9 @@ enum Commands {
 
     /// Manage local neural model packages
     Models(ModelsArgs),
+
+    /// Check GitHub releases and apply SHA-256 verified binary updates
+    Update(UpdateArgs),
 }
 
 #[derive(Args)]
@@ -231,6 +234,17 @@ struct CloneArgs {
 }
 
 #[derive(Args)]
+struct UpdateArgs {
+    /// Only check for newer GitHub releases without installing
+    #[arg(long, default_value_t = false)]
+    check: bool,
+
+    /// Skip confirmation prompt when installing release binary
+    #[arg(short, long, default_value_t = false)]
+    yes: bool,
+}
+
+#[derive(Args)]
 struct ModelsArgs {
     #[command(subcommand)]
     command: ModelsCommands,
@@ -264,6 +278,9 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber).ok();
 
     let cli = Cli::parse();
+
+    // Remove leftover `.old` executable backups from previous Windows in-place updates
+    voxforge_api::routes::system::cleanup_stale_update_backups();
 
     // Default data directory: %APPDATA%\VoxForge on Windows, ~/.voxforge elsewhere.
     // This ensures the installed app has a stable writable location regardless
@@ -308,6 +325,7 @@ async fn main() -> Result<()> {
         Commands::Transcribe(args) => run_transcribe(args).await,
         Commands::Clone(args) => run_clone(args).await,
         Commands::Models(args) => run_models(args).await,
+        Commands::Update(args) => run_update(args).await,
     }
 }
 
@@ -933,6 +951,63 @@ async fn run_models(args: ModelsArgs) -> Result<()> {
     Ok(())
 }
 
+async fn run_update(args: UpdateArgs) -> Result<()> {
+    let status = voxforge_api::routes::system::check_for_updates(true).await;
+    println!("VoxForge Software Updater");
+    println!("  Installed:  v{}", status.current_version);
+    println!(
+        "  Latest:     v{} ({})",
+        status.latest_version.as_deref().unwrap_or("unknown"),
+        status.check_status
+    );
+    println!("  Platform:   {}/{} ({})", status.platform, status.arch, status.install_mode);
+
+    if let Some(ref err) = status.error {
+        anyhow::bail!("Update check failed: {err}");
+    }
+
+    if !status.update_available {
+        println!("  Result:     Up to date.");
+        return Ok(());
+    }
+
+    println!("  Asset:      {}", status.asset_name);
+    if let Some(ref sha) = status.checksum_sha256 {
+        println!("  SHA-256:    {sha}");
+    }
+    println!("  Release:    {}", status.release_url);
+
+    if args.check {
+        println!("  Status:     Update available. Run `voxforge update --yes` to install.");
+        return Ok(());
+    }
+
+    if !status.can_self_update {
+        println!("  Notice:     {}", status.update_hint);
+        return Ok(());
+    }
+
+    if !args.yes {
+        use std::io::{self, Write};
+        print!("Download, verify SHA-256, and install VoxForge v{}? [y/N]: ", status.latest_version.as_deref().unwrap_or("latest"));
+        io::stdout().flush()?;
+        let mut line = String::new();
+        io::stdin().read_line(&mut line)?;
+        if !matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+            println!("Update cancelled.");
+            return Ok(());
+        }
+    }
+
+    match voxforge_api::routes::system::download_verify_and_install_update().await {
+        Ok(res) => {
+            println!("{} (SHA-256: {})", res.message, res.sha256);
+            Ok(())
+        }
+        Err((_, msg)) => anyhow::bail!("Self-update failed: {msg}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1039,6 +1114,19 @@ mod tests {
                 assert_eq!(args.iterations, 3);
             }
             _ => panic!("Expected AbTest command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_update_command() {
+        let cli = Cli::try_parse_from(["voxforge", "update", "--check", "--yes"])
+            .expect("Failed to parse update command");
+        match cli.command {
+            Some(Commands::Update(args)) => {
+                assert!(args.check);
+                assert!(args.yes);
+            }
+            _ => panic!("Expected Update command"),
         }
     }
 

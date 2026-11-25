@@ -6,6 +6,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] — 2026-11-25
+
+### 🔄 Enterprise Auto-Updater, Unified Versioning & MCP Bridge
+- **In-App & CLI Release Self-Updater**: Added `GET /v1/system/update`, `POST /v1/system/update/apply`, `POST /v1/system/restart`, and `voxforge update [--check|--yes]` with GitHub Releases polling (15m TTL cache), SemVer comparison, trusted asset origin allowlist, `checksums.txt` SHA-256 verification, pre-swap `--version` execution health check, atomic replacement, and the Studio `UpdateCenter` modal.
+- **One-Click MCP Agent Bridge & Stdio Hardening**: Upgraded the navbar MCP Bridge flyout with live 17-tool / 4-resource / 2-prompt telemetry and 1-click JSON config presets (`npx -y github:AMG555/VoxForge mcp`, local `voxforge mcp`, and Streamable HTTP `/mcp`). Isolated NPX runner logs to `stderr`, added automatic cached-version refresh, and added SHA-256 verification across `install.ps1`, `install.sh`, and `voxforge.js`.
+- **Unified Versioning Everywhere**: Synchronized workspace crates, npm packages, installers, OpenAPI `docs.rs` schema, `cloning.rs` user-agent, and Vite build-time `__APP_VERSION__` (`Logo.tsx`, `VoiceTipsModal.tsx`, `UpdateCenter.tsx`, `HardwareInspector.tsx`).
+
+---
+
 ## [0.5.0] — 2026-11-25
 
 ### 🎙️ Voice Cloning & Multilingual Upgrade

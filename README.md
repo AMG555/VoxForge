@@ -6,10 +6,10 @@
 
 **Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
 
-[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.5.0_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
-[![Release](https://img.shields.io/badge/Release-v0.5.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.6.0_(Windows)-20bf6b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.6.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.5.0-brightgreen.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.6.0-brightgreen.svg)](docs/architecture.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![Frontend](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
@@ -25,8 +25,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: Feature-Complete (v0.5.0 Stable)**  
-> All core features built, tested, and operational: multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, infinite visual DAG pipeline builder, 14-tool Model Context Protocol (MCP) server, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests.
+> **Project Status: Feature-Complete (v0.6.0 Stable)**  
+> All core features built, tested, and operational: multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, infinite visual DAG pipeline builder, 17-tool Model Context Protocol (MCP) server, in-app SHA-256 verified auto-updater, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  
@@ -80,7 +80,8 @@ Install standalone binary into system PATH or cleanly remove it with 1 command:
 - **🌐 646+ Languages & Cross-Lingual Synthesis**: Synthesize speech across 646+ languages and dialects with native Unicode script detection (Devanagari, Arabic, CJK, Malayalam, Cyrillic, Latin) and automatic RTL text alignment.
 - **🔀 Voice Blend Studio & Biometric Verification**: Interpolate continuous acoustic speaker embeddings between two voice profiles with spherical linear interpolation (`POST /v1/voices/profiles/blend`), and verify speaker identity similarity across 5 acoustic dimensions (`POST /v1/voices/verify`).
 - **🎛️ Visual DAG Pipeline Studio**: Infinite node canvas with focal zoom (`0.25x` to `2.5x`), Kahn's topological execution, magnetic snapping, multi-node clipboard copying (`Ctrl+C`), video dubbing time-stretching (WSOLA), and audiobook resumption checkpointing (`resume.json`).
-- **🤖 Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 server over `stdio` and `HTTP` providing 14 speech tools, 4 resource streams, and 2 prompts directly to Claude Desktop, Cursor, Antigravity, and Windsurf.
+- **🤖 Model Context Protocol (MCP) Server**: Built-in JSON-RPC 2.0 server over `stdio` and Streamable HTTP (`POST`/`GET /mcp`) providing 17 speech tools, 4 resource streams, and 2 prompts with 1-click config export in the Studio navbar (`MCP Bridge`) for Claude Desktop, Cursor, Google Antigravity, and Windsurf.
+- **🔄 Enterprise Release & Auto-Update Manager**: Built-in GitHub Releases checker (`GET /v1/system/update`) and SHA-256 verified atomic binary self-updater (`voxforge update --yes` and in-app Release Manager modal).
 - **🎧 Studio Broadcast DSP Mastering**: Two-pass EBU R128 LUFS loudness normalization (-16 LUFS voice target), true 5ms look-ahead brickwall limiter, slow phrase leveler with speech gate, and room-tone gap filling.
 - **🛡️ Enterprise Hardware Profiler**: Automated hardware detection for AVX2/AVX-512, NVIDIA CUDA, and Apple MPS; SLA policy routing; real-time Acoustic Echo Cancellation (NLMS); and spread-spectrum acoustic watermarking (`0x5658`).
 
@@ -161,19 +162,32 @@ For complete technical specifications, sequence diagrams, and lifecycle document
 
 ### 1. AI Agent Integration via Model Context Protocol (MCP)
 
-Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForge:
+Connect Claude Desktop, Cursor, Google Antigravity, Windsurf, or Roo Code directly to VoxForge with zero manual compilation:
 
+**Zero-Install via NPX (works out of the box on Windows, macOS & Linux):**
 ```json
 {
   "mcpServers": {
     "voxforge": {
-      "command": "cargo",
-      "args": ["run", "-p", "voxforge-cli", "--", "mcp"]
+      "command": "npx",
+      "args": ["-y", "github:AMG555/VoxForge", "mcp"]
     }
   }
 }
 ```
-*Equips AI agents with 14 speech tools (synthesis, cloning, Whisper transcription, voice conversion, DAG pipelines, watermark embedding/verification), 4 resource streams, and direct file artifact delivery.* See the [MCP Integration Guide](docs/mcp.md).
+
+**Or using the installed `voxforge` binary (or `cargo run` from source):**
+```json
+{
+  "mcpServers": {
+    "voxforge": {
+      "command": "voxforge",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+*Equips AI agents with 17 speech tools (`synthesize_speech`, `clone_voice`, `refine_voice`, `transcribe_audio`, `speech_to_speech`, `execute_pipeline`, `manage_pronunciation`, `refine_text`, `embed_watermark`, `verify_watermark`, `list_voices`, `list_models`, `install_model`, `benchmark_engine`, `get_cluster_status`, `check_audio`, `parse_manuscript`), 4 resource streams, 2 prompts, and Streamable HTTP/SSE on `http://localhost:8080/mcp`.* See the [MCP Integration Guide](docs/mcp.md).
 
 ---
 
@@ -347,7 +361,7 @@ voxforge/
 
 ### Running Rust Workspace Tests
 
-The workspace features a comprehensive 120+ automated test suite covering acoustic quality metrics, DAG scheduling, topological sorting, storage isolation, hardware tiering, voice cloning, ASR transcriptions, model catalogs, MCP protocol, and REST/WebSocket API endpoints:
+The workspace features a comprehensive 360+ automated test suite covering acoustic quality metrics, DAG scheduling, topological sorting, storage isolation, hardware tiering, voice cloning, SSRF/update integrity verification, ASR transcriptions, model catalogs, MCP protocol, and REST/WebSocket API endpoints:
 
 ```bash
 # Run all unit and integration tests across crates (120+ tests)

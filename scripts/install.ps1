@@ -38,7 +38,7 @@ if (-not (Test-Path $BinDir)) {
 }
 
 # 3. Retrieve latest release tag
-$LatestTag = "v0.5.0"
+$LatestTag = "v0.6.0"
 try {
     $ReleaseInfo = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="VoxForge-Installer"} -ErrorAction SilentlyContinue
     if ($ReleaseInfo -and $ReleaseInfo.tag_name) {
@@ -75,13 +75,40 @@ foreach ($Cand in $LocalCandidates) {
 
 if (-not $FoundLocal) {
     $DownloadUrl = "https://github.com/$Repo/releases/download/$LatestTag/$BinaryName"
+    $ChecksumsUrl = "https://github.com/$Repo/releases/download/$LatestTag/checksums.txt"
+    $TempExe = "$TargetExe.tmp"
     Write-Host "Downloading VoxForge $LatestTag..." -ForegroundColor Cyan
 
     try {
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TargetExe -UseBasicParsing
-        Write-Host "Successfully downloaded to $TargetExe" -ForegroundColor Green
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempExe -UseBasicParsing
+
+        # Verify SHA-256 against published checksums.txt when present
+        try {
+            $SumsContent = [System.Text.Encoding]::UTF8.GetString((Invoke-WebRequest -Uri $ChecksumsUrl -UseBasicParsing -ErrorAction Stop).Content)
+            $ExpectedMatch = ($SumsContent -split "`r?`n") | Where-Object { $_ -match "^([0-9a-fA-F]{64})\s+\*?\.?/?$([regex]::Escape($BinaryName))$" } | Select-Object -First 1
+            if ($ExpectedMatch -match "^([0-9a-fA-F]{64})\s+") {
+                $ExpectedHash = $Matches[1].ToLowerInvariant()
+                $ActualHash = (Get-FileHash -Path $TempExe -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($ActualHash -ne $ExpectedHash) {
+                    Remove-Item $TempExe -Force -ErrorAction SilentlyContinue
+                    throw "SHA-256 checksum mismatch for $BinaryName (expected $ExpectedHash, got $ActualHash)"
+                }
+                Write-Host "SHA-256 checksum verified: $ActualHash" -ForegroundColor Green
+            }
+        } catch {
+            if ($_.Exception.Message -like "*SHA-256 checksum mismatch*") { throw }
+            Write-Warning "checksums.txt unavailable for verification; proceeding with HTTPS release artifact."
+        }
+
+        if (Test-Path $TargetExe) {
+            $BackupExe = "$TargetExe.old"
+            Move-Item -Path $TargetExe -Destination $BackupExe -Force -ErrorAction SilentlyContinue
+        }
+        Move-Item -Path $TempExe -Destination $TargetExe -Force
+        Write-Host "Successfully installed to $TargetExe" -ForegroundColor Green
     } catch {
-        Write-Warning "Direct release download unavailable. Checking for local cargo installation..."
+        Remove-Item $TempExe -Force -ErrorAction SilentlyContinue
+        Write-Warning "Direct release download unavailable ($($_.Exception.Message)). Checking for local cargo installation..."
         if (Get-Command cargo -ErrorAction SilentlyContinue) {
             cargo install --git "https://github.com/$Repo.git" voxforge-cli --root $InstallBase
             Write-Host "Successfully built and installed via cargo." -ForegroundColor Green
@@ -165,6 +192,8 @@ Write-Host @"
 
 Desktop App:          Double-click 'VoxForge' on your Desktop
 Run via Terminal:     voxforge serve --open
+MCP Server (stdio):   voxforge mcp
+Self-Update CLI:      voxforge update --yes
 Direct synthesis:     voxforge synth "Hello from VoxForge"
 Documentation & API:  http://localhost:8080/docs
 

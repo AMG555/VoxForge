@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.5.0
+PackageVersion: 0.6.0
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0
@@ -10,7 +10,7 @@ ManifestVersion: 1.6.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.5.0
+PackageVersion: 0.6.0
 PackageLocale: en-US
 Publisher: AMG555
 PublisherUrl: https://github.com/AMG555
@@ -21,8 +21,9 @@ License: Apache-2.0 OR MIT
 LicenseUrl: https://github.com/AMG555/VoxForge/blob/main/LICENSE-APACHE
 ShortDescription: High-performance Neural Speech Synthesis & Voice Cloning Studio.
 Description: |
-  VoxForge is a local neural speech workstation supporting XTTS v2, Piper,
-  Kokoro, and Whisper with a real-time multi-track audio workstation UI.
+  VoxForge is a local neural speech workstation supporting OmniVoice, CosyVoice,
+  Piper, Kokoro, and Whisper with zero-shot 646-language voice cloning, broadcast
+  DSP mastering, built-in 17-tool MCP server, and SHA-256 verified auto-updates.
 Tags:
   - tts
   - speech-synthesis
@@ -36,7 +37,7 @@ ManifestVersion: 1.6.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.5.0
+PackageVersion: 0.6.0
 Platform:
   - Windows.Desktop
 InstallModes:
@@ -46,8 +47,8 @@ InstallModes:
 Installers:
   - Architecture: x64
     InstallerType: inno
-    InstallerUrl: https://github.com/AMG555/VoxForge/releases/download/v0.5.0/VoxForge_Setup_x64.exe
-    InstallerSha256: 0AA4BD3F6243ECDF8F87520B1D06DCC049F1DBFAA1BA457C5AFD20345B5A778F
+    InstallerUrl: https://github.com/AMG555/VoxForge/releases/download/v0.6.0/VoxForge_Setup_x64.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
     Scope: user
 ManifestType: installer
 ManifestVersion: 1.6.0

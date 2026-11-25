@@ -8,6 +8,8 @@ import {
   HardwareInfo,
   PipelineDefinition,
   RefineVoicePayload,
+  SystemUpdateApplyResult,
+  SystemUpdateInfo,
   Voice,
   VoiceProfile,
 } from '../types';
@@ -592,6 +594,44 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Manuscript parse failed' }));
       throw new Error(err.detail || 'Manuscript parse failed');
+    }
+    return res.json();
+  },
+
+  async checkSystemUpdate(force = false): Promise<SystemUpdateInfo> {
+    const query = force ? '?force=true' : '';
+    const res = await fetch(`${BASE_URL}/v1/system/update${query}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed checking for updates' }));
+      throw new Error(err.detail || 'Failed checking for updates');
+    }
+    return res.json();
+  },
+
+  async applySystemUpdate(autoRestart = false): Promise<SystemUpdateApplyResult> {
+    const res = await fetch(`${BASE_URL}/v1/system/update/apply`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ auto_restart: autoRestart }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Update installation failed' }));
+      throw new Error(err.detail || 'Update installation failed');
+    }
+    return res.json();
+  },
+
+  async restartSystemServer(): Promise<{ status: string; message: string }> {
+    const res = await fetch(`${BASE_URL}/v1/system/restart`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Server restart failed' }));
+      throw new Error(err.detail || 'Server restart failed');
     }
     return res.json();
   },

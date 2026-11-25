@@ -65,7 +65,7 @@ TARGET_FILE="$INSTALL_DIR/voxforge"
 # 3. Fetch latest release version
 LATEST_TAG=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || true)
 if [ -z "$LATEST_TAG" ]; then
-    LATEST_TAG="v0.5.0"
+    LATEST_TAG="v0.6.0"
 fi
 
 # 4. Resolve candidate asset filenames for platform
@@ -73,26 +73,60 @@ if [ "$PLATFORM" = "macos" ]; then
     # Universal FAT binary preferred, followed by arch-specific fallbacks
     CANDIDATES="voxforge-macos-universal voxforge-macos-${TARGET_ARCH} voxforge-macos-arm64 voxforge-macos-x86_64"
 else
-    CANDIDATES="voxforge-linux-${TARGET_ARCH} voxforge-linux-x86_64"
+    CANDIDATES="voxforge-linux-${TARGET_ARCH}"
 fi
 
 printf "Fetching release \033[1;36m%s\033[0m from GitHub...\n" "$LATEST_TAG"
 
+CHECKSUMS_FILE="$(mktemp 2>/dev/null || echo "/tmp/voxforge-checksums-$$.txt")"
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/checksums.txt"
+if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_FILE" 2>/dev/null; then
+    rm -f "$CHECKSUMS_FILE"
+    CHECKSUMS_FILE=""
+fi
+
+verify_sha256() {
+    local_file="$1"
+    asset_name="$2"
+    [ -z "$CHECKSUMS_FILE" ] && return 0
+    expected=$(grep -E "[[:space:]](\*|\./)?${asset_name}\$" "$CHECKSUMS_FILE" | awk '{print $1}' | head -n 1 || true)
+    [ -z "$expected" ] && return 0
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$local_file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$local_file" | awk '{print $1}')
+    else
+        return 0
+    fi
+    if [ "$actual" != "$expected" ]; then
+        printf "\033[1;31mSHA-256 verification failed for %s\033[0m\n" "$asset_name"
+        return 1
+    fi
+    printf "\033[1;32mSHA-256 verified (%s)\033[0m\n" "$actual"
+    return 0
+}
+
+TMP_FILE="${TARGET_FILE}.tmp.$$"
 DOWNLOAD_SUCCESS=0
 for CANDIDATE in $CANDIDATES; do
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${CANDIDATE}"
     printf "Attempting download: \033[1;34m%s\033[0m\n" "$CANDIDATE"
-    if curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TARGET_FILE" 2>/dev/null; then
-        chmod +x "$TARGET_FILE"
-        if [ "$PLATFORM" = "macos" ]; then
-            # Strip macOS quarantine attribute to prevent Gatekeeper popup
-            xattr -d com.apple.quarantine "$TARGET_FILE" 2>/dev/null || true
+    if curl -fL --progress-bar "$DOWNLOAD_URL" -o "$TMP_FILE" 2>/dev/null; then
+        if verify_sha256 "$TMP_FILE" "$CANDIDATE"; then
+            chmod +x "$TMP_FILE"
+            mv -f "$TMP_FILE" "$TARGET_FILE"
+            if [ "$PLATFORM" = "macos" ]; then
+                # Strip macOS quarantine attribute to prevent Gatekeeper popup
+                xattr -d com.apple.quarantine "$TARGET_FILE" 2>/dev/null || true
+            fi
+            printf "\033[1;32mSuccessfully installed voxforge binary to %s\033[0m\n" "$TARGET_FILE"
+            DOWNLOAD_SUCCESS=1
+            break
         fi
-        printf "\033[1;32mSuccessfully installed voxforge binary to %s\033[0m\n" "$TARGET_FILE"
-        DOWNLOAD_SUCCESS=1
-        break
     fi
+    rm -f "$TMP_FILE"
 done
+[ -n "$CHECKSUMS_FILE" ] && rm -f "$CHECKSUMS_FILE"
 
 if [ "$DOWNLOAD_SUCCESS" -eq 0 ]; then
     # Fallback to local source compilation if binary release asset is unavailable
@@ -159,5 +193,7 @@ printf "\nValidating installation...\n"
 
 printf "\n\033[1;32m=== VoxForge installation ready! ===\033[0m\n"
 printf "Run visual workstation:  \033[1;37mvoxforge serve --open\033[0m\n"
+printf "Start MCP server:        \033[1;37mvoxforge mcp\033[0m\n"
+printf "Self-update anytime:     \033[1;37mvoxforge update --yes\033[0m\n"
 printf "Run speech synthesis:    \033[1;37mvoxforge synth \"Hello from VoxForge\"\033[0m\n"
 printf "Documentation & API:     \033[1;37mhttp://localhost:8080/docs\033[0m\n\n"

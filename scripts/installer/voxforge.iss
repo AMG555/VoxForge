@@ -3,7 +3,7 @@
 ; Requires Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VoxForge"
-#define MyAppVersion "0.5.0"
+#define MyAppVersion "0.6.0"
 #define MyAppPublisher "VoxForge Contributors"
 #define MyAppURL "https://github.com/AMG555/VoxForge"
 #define MyAppExeName "voxforge.exe"

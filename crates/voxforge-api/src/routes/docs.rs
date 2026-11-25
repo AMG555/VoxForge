@@ -96,8 +96,8 @@ pub async fn openapi_spec() -> Json<serde_json::Value> {
                                     "schema": {
                                         "type": "object",
                                         "properties": {
-                                            "status": { "type": "string", "example": "ok" },
-                                            "version": { "type": "string", "example": "0.1.0" }
+                                            "status": { "type": "string", "example": "healthy" },
+                                            "version": { "type": "string", "example": env!("CARGO_PKG_VERSION") }
                                         }
                                     }
                                 }
@@ -120,7 +120,7 @@ pub async fn openapi_spec() -> Json<serde_json::Value> {
                                         "type": "object",
                                         "properties": {
                                             "status": { "type": "string", "example": "ready" },
-                                            "version": { "type": "string", "example": "0.1.0" },
+                                            "version": { "type": "string", "example": env!("CARGO_PKG_VERSION") },
                                             "registered_engines": {
                                                 "type": "array",
                                                 "items": { "type": "string" }

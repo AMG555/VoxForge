@@ -783,7 +783,7 @@ pub(crate) async fn fetch_remote_audio(
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(std::time::Duration::from_secs(20))
-            .user_agent("VoxForge/0.5")
+            .user_agent(concat!("VoxForge/", env!("CARGO_PKG_VERSION")))
             .resolve_to_addrs(&host, &addrs)
             .build()
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("HTTP client error: {e}")))?;

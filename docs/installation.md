@@ -202,7 +202,7 @@ cargo build --release --bin voxforge
 ```bash
 cargo test --workspace
 ```
-*Expected: 106+ tests passed across 14 crates, 0 failed.*
+*Expected: 360+ tests passed across 14 crates, 0 failed.*
 
 ---
 
@@ -266,11 +266,15 @@ docker compose up -d
    ```bash
    voxforge synth "VoxForge workstation operational." --voice en-US-AriaNeural --out test.wav
    ```
-5. **Launch Server with Browser Auto-Launch**:
+5. **Check & Apply Updates (Installed Binary)**:
+   ```bash
+   voxforge update --check
+   ```
+6. **Launch Server with Browser Auto-Launch**:
    ```bash
    voxforge serve --open
    ```
-6. **Verify Endpoints**:
+7. **Verify Endpoints**:
    - Webstation Workstation: `http://localhost:8080/`
    - Interactive OpenAPI Docs: `http://localhost:8080/docs`
    - Health Check: `http://localhost:8080/health`
