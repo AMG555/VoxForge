@@ -13,6 +13,7 @@ RUN npm run build
 FROM rust:1-bookworm AS rust-builder
 WORKDIR /usr/src/voxforge
 COPY Cargo.toml Cargo.lock ./
+COPY assets ./assets
 COPY crates ./crates
 
 # Copy freshly compiled UI assets into voxforge-api embedded location
