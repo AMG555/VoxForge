@@ -37,7 +37,7 @@ import {
   Gauge,
 } from 'lucide-react';
 import { Voice } from '../../types';
-import { api } from '../../services/api';
+import { api, isAbortError } from '../../services/api';
 import { AudioVisualizer } from '../common/AudioVisualizer';
 import { PronunciationModal } from './PronunciationModal';
 import { VoiceTipsModal } from './VoiceTipsModal';
@@ -136,6 +136,9 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const [instruct, setInstruct] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [synthError, setSynthError] = useState<string | null>(null);
+  const [synthNotice, setSynthNotice] = useState<string | null>(null);
+  const synthAbortRef = useRef<AbortController | null>(null);
+  const stsAbortRef = useRef<AbortController | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [sidecarStatus, setSidecarStatus] = useState<{ running: boolean; url?: string } | null>(null);
 
@@ -151,6 +154,8 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       .catch(() => {});
     return () => {
       active = false;
+      synthAbortRef.current?.abort();
+      stsAbortRef.current?.abort();
     };
   }, []);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -754,9 +759,20 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const isRouterConfigured = Boolean(apiKeyInput.trim() && routerModelInput.trim());
   const canGenerate = selectedVoice?.engine_id !== 'openai-router' || isRouterConfigured;
 
+  const handleCancelGenerate = () => {
+    if (synthAbortRef.current) {
+      synthAbortRef.current.abort();
+      synthAbortRef.current = null;
+    }
+  };
+
   const handleGenerate = async () => {
     if (!text.trim() || !canGenerate) return;
+    synthAbortRef.current?.abort();
+    const controller = new AbortController();
+    synthAbortRef.current = controller;
     setSynthError(null);
+    setSynthNotice(null);
     try {
       setIsGenerating(true);
       if (audioUrl) {
@@ -822,7 +838,9 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         num_step: refinementSteps,
         precision: audioPrecision,
         seed: currentSeed,
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
 
       // Apply Pro Studio Mastering DSP chain (Tube Warmth, 4-Band EQ, De-Esser, Reverb)
       if (studioMode && studioConfig.enabled) {
@@ -833,6 +851,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           console.warn('Studio mastering DSP error, using direct audio:', masteringErr);
         }
       }
+      if (controller.signal.aborted) return;
 
       const renderTimeMs = Math.round(performance.now() - renderStartTime);
       const renderTimeSec = renderTimeMs / 1000;
@@ -877,12 +896,19 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         setActiveSeed(Math.floor(Math.random() * 899999) + 100000);
       }
     } catch (err: any) {
-      console.error('Synthesis error:', err);
-      setSynthError(
-        err?.message ||
-          'Speech synthesis failed. Check that the VoxForge server is online and selected voice supports this language.'
-      );
+      if (isAbortError(err)) {
+        setSynthNotice('Audio generation cancelled.');
+      } else {
+        console.error('Synthesis error:', err);
+        setSynthError(
+          err?.message ||
+            'Speech synthesis failed. Check that the VoxForge server is online and selected voice supports this language.'
+        );
+      }
     } finally {
+      if (synthAbortRef.current === controller) {
+        synthAbortRef.current = null;
+      }
       setIsGenerating(false);
     }
   };
@@ -1005,9 +1031,20 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
     reader.readAsDataURL(file);
   };
 
+  const handleCancelSts = () => {
+    if (stsAbortRef.current) {
+      stsAbortRef.current.abort();
+      stsAbortRef.current = null;
+    }
+  };
+
   const handleConvertVoice = async () => {
     if (!stsInputBase64) return;
+    stsAbortRef.current?.abort();
+    const controller = new AbortController();
+    stsAbortRef.current = controller;
     setStsError(null);
+    setSynthNotice(null);
     try {
       setStsIsConverting(true);
       if (stsConvertedUrl) {
@@ -1031,7 +1068,9 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
         instruct: instruct.trim() || undefined,
         seed: pinnedSeed ?? activeSeed,
         precision: audioPrecision,
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
 
       const url = URL.createObjectURL(blob);
       setStsConvertedUrl(url);
@@ -1054,9 +1093,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       setTakes((prev) => [newTake, ...prev]);
       setActiveTakeId(newTake.id);
     } catch (err: any) {
-      console.error('Speech-to-Speech conversion failed:', err);
-      setStsError(err?.message || 'Speech-to-Speech conversion failed.');
+      if (isAbortError(err)) {
+        setSynthNotice('Voice conversion cancelled.');
+      } else {
+        console.error('Speech-to-Speech conversion failed:', err);
+        setStsError(err?.message || 'Speech-to-Speech conversion failed.');
+      }
     } finally {
+      if (stsAbortRef.current === controller) {
+        stsAbortRef.current = null;
+      }
       setStsIsConverting(false);
     }
   };
@@ -2123,7 +2169,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               </div>
 
               {/* Action Button */}
-              <div className="flex items-center space-x-4 pt-2">
+              <div className="flex items-center space-x-3 pt-2">
                 <button
                   type="button"
                   onClick={handleConvertVoice}
@@ -2142,6 +2188,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                     </>
                   )}
                 </button>
+                {stsIsConverting && (
+                  <button
+                    type="button"
+                    onClick={handleCancelSts}
+                    className="flex items-center space-x-1.5 px-4 py-3 rounded-xl bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 font-semibold text-xs transition-colors"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Cancel</span>
+                  </button>
+                )}
               </div>
               {stsError && (
                 <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between">
@@ -3135,9 +3191,22 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               </div>
             )}
 
+            {synthNotice && !synthError && (
+              <div className="p-3 rounded-xl bg-slate-800/70 border border-slate-600/40 text-slate-300 text-xs flex items-center justify-between">
+                <span>{synthNotice}</span>
+                <button
+                  type="button"
+                  onClick={() => setSynthNotice(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             {studioPlaygroundMode === 'tts' && (
               canGenerate ? (
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                   <button
                     onClick={handleGenerate}
                     disabled={isGenerating}
@@ -3155,6 +3224,16 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                       </>
                     )}
                   </button>
+                  {isGenerating && (
+                    <button
+                      type="button"
+                      onClick={handleCancelGenerate}
+                      className="flex items-center space-x-1.5 px-4 py-2.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 font-semibold text-xs transition-colors"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>Cancel</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start space-x-3 text-xs text-amber-300 font-mono">

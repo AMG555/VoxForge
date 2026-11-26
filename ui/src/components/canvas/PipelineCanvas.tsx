@@ -39,6 +39,7 @@ import {
   ArrowLeft,
   Search,
   Upload,
+  Square,
 } from 'lucide-react';
 import {
   PipelineNode,
@@ -59,7 +60,7 @@ import {
   StoredWorkflow,
   StickyNoteData,
 } from '../../services/workflowStorage';
-import { api } from '../../services/api';
+import { api, isAbortError } from '../../services/api';
 import { AudioProcessor } from '../../services/audioProcessor';
 
 interface PipelineCanvasProps {
@@ -297,6 +298,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const pipelineAbortRef = useRef<AbortController | null>(null);
 
   const showToast = useCallback((text: string, type: 'info' | 'error' = 'info') => {
     setToastMessage({ text, type });
@@ -312,12 +314,18 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     }
   }, [pipeline, pushHistory]);
 
-  // Clean audio URL on unmount
+  // Clean audio URL and abort pending execution on unmount
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
+
+  useEffect(() => {
+    return () => {
+      pipelineAbortRef.current?.abort();
+    };
+  }, []);
 
   // Update master audio source safely
   useEffect(() => {
@@ -1301,8 +1309,18 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
     setQuickAddPos(null);
   };
 
+  const handleCancelPipeline = () => {
+    if (pipelineAbortRef.current) {
+      pipelineAbortRef.current.abort();
+      pipelineAbortRef.current = null;
+    }
+  };
+
   // ── Real-Time Execution & Flow Visualization (Topological DAG Flow) ──────
   const handleRunPipeline = async () => {
+    pipelineAbortRef.current?.abort();
+    const controller = new AbortController();
+    pipelineAbortRef.current = controller;
     try {
       setIsRunning(true);
       setShowExecutionDrawer(true);
@@ -1365,6 +1383,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
 
       // 2. Animate step-by-step progression through stages in topological order
       for (let i = 0; i < sortedActiveNodes.length; i++) {
+        if (controller.signal.aborted) {
+          throw new DOMException('Pipeline execution cancelled', 'AbortError');
+        }
         const node = sortedActiveNodes[i];
         // Mark current node running
         setExecutionStates((prev) => ({
@@ -1379,6 +1400,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         // Simulated latency step
         const stepDelay = Math.floor(Math.random() * 80 + 50);
         await new Promise((r) => setTimeout(r, stepDelay));
+        if (controller.signal.aborted) {
+          throw new DOMException('Pipeline execution cancelled', 'AbortError');
+        }
 
         // Mark current node success
         setExecutionStates((prev) => ({
@@ -1390,8 +1414,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       // 3. Dispatch real backend pipeline execution with standalone fallback
       let blob: Blob;
       try {
-        blob = await api.executePipeline(pipeline);
+        blob = await api.executePipeline(pipeline, undefined, controller.signal);
       } catch (err) {
+        if (isAbortError(err)) throw err;
         console.warn('Backend execution offline or error; generating studio synthesis sample:', err);
         const sample = await AudioProcessor.createDemoReferenceSample('broadcaster');
         blob = sample.wavBlob;
@@ -1404,8 +1429,15 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       setAudioUrl(url);
       showToast(`Pipeline executed successfully in ${totalElapsed}ms!`, 'info');
     } catch (err: any) {
-      showToast(`Pipeline Execution Notice: ${err.message}`, 'error');
+      if (isAbortError(err)) {
+        showToast('Pipeline execution cancelled', 'info');
+      } else {
+        showToast(`Pipeline Execution Notice: ${err.message}`, 'error');
+      }
     } finally {
+      if (pipelineAbortRef.current === controller) {
+        pipelineAbortRef.current = null;
+      }
       setIsRunning(false);
       setActiveEdgeIds(new Set());
     }
@@ -1782,6 +1814,16 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
                 </>
               )}
             </button>
+            {isRunning && (
+              <button
+                type="button"
+                onClick={handleCancelPipeline}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 font-semibold text-xs transition-colors"
+              >
+                <Square className="w-3 h-3 fill-current" />
+                <span>Cancel</span>
+              </button>
+            )}
 
             {/* More menu */}
             <div className="relative">

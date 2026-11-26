@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Award, Loader2, Scale, Eye, EyeOff, Sparkles, Star, ShieldCheck, Upload, CheckCircle2, AlertTriangle, FileAudio } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Award, Loader2, Scale, Eye, EyeOff, Sparkles, Star, ShieldCheck, Upload, CheckCircle2, AlertTriangle, FileAudio, Square } from 'lucide-react';
 import { AbTestComparison, Voice } from '../../types';
-import { api } from '../../services/api';
+import { api, isAbortError } from '../../services/api';
 
 interface AbTestLabProps {
   voices: Voice[];
@@ -20,6 +20,7 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
   const [pitchB, setPitchB] = useState<number>(0.0);
 
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const abAbortRef = useRef<AbortController | null>(null);
   const [comparison, setComparison] = useState<AbTestComparison | null>(null);
   const [audioUrlA, setAudioUrlA] = useState<string | null>(null);
   const [audioUrlB, setAudioUrlB] = useState<string | null>(null);
@@ -75,8 +76,24 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
     };
   }, [audioUrlA, audioUrlB]);
 
+  React.useEffect(() => {
+    return () => {
+      abAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleCancelEvaluation = () => {
+    if (abAbortRef.current) {
+      abAbortRef.current.abort();
+      abAbortRef.current = null;
+    }
+  };
+
   const handleRunEvaluation = async () => {
     if (!text.trim()) return;
+    abAbortRef.current?.abort();
+    const controller = new AbortController();
+    abAbortRef.current = controller;
     try {
       setIsRunning(true);
       setIsUnblinded(false);
@@ -94,24 +111,34 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
       }
 
       // Run automated QA A/B test via API
-      const result = await api.runAbTest({
-        name: 'Interactive Voice QA Comparison',
-        text,
-        variant_a: { voice_id: voiceA, speed: speedA, pitch: pitchA },
-        variant_b: { voice_id: voiceB, speed: speedB, pitch: pitchB },
-      });
+      const result = await api.runAbTest(
+        {
+          name: 'Interactive Voice QA Comparison',
+          text,
+          variant_a: { voice_id: voiceA, speed: speedA, pitch: pitchA },
+          variant_b: { voice_id: voiceB, speed: speedB, pitch: pitchB },
+        },
+        controller.signal
+      );
+      if (controller.signal.aborted) return;
       setComparison(result);
 
       // Fetch actual audio for both variants so user can audition
       const [blobA, blobB] = await Promise.all([
-        api.synthesizeDirect({ input: text, voice: voiceA, speed: speedA, pitch: pitchA }),
-        api.synthesizeDirect({ input: text, voice: voiceB, speed: speedB, pitch: pitchB }),
+        api.synthesizeDirect({ input: text, voice: voiceA, speed: speedA, pitch: pitchA, signal: controller.signal }),
+        api.synthesizeDirect({ input: text, voice: voiceB, speed: speedB, pitch: pitchB, signal: controller.signal }),
       ]);
+      if (controller.signal.aborted) return;
       setAudioUrlA(URL.createObjectURL(blobA));
       setAudioUrlB(URL.createObjectURL(blobB));
     } catch (err: any) {
-      alert(`QA A/B Test Failed: ${err.message}`);
+      if (!isAbortError(err)) {
+        alert(`QA A/B Test Failed: ${err.message}`);
+      }
     } finally {
+      if (abAbortRef.current === controller) {
+        abAbortRef.current = null;
+      }
       setIsRunning(false);
     }
   };
@@ -304,7 +331,7 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
         </div>
 
         {/* Action Button */}
-        <div className="flex justify-center">
+        <div className="flex justify-center items-center space-x-3">
           <button
             onClick={handleRunEvaluation}
             disabled={isRunning}
@@ -322,6 +349,16 @@ export const AbTestLab: React.FC<AbTestLabProps> = ({ voices }) => {
               </>
             )}
           </button>
+          {isRunning && (
+            <button
+              type="button"
+              onClick={handleCancelEvaluation}
+              className="flex items-center space-x-1.5 px-4 py-3 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 font-semibold text-xs transition-colors"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span>Cancel</span>
+            </button>
+          )}
         </div>
 
         {/* Double-Blind Audition Deck */}

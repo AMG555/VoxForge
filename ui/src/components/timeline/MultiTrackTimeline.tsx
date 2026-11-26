@@ -10,9 +10,10 @@ import {
   Clock,
   Layers,
   FileAudio,
+  Square,
 } from 'lucide-react';
 import { Voice } from '../../types';
-import { api } from '../../services/api';
+import { api, isAbortError } from '../../services/api';
 
 export interface TimelineClip {
   id: string;
@@ -152,6 +153,20 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
   const [currentTimeSec, setCurrentTimeSec] = useState<number>(0);
   const [zoomPxPerSec, setZoomPxPerSec] = useState<number>(45);
   const [isRenderingMaster, setIsRenderingMaster] = useState<boolean>(false);
+  const renderAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      renderAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleCancelRender = () => {
+    if (renderAbortRef.current) {
+      renderAbortRef.current.abort();
+      renderAbortRef.current = null;
+    }
+  };
   const [masterAudioUrl, setMasterAudioUrl] = useState<string | null>(null);
   const [isAuditioningMaster, setIsAuditioningMaster] = useState<boolean>(false);
   const [newClipText, setNewClipText] = useState<string>('');
@@ -316,6 +331,9 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
   };
 
   const handleRenderMaster = async () => {
+    renderAbortRef.current?.abort();
+    const controller = new AbortController();
+    renderAbortRef.current = controller;
     try {
       setIsRenderingMaster(true);
       const anySoloed = tracks.some((t) => t.isSoloed);
@@ -346,14 +364,17 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
       );
 
       for (const clip of allActiveClips) {
+        if (controller.signal.aborted) return;
         let blob = clip.audioBlob;
         if (!blob) {
           blob = await api.synthesizeDirect({
             input: clip.text,
             voice: clip.voiceId || clip.trackVoiceId,
             speed: 1.0,
+            signal: controller.signal,
           });
         }
+        if (controller.signal.aborted) return;
         const arrayBuf = await blob.arrayBuffer();
         const audioBuffer = await offlineCtx.decodeAudioData(arrayBuf);
 
@@ -383,6 +404,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
       const url = URL.createObjectURL(wavBlob);
       setMasterAudioUrl(url);
     } catch (err) {
+      if (isAbortError(err)) return;
       console.error('Master multi-track mix error, falling back:', err);
       try {
         const anySoloed = tracks.some((t) => t.isSoloed);
@@ -391,19 +413,26 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           .flatMap((t) => t.clips)
           .sort((a, b) => a.startSec - b.startSec);
 
-        if (activeClips.length > 0) {
+        if (activeClips.length > 0 && !controller.signal.aborted) {
           const fallbackBlob = await api.synthesizeDirect({
             input: activeClips.map((c) => c.text).join(' ... '),
             voice: activeClips[0].voiceId,
             speed: 1.0,
+            signal: controller.signal,
           });
+          if (controller.signal.aborted) return;
           if (masterAudioUrl) URL.revokeObjectURL(masterAudioUrl);
           setMasterAudioUrl(URL.createObjectURL(fallbackBlob));
         }
       } catch (fallbackErr) {
-        console.error('Fallback synthesis failed:', fallbackErr);
+        if (!isAbortError(fallbackErr)) {
+          console.error('Fallback synthesis failed:', fallbackErr);
+        }
       }
     } finally {
+      if (renderAbortRef.current === controller) {
+        renderAbortRef.current = null;
+      }
       setIsRenderingMaster(false);
     }
   };
@@ -494,6 +523,16 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
             <Sparkles className="w-3.5 h-3.5" />
             <span>{isRenderingMaster ? 'Bouncing Master...' : 'Export Master WAV'}</span>
           </button>
+          {isRenderingMaster && (
+            <button
+              type="button"
+              onClick={handleCancelRender}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 font-semibold text-xs font-mono transition-colors"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>Cancel</span>
+            </button>
+          )}
 
           {masterAudioUrl && (
             <div className="flex items-center space-x-1.5">

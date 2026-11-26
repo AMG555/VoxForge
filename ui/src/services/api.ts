@@ -25,6 +25,13 @@ const getHeaders = (customHeaders: Record<string, string> = {}): Record<string, 
   return headers;
 };
 
+export const isAbortError = (err: unknown): boolean =>
+  (err instanceof DOMException && err.name === 'AbortError') ||
+  (typeof err === 'object' &&
+    err !== null &&
+    'name' in err &&
+    (err as { name?: string }).name === 'AbortError');
+
 export const api = {
   async getHealth(): Promise<{
     status: string;
@@ -71,9 +78,11 @@ export const api = {
     num_step?: number;
     precision?: number;
     seed?: number;
+    signal?: AbortSignal;
   }): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/audio/speech`, {
       method: 'POST',
+      signal: options.signal,
       headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         model:
@@ -108,9 +117,14 @@ export const api = {
     return res.blob();
   },
 
-  async executePipeline(pipeline: PipelineDefinition, text?: string): Promise<Blob> {
+  async executePipeline(
+    pipeline: PipelineDefinition,
+    text?: string,
+    signal?: AbortSignal
+  ): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/pipeline/execute`, {
       method: 'POST',
+      signal,
       headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         pipeline,
@@ -126,9 +140,13 @@ export const api = {
     return res.blob();
   },
 
-  async runAbTest(scenario: AbTestScenario): Promise<AbTestComparison> {
+  async runAbTest(
+    scenario: AbTestScenario,
+    signal?: AbortSignal
+  ): Promise<AbTestComparison> {
     const res = await fetch(`${BASE_URL}/v1/qa/ab-test`, {
       method: 'POST',
+      signal,
       headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         name: scenario.name,
@@ -289,9 +307,11 @@ export const api = {
     instruct?: string;
     seed?: number;
     precision?: number;
+    signal?: AbortSignal;
   }): Promise<Blob> {
     const res = await fetch(`${BASE_URL}/v1/audio/speech-to-speech`, {
       method: 'POST',
+      signal: payload.signal,
       headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         audio_base64: payload.audio_base64,
