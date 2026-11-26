@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Play,
+  Pause,
   Loader2,
   Search,
   Sparkles,
@@ -743,18 +744,69 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
   const [refineStatus, setRefineStatus] = useState<string | null>(null);
   const refineFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Microphone recording state
+  // Microphone recording & preview state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState<boolean>(false);
   const [previewCurrentTime, setPreviewCurrentTime] = useState<number>(0);
   const [previewDuration, setPreviewDuration] = useState<number>(0);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicDeviceId, setSelectedMicDeviceId] = useState<string>('');
+  const [micLevel, setMicLevel] = useState<number>(0);
+  const [micSilentWarning, setMicSilentWarning] = useState<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const speechRecognitionRef = useRef<any>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const micAudioCtxRef = useRef<AudioContext | null>(null);
+  const micRafRef = useRef<number | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micPeakSeenRef = useRef<boolean>(false);
+  const recordingSecondsRef = useRef<number>(0);
+
+  const cleanupMicMonitoring = () => {
+    if (micRafRef.current !== null) {
+      cancelAnimationFrame(micRafRef.current);
+      micRafRef.current = null;
+    }
+    if (micAudioCtxRef.current) {
+      micAudioCtxRef.current.close().catch(() => {});
+      micAudioCtxRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+    setMicLevel(0);
+  };
+
+  const refreshMicDevices = async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter((d) => d.kind === 'audioinput');
+      setMicDevices(inputs);
+    } catch {
+      // Non-fatal if device enumeration denied
+    }
+  };
+
+  useEffect(() => {
+    if (showCloneModal) {
+      refreshMicDevices();
+    }
+  }, [showCloneModal]);
+
+  useEffect(() => {
+    if (previewAudioRef.current && recordedAudioUrl) {
+      previewAudioRef.current.load();
+    }
+    setIsPreviewPlaying(false);
+    setPreviewCurrentTime(0);
+  }, [recordedAudioUrl]);
 
   useEffect(() => {
     return () => {
@@ -787,6 +839,12 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
       }
     };
   }, [audioUrl, recordedAudioUrl, stsAudioUrl, stsConvertedUrl]);
+
+  useEffect(() => {
+    return () => {
+      cleanupMicMonitoring();
+    };
+  }, []);
 
   // Clean neural voices list: eliminate mock sine voices and sort working neural voices to top
   const filteredVoices = localVoices
@@ -1165,17 +1223,68 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
     }
   };
 
-  // Microphone audio capture
+  // Microphone audio capture with live VU monitoring and device selection
   const startRecording = async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setCloneError('Microphone capture is not supported in this browser context.');
+      return;
+    }
     try {
+      cleanupMicMonitoring();
       audioChunksRef.current = [];
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      setCloneError(null);
+      setPreviewError(null);
+      setMicSilentWarning(false);
+      micPeakSeenRef.current = false;
+      recordingSecondsRef.current = 0;
+
+      const baseConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: selectedMicDeviceId
+            ? { ...baseConstraints, deviceId: { exact: selectedMicDeviceId } }
+            : baseConstraints,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      micStreamRef.current = stream;
+      refreshMicDevices();
+
+      // Live Web Audio AnalyserNode for instant mic signal VU feedback
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtx();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        micAudioCtxRef.current = ctx;
+
+        const dataBuf = new Uint8Array(analyser.fftSize);
+        const tickMeter = () => {
+          analyser.getByteTimeDomainData(dataBuf);
+          let peakAbs = 0;
+          for (let i = 0; i < dataBuf.length; i++) {
+            const dev = Math.abs((dataBuf[i] - 128) / 128);
+            if (dev > peakAbs) peakAbs = dev;
+          }
+          if (peakAbs > 0.015) {
+            micPeakSeenRef.current = true;
+            setMicSilentWarning(false);
+          }
+          setMicLevel(Math.min(100, Math.round(peakAbs * 220)));
+          micRafRef.current = requestAnimationFrame(tickMeter);
+        };
+        micRafRef.current = requestAnimationFrame(tickMeter);
+      } catch {
+        // Non-fatal if AudioContext VU fails
+      }
 
       // Cross-browser MIME type check
       const supportedMime = [
@@ -1225,6 +1334,12 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
       mediaRecorder.onstop = async () => {
         const chosenMime = mediaRecorder.mimeType || supportedMime || 'audio/webm';
         const rawBlob = new Blob(audioChunksRef.current, { type: chosenMime });
+        cleanupMicMonitoring();
+
+        if (rawBlob.size === 0) {
+          setCloneError('No audio data captured from microphone. Check permissions or input device.');
+          return;
+        }
 
         try {
           // Preprocess: 80Hz rumble cut, silence gating, -1.0 dBFS normalization, 24kHz 16-bit WAV
@@ -1234,27 +1349,32 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
           }
           const url = URL.createObjectURL(result.wavBlob);
           setRecordedAudioUrl(url);
+          setPreviewDuration(result.metrics.durationSeconds);
           setCloneAudioBase64(result.wavBase64);
           assessReferenceClip(result.wavBase64);
           setAudioQuality(result.metrics);
           setCloneFileName(`Enhanced Studio WAV (${result.durationFormatted})`);
+          if (result.metrics.isSilent) {
+            setCloneError(
+              'Captured audio is completely silent (-96 dBFS). Verify the selected microphone is unmuted and speaks live on the VU meter before recording.'
+            );
+          }
         } catch {
           // Fallback to direct raw blob if Web Audio decode is unsupported
+          if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
           const url = URL.createObjectURL(rawBlob);
           setRecordedAudioUrl(url);
+          setPreviewDuration(recordingSecondsRef.current);
           const reader = new FileReader();
           reader.onloadend = () => {
             const base64data = reader.result as string;
             const base64 = base64data.includes(',') ? base64data.split(',')[1] : base64data;
             setCloneAudioBase64(base64);
             assessReferenceClip(base64);
-            setCloneFileName(`Microphone Sample (${recordingSeconds}s)`);
+            setCloneFileName(`Microphone Sample (${recordingSecondsRef.current}s)`);
           };
           reader.readAsDataURL(rawBlob);
         }
-
-        // Stop all audio tracks to release microphone hardware
-        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorder.start(250);
@@ -1262,16 +1382,12 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
       setRecordingSeconds(0);
 
       timerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => {
-          if (prev >= 20) {
-            stopRecording();
-            return 20;
-          }
-          return prev + 1;
-        });
+        recordingSecondsRef.current += 1;
+        setRecordingSeconds(recordingSecondsRef.current);
       }, 1000);
     } catch (err: any) {
-      alert(`Microphone access error: ${err.message}`);
+      cleanupMicMonitoring();
+      setCloneError(`Microphone access error: ${err.message}`);
     }
   };
 
@@ -1293,19 +1409,32 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
     setIsRecording(false);
   };
 
+  useEffect(() => {
+    if (isRecording && recordingSeconds >= 20) {
+      stopRecording();
+    } else if (isRecording && recordingSeconds >= 2 && !micPeakSeenRef.current) {
+      setMicSilentWarning(true);
+    }
+  }, [isRecording, recordingSeconds]);
+
   const resetRecording = () => {
+    cleanupMicMonitoring();
     if (recordedAudioUrl) {
       URL.revokeObjectURL(recordedAudioUrl);
     }
     setRecordedAudioUrl(null);
     setPreviewCurrentTime(0);
     setPreviewDuration(0);
+    setPreviewError(null);
     setIsPreviewPlaying(false);
     setCloneAudioBase64('');
     setCloneAssessment(null);
+    setCloneError(null);
+    setMicSilentWarning(false);
     setCloneFileName('');
     setAudioQuality(null);
     setRecordingSeconds(0);
+    recordingSecondsRef.current = 0;
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
@@ -1330,15 +1459,23 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
       }
 
       setCloneFileName(file.name);
+      setCloneError(null);
+      setPreviewError(null);
       try {
         const result = await AudioProcessor.preprocessForCloning(file);
         if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
         setRecordedAudioUrl(URL.createObjectURL(result.wavBlob));
+        setPreviewDuration(result.metrics.durationSeconds);
         setCloneAudioBase64(result.wavBase64);
         assessReferenceClip(result.wavBase64);
         setAudioQuality(result.metrics);
         setCloneFileName(`${file.name} (Enhanced 24kHz Studio WAV)`);
+        if (result.metrics.isSilent) {
+          setCloneError('Uploaded audio file appears silent. Select a file with clear speech.');
+        }
       } catch {
+        if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
+        setRecordedAudioUrl(URL.createObjectURL(file));
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
@@ -1357,6 +1494,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
     if (!trimmed || isFetchingUrl) return;
     setIsFetchingUrl(true);
     setCloneError(null);
+    setPreviewError(null);
     try {
       const fetched = await api.fetchRemoteAudioUrl(trimmed);
       const byteString = atob(fetched.audio_base64);
@@ -1369,6 +1507,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
         const result = await AudioProcessor.preprocessForCloning(rawBlob);
         if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
         setRecordedAudioUrl(URL.createObjectURL(result.wavBlob));
+        setPreviewDuration(result.metrics.durationSeconds);
         setCloneAudioBase64(result.wavBase64);
         assessReferenceClip(result.wavBase64);
         setAudioQuality(result.metrics);
@@ -1651,9 +1790,12 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
 
   const handleLoadDemoSample = async (type: 'broadcaster' | 'dispatcher') => {
     try {
+      setCloneError(null);
+      setPreviewError(null);
       const demo = await AudioProcessor.createDemoReferenceSample(type);
       if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl);
       setRecordedAudioUrl(URL.createObjectURL(demo.wavBlob));
+      setPreviewDuration(demo.metrics.durationSeconds);
       setCloneAudioBase64(demo.wavBase64);
       assessReferenceClip(demo.wavBase64);
       setAudioQuality(demo.metrics);
@@ -4138,112 +4280,57 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
 
                   {cloneMode === 'record' ? (
                     <div className="border border-[#242E3D] bg-[#0B0E14] rounded-xl p-4 flex flex-col items-center justify-center space-y-3">
-                      {recordedAudioUrl ? (
-                        <div className="w-full space-y-3">
-                          <div className="flex items-center justify-between text-xs text-[#94A3B8]">
-                            <span className="flex items-center space-x-1.5 text-emerald-400 font-mono">
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>Audio Sample Captured ({recordingSeconds}s)</span>
-                            </span>
-                            <button
-                              type="button"
-                              onClick={resetRecording}
-                              className="flex items-center space-x-1 text-xs text-[#64748B] hover:text-amber-400 transition-colors"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Record Again</span>
-                            </button>
-                          </div>
-
-                          {/* Sleek Custom Audio Player Bar */}
-                          <div className="flex items-center space-x-3 bg-[#121820] p-3 rounded-xl border border-[#242E3D]">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!previewAudioRef.current) return;
-                                if (isPreviewPlaying) {
-                                  previewAudioRef.current.pause();
-                                  setIsPreviewPlaying(false);
-                                } else {
-                                  previewAudioRef.current.currentTime = 0;
-                                  previewAudioRef.current.play().catch(console.error);
-                                  setIsPreviewPlaying(true);
-                                }
-                              }}
-                              className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-400 text-black flex items-center justify-center transition-all shadow-md shadow-amber-500/20 shrink-0"
-                              title={isPreviewPlaying ? 'Stop playback' : 'Play audio preview'}
-                            >
-                              {isPreviewPlaying ? (
-                                <Square className="w-4 h-4 fill-black" />
-                              ) : (
-                                <Play className="w-4 h-4 fill-black ml-0.5" />
-                              )}
-                            </button>
-
-                            <div className="flex-1 space-y-1">
-                              <div
-                                onClick={(e) => {
-                                  if (!previewAudioRef.current || !previewDuration) return;
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const clickPos = (e.clientX - rect.left) / rect.width;
-                                  previewAudioRef.current.currentTime = clickPos * previewDuration;
-                                }}
-                                className="h-2 w-full bg-[#0B0E14] hover:bg-[#1A222D] rounded-full overflow-hidden cursor-pointer relative transition-colors"
-                              >
-                                <div
-                                  className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all"
-                                  style={{
-                                    width: `${previewDuration > 0 ? (previewCurrentTime / previewDuration) * 100 : 0}%`,
-                                  }}
-                                />
-                              </div>
-                              <div className="flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
-                                <span className="text-amber-400 font-medium">
-                                  {Math.floor(previewCurrentTime / 60)}:
-                                  {Math.floor(previewCurrentTime % 60)
-                                    .toString()
-                                    .padStart(2, '0')}
-                                </span>
-                                <span>
-                                  {previewDuration > 0
-                                    ? `${Math.floor(previewDuration / 60)}:${Math.floor(previewDuration % 60).toString().padStart(2, '0')}`
-                                    : `0:${recordingSeconds.toString().padStart(2, '0')}`}
-                                </span>
-                              </div>
-                            </div>
-
-                            <audio
-                              ref={previewAudioRef}
-                              src={recordedAudioUrl}
-                              onPlay={() => setIsPreviewPlaying(true)}
-                              onPause={() => setIsPreviewPlaying(false)}
-                              onEnded={() => {
-                                setIsPreviewPlaying(false);
-                                setPreviewCurrentTime(0);
-                              }}
-                              onTimeUpdate={(e) => {
-                                setPreviewCurrentTime(e.currentTarget.currentTime);
-                              }}
-                              onLoadedMetadata={(e) => {
-                                setPreviewDuration(e.currentTarget.duration);
-                              }}
-                              className="hidden"
-                            />
-                          </div>
+                      {!recordedAudioUrl && micDevices.length > 0 && (
+                        <div className="w-full flex items-center space-x-2">
+                          <label className="text-[10px] font-mono uppercase text-[#94A3B8] shrink-0">
+                            Mic Input:
+                          </label>
+                          <select
+                            value={selectedMicDeviceId}
+                            onChange={(e) => setSelectedMicDeviceId(e.target.value)}
+                            disabled={isRecording}
+                            className="flex-1 bg-[#121820] border border-[#242E3D] rounded-lg px-2.5 py-1 text-[11px] text-white font-mono focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                          >
+                            <option value="">System Default Microphone</option>
+                            {micDevices.map((d, idx) => (
+                              <option key={d.deviceId || `mic-${idx}`} value={d.deviceId}>
+                                {d.label || `Microphone ${idx + 1}`}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      ) : isRecording ? (
-                        <div className="flex flex-col items-center space-y-3 py-3">
+                      )}
+
+                      {isRecording ? (
+                        <div className="flex flex-col items-center space-y-3 py-2 w-full">
                           <div className="flex items-center space-x-2 text-rose-400 animate-pulse font-mono text-xs font-bold">
                             <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
                             <span>RECORDING: 00:{recordingSeconds.toString().padStart(2, '0')} / 00:20</span>
                           </div>
-                          <div className="flex items-center space-x-1.5 h-8">
-                            <span className="w-1.5 h-4 bg-amber-500 animate-pulse rounded-full" />
-                            <span className="w-1.5 h-7 bg-amber-400 animate-pulse delay-75 rounded-full" />
-                            <span className="w-1.5 h-5 bg-amber-500 animate-pulse delay-100 rounded-full" />
-                            <span className="w-1.5 h-8 bg-amber-400 animate-pulse delay-150 rounded-full" />
-                            <span className="w-1.5 h-4 bg-amber-500 animate-pulse delay-200 rounded-full" />
+                          {/* Live Web Audio VU Meter */}
+                          <div className="w-full max-w-xs space-y-1">
+                            <div className="h-2.5 w-full bg-[#121820] border border-[#242E3D] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-75 rounded-full ${
+                                  micLevel > 75
+                                    ? 'bg-rose-500'
+                                    : micLevel > 15
+                                    ? 'bg-emerald-400'
+                                    : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${Math.max(4, micLevel)}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
+                              <span>Live Input Level</span>
+                              <span>{micLevel}%</span>
+                            </div>
                           </div>
+                          {micSilentWarning && (
+                            <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5 font-mono text-center">
+                              No microphone audio detected yet — verify mic isn&apos;t muted or switch Mic Input above.
+                            </div>
+                          )}
                           <button
                             type="button"
                             onClick={stopRecording}
@@ -4253,8 +4340,8 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                             <span>Stop Recording</span>
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex flex-col items-center space-y-2 py-3">
+                      ) : !recordedAudioUrl ? (
+                        <div className="flex flex-col items-center space-y-2 py-2">
                           <button
                             type="button"
                             onClick={startRecording}
@@ -4268,6 +4355,21 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                               Speak clearly for 5 to 15 seconds to capture vocal timbre
                             </p>
                           </div>
+                        </div>
+                      ) : (
+                        <div className="w-full flex items-center justify-between text-xs text-[#94A3B8]">
+                          <span className="flex items-center space-x-1.5 text-emerald-400 font-mono">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Microphone Recording Ready ({recordingSeconds}s)</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={resetRecording}
+                            className="flex items-center space-x-1 text-xs text-[#94A3B8] hover:text-amber-400 transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Record Again</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -4320,6 +4422,154 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                         className="hidden"
                       />
                     </label>
+                  )}
+
+                  {/* Shared Audio Sample Preview Player (Works across Mic, Upload, URL & Quick Demo) */}
+                  {recordedAudioUrl && (
+                    <div className="mt-3 space-y-2 bg-[#121820] p-3 rounded-xl border border-[#242E3D]">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
+                        <span className="truncate text-emerald-400">
+                          Reference Preview{cloneFileName ? `: ${cloneFileName}` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={resetRecording}
+                          className="flex items-center space-x-1 text-[#94A3B8] hover:text-rose-300 shrink-0 ml-2"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Clear</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const audioEl = previewAudioRef.current;
+                            if (!audioEl) return;
+                            setPreviewError(null);
+                            if (isPreviewPlaying) {
+                              audioEl.pause();
+                              setIsPreviewPlaying(false);
+                            } else {
+                              if (
+                                audioEl.ended ||
+                                (Number.isFinite(audioEl.duration) &&
+                                  audioEl.duration > 0 &&
+                                  audioEl.currentTime >= audioEl.duration - 0.05)
+                              ) {
+                                audioEl.currentTime = 0;
+                              }
+                              audioEl
+                                .play()
+                                .then(() => setIsPreviewPlaying(true))
+                                .catch((err) => {
+                                  setIsPreviewPlaying(false);
+                                  setPreviewError(err?.message || 'Unable to play reference preview.');
+                                });
+                            }
+                          }}
+                          className="w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-400 text-black flex items-center justify-center transition-all shadow-md shadow-amber-500/20 shrink-0"
+                          title={isPreviewPlaying ? 'Pause preview' : 'Play audio preview'}
+                        >
+                          {isPreviewPlaying ? (
+                            <Pause className="w-4 h-4 fill-black" />
+                          ) : (
+                            <Play className="w-4 h-4 fill-black ml-0.5" />
+                          )}
+                        </button>
+
+                        <div className="flex-1 space-y-1">
+                          <div
+                            onClick={(e) => {
+                              const el = previewAudioRef.current;
+                              const dur =
+                                previewDuration > 0 && Number.isFinite(previewDuration)
+                                  ? previewDuration
+                                  : audioQuality?.durationSeconds || recordingSeconds || 0;
+                              if (!el || dur <= 0) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const clickPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                              el.currentTime = clickPos * dur;
+                              setPreviewCurrentTime(clickPos * dur);
+                            }}
+                            className="h-2 w-full bg-[#0B0E14] hover:bg-[#1A222D] rounded-full overflow-hidden cursor-pointer relative transition-colors"
+                          >
+                            <div
+                              className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all"
+                              style={{
+                                width: `${(() => {
+                                  const dur =
+                                    previewDuration > 0 && Number.isFinite(previewDuration)
+                                      ? previewDuration
+                                      : audioQuality?.durationSeconds || recordingSeconds || 0;
+                                  return dur > 0 ? Math.min(100, (previewCurrentTime / dur) * 100) : 0;
+                                })()}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
+                            <span className="text-amber-400 font-medium">
+                              {Math.floor(previewCurrentTime / 60)}:
+                              {Math.floor(previewCurrentTime % 60)
+                                .toString()
+                                .padStart(2, '0')}
+                            </span>
+                            <span>
+                              {(() => {
+                                const dur =
+                                  previewDuration > 0 && Number.isFinite(previewDuration)
+                                    ? previewDuration
+                                    : audioQuality?.durationSeconds || recordingSeconds || 0;
+                                return `${Math.floor(dur / 60)}:${Math.floor(dur % 60)
+                                  .toString()
+                                  .padStart(2, '0')}`;
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <audio
+                          ref={previewAudioRef}
+                          src={recordedAudioUrl}
+                          preload="metadata"
+                          onPlay={() => setIsPreviewPlaying(true)}
+                          onPause={() => setIsPreviewPlaying(false)}
+                          onEnded={() => {
+                            setIsPreviewPlaying(false);
+                            setPreviewCurrentTime(0);
+                          }}
+                          onTimeUpdate={(e) => {
+                            setPreviewCurrentTime(e.currentTarget.currentTime);
+                          }}
+                          onLoadedMetadata={(e) => {
+                            const d = e.currentTarget.duration;
+                            if (Number.isFinite(d) && d > 0) {
+                              setPreviewDuration(d);
+                            } else if (audioQuality?.durationSeconds) {
+                              setPreviewDuration(audioQuality.durationSeconds);
+                            }
+                          }}
+                          onDurationChange={(e) => {
+                            const d = e.currentTarget.duration;
+                            if (Number.isFinite(d) && d > 0) {
+                              setPreviewDuration(d);
+                            }
+                          }}
+                          onError={() => {
+                            setIsPreviewPlaying(false);
+                            setPreviewError('Browser could not decode this audio preview format.');
+                          }}
+                          className="hidden"
+                        />
+                      </div>
+
+                      {previewError && (
+                        <div className="text-[11px] text-rose-300 font-mono">
+                          {previewError}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Real-Time Audio Quality Diagnostics */}
@@ -4557,6 +4807,23 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                   <p className="text-[11px] text-[#64748B] font-mono mt-1.5 leading-relaxed">
                     Powered by OmniVoice & CosyVoice: supports zero-shot cross-lingual cloning across <span className="text-amber-400 font-semibold">646 languages</span> with 581,000+ hours of speech data.
                   </p>
+                  {!runtimeStatus?.neural_sidecar.running && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200 flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        Neural Sidecar (:9000) is offline — full 646-language OmniVoice &amp; Refinement Steps require starting the sidecar; standalone mode covers 130+ languages.
+                      </span>
+                      {runtimeStatus?.python_packages.omnivoice && (
+                        <button
+                          type="button"
+                          disabled={runtimeActionBusy !== null}
+                          onClick={() => handleStartSidecarQuick('omnivoice', 9000)}
+                          className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 font-mono text-[10px]"
+                        >
+                          {runtimeActionBusy === 'start-omnivoice' ? 'Starting...' : 'Start Sidecar'}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Studio Controls: Refinement & Precision Settings */}
@@ -4731,7 +4998,17 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isCloning || !cloneName || !cloneAudioBase64}
+                  disabled={
+                    isCloning ||
+                    !cloneName ||
+                    !cloneAudioBase64 ||
+                    Boolean(audioQuality?.isSilent || cloneAssessment?.is_silent)
+                  }
+                  title={
+                    audioQuality?.isSilent || cloneAssessment?.is_silent
+                      ? 'Reference clip is silent — record or upload audible speech first'
+                      : undefined
+                  }
                   className="flex items-center space-x-2 px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 active:scale-95"
                 >
                   {isCloning ? (

@@ -19,6 +19,7 @@ export interface AudioQualityAssessment {
   clarityRating: 'excellent' | 'good' | 'fair' | 'noisy';
   clarityMessage: string;
   clippingDetected: boolean;
+  isSilent?: boolean;
   sampleRate: number;
   channelCount: number;
 }
@@ -242,11 +243,13 @@ export class AudioProcessor {
     }
 
     const rms = Math.sqrt(sumSquares / Math.max(1, samples.length));
-    const peakDbfs = peak > 0 ? 20 * Math.log10(peak) : -96;
-    const rmsDbfs = rms > 0 ? 20 * Math.log10(rms) : -96;
+    // Floor subnormal filter residuals (e.g. 1e-34 after high-pass filter) to -96 dBFS
+    const peakDbfs = peak > 1e-5 ? Math.max(-96, 20 * Math.log10(peak)) : -96;
+    const rmsDbfs = rms > 1e-5 ? Math.max(-96, 20 * Math.log10(rms)) : -96;
+    const isSilent = peak <= 1e-4 || rms <= 3e-5;
 
     // Estimate noise floor from bottom 10th percentile
-    const snrEstimateDb = Math.max(10, Math.min(55, Math.round((peakDbfs - -50) * 1.2)));
+    const snrEstimateDb = isSilent ? 0 : Math.max(10, Math.min(55, Math.round((peakDbfs - -50) * 1.2)));
 
     // Duration score
     let durationQuality: 'optimal' | 'short' | 'long' = 'optimal';
@@ -263,7 +266,10 @@ export class AudioProcessor {
     let clarityRating: 'excellent' | 'good' | 'fair' | 'noisy' = 'excellent';
     let clarityMessage = 'Pristine, clean voice signal';
 
-    if (clipCount > 10) {
+    if (isSilent) {
+      clarityRating = 'noisy';
+      clarityMessage = 'Audio is completely silent or muted. Check microphone permissions, input device, or mute switch.';
+    } else if (clipCount > 10) {
       clarityRating = 'fair';
       clarityMessage = 'Digital clipping detected. Consider lowering mic input volume.';
     } else if (rmsDbfs < -35) {
@@ -290,6 +296,7 @@ export class AudioProcessor {
       clarityRating,
       clarityMessage,
       clippingDetected: clipCount > 5,
+      isSilent,
       sampleRate,
       channelCount: 1,
     };
