@@ -529,7 +529,7 @@ export function detectLanguage(text: string): DetectedLanguage {
       name: 'Punjabi (ਪੰਜਾਬੀ)',
       flag: '🇮🇳',
       isRomanizedDialect: false,
-      suggestedVoiceId: 'pa-IN-VaaniNeural',
+      suggestedVoiceId: 'hi-IN-SwaraNeural',
       confidence: Math.min(1.0, 0.7 + (gurmukhiChars / trimmed.length) * 0.3),
     };
   }
@@ -730,7 +730,7 @@ export function detectLanguage(text: string): DetectedLanguage {
       name: 'German (Deutsch)',
       flag: '🇩🇪',
       isRomanizedDialect: false,
-      suggestedVoiceId: 'de-DE-KatjaNeural',
+      suggestedVoiceId: 'de-DE-TanjaNeural',
       confidence: 0.85,
     };
   }

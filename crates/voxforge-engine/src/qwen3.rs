@@ -1898,7 +1898,7 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
     // ── English variants ──────────────────────────────────────────────────
     ("en-US", "en-US-GuyNeural", "en-US-AriaNeural"),
     ("en-GB", "en-GB-RyanNeural", "en-GB-SoniaNeural"),
-    ("en-AU", "en-AU-WilliamNeural", "en-AU-NatashaNeural"),
+    ("en-AU", "en-AU-WilliamMultilingualNeural", "en-AU-NatashaNeural"),
     ("en-CA", "en-CA-LiamNeural", "en-CA-ClaraNeural"),
     ("en-NZ", "en-NZ-MitchellNeural", "en-NZ-MollyNeural"),
     ("en-IN", "en-IN-PrabhatNeural", "en-IN-NeerjaNeural"),
@@ -1906,7 +1906,7 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
     ("en-ZA", "en-ZA-LukeNeural", "en-ZA-LeahNeural"),
     ("en-SG", "en-SG-WayneNeural", "en-SG-LunaNeural"),
     ("en-TZ", "en-TZ-ElimuNeural", "en-TZ-ImaniNeural"),
-    ("en-KE", "en-KE-AsilNeural", "en-KE-ChiamaNeural"),
+    ("en-KE", "en-KE-ChilembaNeural", "en-KE-AsiliaNeural"),
     ("en-NG", "en-NG-AbeoNeural", "en-NG-EzinneNeural"),
     ("en-PH", "en-PH-JamesNeural", "en-PH-RosaNeural"),
     ("en-HK", "en-HK-SamNeural", "en-HK-YanNeural"),
@@ -1932,7 +1932,7 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
     ("es-NI", "es-NI-FedericoNeural", "es-NI-YolandaNeural"),
     ("es-PA", "es-PA-RobertoNeural", "es-PA-MargaritaNeural"),
     ("es-DO", "es-DO-EmilioNeural", "es-DO-RamonaNeural"),
-    ("es-EC", "es-EC-AndresNeural", "es-EC-AndreaNeural"),
+    ("es-EC", "es-EC-LuisNeural", "es-EC-AndreaNeural"),
     ("es-GT", "es-GT-AndresNeural", "es-GT-MartaNeural"),
     ("es-HN", "es-HN-CarlosNeural", "es-HN-KarlaNeural"),
     ("es-SV", "es-SV-RodrigoNeural", "es-SV-LorenaNeural"),
@@ -1986,14 +1986,14 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
     ("sw-TZ", "sw-TZ-DaudiNeural", "sw-TZ-RehemaNeural"),
     ("am-ET", "am-ET-AmehaNeural", "am-ET-MekdesNeural"),
     ("so-SO", "so-SO-MuuseNeural", "so-SO-UbaxNeural"),
-    ("zu-ZA", "zu-ZA-ThandoNeural", "zu-ZA-ThandekileNeural"),
+    ("zu-ZA", "zu-ZA-ThembaNeural", "zu-ZA-ThandoNeural"),
     ("yo-NG", "yo-NG-IsiolaNeural", "yo-NG-EzinneNeural"),
     ("ig-NG", "ig-NG-EchewuNeural", "ig-NG-EzinneNeural"),
     ("ha-NG", "ha-NG-OmaruNeural", "ha-NG-HalimaNeural"),
     ("ps-AF", "ps-AF-GulNawazNeural", "ps-AF-LatifaNeural"),
     // ── Americas (additional) ─────────────────────────────────────────────
     ("gl-ES", "gl-ES-RoiNeural", "gl-ES-SabelaNeural"),
-    ("ca-ES", "ca-ES-EnricNeural", "ca-ES-AlbaNeural"),
+    ("ca-ES", "ca-ES-EnricNeural", "ca-ES-JoanaNeural"),
     ("eu-ES", "eu-ES-AitorNeural", "eu-ES-AinhoaNeural"),
     ("ht-HT", "ht-HT-RamaNeural", "ht-HT-KellyNeural"),
     ("qu-PE", "qu-PE-NinanNeural", "qu-PE-ChuraNeural"),
@@ -2213,6 +2213,13 @@ pub fn resolve_cross_lingual_base_voice(
     }
 
     let normalized = normalize_language_code(profile_lang);
+    let prefix = normalized.split('-').next().unwrap_or(&normalized);
+
+    // Edge-TTS Malayalam voices glitch badly on pure Latin/English text, so route
+    // Latin-only text targeted at a Malayalam profile through Indian-English voices.
+    if prefix.eq_ignore_ascii_case("ml") && text.chars().any(|c| c.is_ascii_alphabetic()) {
+        return pick("en-IN-PrabhatNeural", "en-IN-NeerjaNeural");
+    }
 
     // 2. Exact locale match (e.g. "en-GB", "fr-CA", "pt-BR", "pt-PT") — only reached for Latin/undetected scripts.
     for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
@@ -2222,7 +2229,6 @@ pub fn resolve_cross_lingual_base_voice(
     }
 
     // 3. Language-prefix match on normalized language code (e.g. "arb"->"ar" matches "ar-SA")
-    let prefix = normalized.split('-').next().unwrap_or(&normalized);
     for &(bcp47, male, female) in EDGE_TTS_LANG_TABLE {
         if bcp47.starts_with(prefix) && !prefix.is_empty() {
             return pick(male, female);
@@ -2413,6 +2419,30 @@ mod tests {
         assert!((nominal_base_voice_f0("ar-SA-HamedNeural") - 120.0).abs() < 1.0);
         assert!((nominal_base_voice_f0("ru-RU-DmitryNeural") - 120.0).abs() < 1.0);
         assert!((nominal_base_voice_f0("el-GR-NestorasNeural") - 120.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_resolve_cross_lingual_malayalam_profile_latin_text() {
+        assert_eq!(
+            resolve_cross_lingual_base_voice(
+                Some(&Gender::Male),
+                "What are you doing for me?",
+                "ml-IN"
+            ),
+            "en-IN-PrabhatNeural"
+        );
+        assert_eq!(
+            resolve_cross_lingual_base_voice(
+                Some(&Gender::Female),
+                "What are you doing for me?",
+                "ml-IN"
+            ),
+            "en-IN-NeerjaNeural"
+        );
+        assert_eq!(
+            resolve_cross_lingual_base_voice(Some(&Gender::Male), "നമസ്കാരം", "ml-IN"),
+            "ml-IN-MidhunNeural"
+        );
     }
 
     #[test]

@@ -152,6 +152,26 @@ fn validate_speech_request(
 /// Resolve engine + voice, honouring `SynthesisPolicy` when provided.
 /// When no policy is present the legacy `resolve_voice` → `model` fallback path
 /// is used unchanged, so all existing callers continue to work.
+/// Prevent Malayalam number-to-word expansion when synthesizing pure Latin/English sentences.
+fn effective_pronunciation_language<'a>(
+    text: &str,
+    requested_lang: Option<&'a str>,
+) -> Option<&'a str> {
+    if let Some(lang) = requested_lang {
+        let is_ml = lang.eq_ignore_ascii_case("ml")
+            || lang.to_ascii_lowercase().starts_with("ml-")
+            || lang.eq_ignore_ascii_case("mal");
+        if is_ml {
+            let has_ml = text.chars().any(|c| ('\u{0D00}'..='\u{0D7F}').contains(&c));
+            let has_latin = text.chars().any(|c| c.is_ascii_alphabetic());
+            if !has_ml && has_latin {
+                return Some("en-IN");
+            }
+        }
+    }
+    requested_lang
+}
+
 async fn resolve_engine_and_voice(
     state: &AppState,
     payload: &OpenAiSpeechRequest,
@@ -447,9 +467,10 @@ pub async fn synthesize_speech(
                 let mut channels = 1;
 
                 for chunk_text in chunks {
-                    let norm_lang = effective_lang
-                        .as_deref()
-                        .or(Some(profile.language.as_str()));
+                    let norm_lang = effective_pronunciation_language(
+                        &chunk_text,
+                        effective_lang.as_deref().or(Some(profile.language.as_str())),
+                    );
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
                         text: state
                             .pronunciation
@@ -577,10 +598,11 @@ pub async fn synthesize_speech(
                         .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
                         .or(Some(voice.language.as_str()));
                     for chunk_text in chunks {
+                        let synth_lang = effective_pronunciation_language(&chunk_text, eff_lang);
                         let synth_req = SynthesisRequest {
                             text: state
                                 .pronunciation
-                                .process_with_language(&chunk_text, eff_lang),
+                                .process_with_language(&chunk_text, synth_lang),
                             voice_id: voice.id.clone(),
                             speed: payload.speed,
                             pitch: payload.pitch.unwrap_or(0.0),
@@ -628,10 +650,11 @@ pub async fn synthesize_speech(
             .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
             .or(Some(voice.language.as_str()));
         for chunk_text in chunks {
+            let synth_lang = effective_pronunciation_language(&chunk_text, eff_lang);
             let synth_req = SynthesisRequest {
                 text: state
                     .pronunciation
-                    .process_with_language(&chunk_text, eff_lang),
+                    .process_with_language(&chunk_text, synth_lang),
                 voice_id: voice.id.clone(),
                 speed: payload.speed,
                 pitch: payload.pitch.unwrap_or(0.0),
@@ -702,10 +725,11 @@ pub async fn synthesize_speech_stream(
         .as_deref()
         .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
         .or(Some(voice.language.as_str()));
+    let synth_lang = effective_pronunciation_language(&payload.input, eff_lang);
     let synth_req = SynthesisRequest {
         text: state
             .pronunciation
-            .process_with_language(&payload.input, eff_lang),
+            .process_with_language(&payload.input, synth_lang),
         voice_id: voice.id,
         speed: payload.speed,
         pitch: payload.pitch.unwrap_or(0.0),
@@ -815,10 +839,11 @@ async fn handle_speech_socket(mut socket: WebSocket, state: AppState) {
                     .as_deref()
                     .filter(|s| !s.trim().is_empty() && !s.eq_ignore_ascii_case("AUTO"))
                     .or(Some(voice.language.as_str()));
+                let synth_lang = effective_pronunciation_language(&req.input, eff_lang);
                 let synth_req = SynthesisRequest {
                     text: state
                         .pronunciation
-                        .process_with_language(&req.input, eff_lang),
+                        .process_with_language(&req.input, synth_lang),
                     voice_id: voice.id,
                     speed: req.speed.clamp(0.25, 4.0),
                     pitch: req.pitch.unwrap_or(0.0).clamp(-50.0, 50.0),

@@ -3,6 +3,7 @@ pub mod client;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tracing::warn;
+use voxforge_audio::AudioMerger;
 use voxforge_core::error::{Result, VoxForgeError};
 use voxforge_core::models::{AudioChunk, Gender, Voice};
 
@@ -50,8 +51,9 @@ impl EdgeTtsEngine {
             format!("{}Hz", pitch_hz)
         };
 
-        let formatted_voice = format_edge_voice_name(&request.voice_id);
-        let xml_lang = extract_locale_from_voice_id(&request.voice_id);
+        let norm_voice = normalize_edge_voice_id(&request.voice_id);
+        let formatted_voice = format_edge_voice_name(&norm_voice);
+        let xml_lang = extract_locale_from_voice_id(&norm_voice);
 
         format!(
             r#"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{}'><voice name='{}'><prosody pitch='{}' rate='{}' volume='+0%'>{}</prosody></voice></speak>"#,
@@ -64,11 +66,105 @@ impl EdgeTtsEngine {
     }
 }
 
+/// Map retired or renamed Microsoft Edge-TTS voice identifiers to verified live equivalents.
+pub fn normalize_edge_voice_id(voice_id: &str) -> String {
+    match voice_id {
+        "de-DE-KatjaNeural" => "de-DE-TanjaNeural".to_string(),
+        "de-DE-ConradNeural" => "de-DE-ChristophNeural".to_string(),
+        "en-AU-WilliamNeural" => "en-AU-WilliamMultilingualNeural".to_string(),
+        "en-KE-AsilNeural" => "en-KE-ChilembaNeural".to_string(),
+        "en-KE-ChiamaNeural" => "en-KE-AsiliaNeural".to_string(),
+        "es-EC-AndresNeural" => "es-EC-LuisNeural".to_string(),
+        "ca-ES-AlbaNeural" => "ca-ES-JoanaNeural".to_string(),
+        "zu-ZA-ThandekileNeural" => "zu-ZA-ThembaNeural".to_string(),
+        // Edge-TTS does not publish pa-IN neural voices; fall back to closest Indic Hindi neural voices.
+        "pa-IN-VaaniNeural" => "hi-IN-SwaraNeural".to_string(),
+        "pa-IN-OjasNeural" => "hi-IN-MadhurNeural".to_string(),
+        other => other.to_string(),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ScriptRunKind {
+    Malayalam,
+    Latin,
+}
+
+fn is_malayalam_char(c: char) -> bool {
+    ('\u{0D00}'..='\u{0D7F}').contains(&c)
+}
+
+/// Segment text sent to a Malayalam Edge-TTS voice so Latin/English spans route to matching
+/// Indian-English voices (`en-IN-PrabhatNeural` / `en-IN-NeerjaExpressiveNeural`) instead of
+/// triggering Edge-TTS's Malayalam voice gibberish bug on Latin characters.
+pub fn segment_malayalam_latin_runs(voice_id: &str, text: &str) -> Vec<(String, String)> {
+    let norm_voice = normalize_edge_voice_id(voice_id);
+    let en_in_voice = match norm_voice.as_str() {
+        "ml-IN-MidhunNeural" => "en-IN-PrabhatNeural",
+        "ml-IN-SobhanaNeural" => "en-IN-NeerjaExpressiveNeural",
+        _ => return vec![(norm_voice, text.to_string())],
+    };
+
+    let has_ml = text.chars().any(is_malayalam_char);
+    let has_latin = text.chars().any(|c| c.is_ascii_alphabetic());
+
+    if !has_ml && has_latin {
+        return vec![(en_in_voice.to_string(), text.to_string())];
+    }
+    if !has_latin {
+        return vec![(norm_voice, text.to_string())];
+    }
+
+    // Mixed Malayalam + Latin text: group whitespace-delimited tokens into contiguous script runs.
+    let mut runs: Vec<(ScriptRunKind, String)> = Vec::new();
+    for token in text.split_whitespace() {
+        let token_kind = if token.chars().any(is_malayalam_char) {
+            Some(ScriptRunKind::Malayalam)
+        } else if token.chars().any(|c| c.is_ascii_alphabetic()) {
+            Some(ScriptRunKind::Latin)
+        } else {
+            None
+        };
+
+        let effective_kind = token_kind.unwrap_or_else(|| {
+            runs.last()
+                .map(|(k, _)| *k)
+                .unwrap_or(ScriptRunKind::Malayalam)
+        });
+
+        if let Some((last_kind, last_buf)) = runs.last_mut() {
+            if *last_kind == effective_kind {
+                if !last_buf.is_empty() {
+                    last_buf.push(' ');
+                }
+                last_buf.push_str(token);
+                continue;
+            }
+        }
+        runs.push((effective_kind, token.to_string()));
+    }
+
+    if runs.is_empty() {
+        return vec![(norm_voice, text.to_string())];
+    }
+
+    runs.into_iter()
+        .map(|(kind, chunk)| {
+            let v = match kind {
+                ScriptRunKind::Malayalam => norm_voice.clone(),
+                ScriptRunKind::Latin => en_in_voice.to_string(),
+            };
+            (v, chunk)
+        })
+        .collect()
+}
+
 pub fn format_edge_voice_name(voice_id: &str) -> String {
     if voice_id.starts_with("Microsoft Server Speech") {
         return voice_id.to_string();
     }
-    let parts: Vec<&str> = voice_id.split('-').collect();
+    let norm_voice = normalize_edge_voice_id(voice_id);
+    let parts: Vec<&str> = norm_voice.split('-').collect();
     if parts.len() >= 3 {
         let lang = parts[0];
         let region = parts[1];
@@ -78,7 +174,7 @@ pub fn format_edge_voice_name(voice_id: &str) -> String {
             lang, region, name
         )
     } else {
-        voice_id.to_string()
+        norm_voice
     }
 }
 
@@ -92,7 +188,8 @@ pub fn extract_locale_from_voice_id(voice_id: &str) -> String {
             }
         }
     }
-    let parts: Vec<&str> = voice_id.split('-').collect();
+    let norm_voice = normalize_edge_voice_id(voice_id);
+    let parts: Vec<&str> = norm_voice.split('-').collect();
     if parts.len() >= 2 && parts[0].len() >= 2 && parts[1].len() >= 2 {
         format!("{}-{}", parts[0], parts[1])
     } else {
@@ -136,6 +233,7 @@ impl TtsEngine for EdgeTtsEngine {
             languages: vec![
                 "en-US".to_string(),
                 "en-GB".to_string(),
+                "en-IN".to_string(),
                 "ml-IN".to_string(),
                 "hi-IN".to_string(),
                 "ta-IN".to_string(),
@@ -145,7 +243,6 @@ impl TtsEngine for EdgeTtsEngine {
                 "mr-IN".to_string(),
                 "gu-IN".to_string(),
                 "ur-IN".to_string(),
-                "pa-IN".to_string(),
                 "de-DE".to_string(),
                 "fr-FR".to_string(),
                 "es-ES".to_string(),
@@ -209,6 +306,34 @@ impl TtsEngine for EdgeTtsEngine {
                 sample_rate_hz: 24000,
                 tags: vec!["british".to_string(), "storytelling".to_string()],
                 description: Some("Polished British English male voice".to_string()),
+            },
+            Voice {
+                id: "en-IN-NeerjaExpressiveNeural".to_string(),
+                name: "Neerja (Indian English Neural)".to_string(),
+                engine_id: self.id().to_string(),
+                language: "en-IN".to_string(),
+                gender: Gender::Female,
+                sample_rate_hz: 24000,
+                tags: vec![
+                    "english".to_string(),
+                    "indian-english".to_string(),
+                    "expressive".to_string(),
+                ],
+                description: Some("Natural Indian-English expressive female voice".to_string()),
+            },
+            Voice {
+                id: "en-IN-PrabhatNeural".to_string(),
+                name: "Prabhat (Indian English Neural)".to_string(),
+                engine_id: self.id().to_string(),
+                language: "en-IN".to_string(),
+                gender: Gender::Male,
+                sample_rate_hz: 24000,
+                tags: vec![
+                    "english".to_string(),
+                    "indian-english".to_string(),
+                    "narration".to_string(),
+                ],
+                description: Some("Clear Indian-English male voice for narration and tech".to_string()),
             },
             // --- Indian Languages Neural Voices ---
             Voice {
@@ -408,30 +533,10 @@ impl TtsEngine for EdgeTtsEngine {
                 tags: vec!["urdu".to_string(), "narration".to_string()],
                 description: Some("Poetic and resonant Urdu male voice".to_string()),
             },
-            Voice {
-                id: "pa-IN-VaaniNeural".to_string(),
-                name: "Vaani (Neural - ਪੰਜਾਬੀ)".to_string(),
-                engine_id: self.id().to_string(),
-                language: "pa-IN".to_string(),
-                gender: Gender::Female,
-                sample_rate_hz: 24000,
-                tags: vec!["punjabi".to_string(), "energetic".to_string()],
-                description: Some("Lively Punjabi female voice".to_string()),
-            },
-            Voice {
-                id: "pa-IN-OjasNeural".to_string(),
-                name: "Ojas (Neural - ਪੰਜਾਬੀ)".to_string(),
-                engine_id: self.id().to_string(),
-                language: "pa-IN".to_string(),
-                gender: Gender::Male,
-                sample_rate_hz: 24000,
-                tags: vec!["punjabi".to_string(), "bold".to_string()],
-                description: Some("Bold, energetic Punjabi male voice".to_string()),
-            },
             // --- Global Languages ---
             Voice {
-                id: "de-DE-KatjaNeural".to_string(),
-                name: "Katja (Neural)".to_string(),
+                id: "de-DE-TanjaNeural".to_string(),
+                name: "Tanja (Neural)".to_string(),
                 engine_id: self.id().to_string(),
                 language: "de-DE".to_string(),
                 gender: Gender::Female,
@@ -483,10 +588,47 @@ impl TtsEngine for EdgeTtsEngine {
     }
 
     async fn synthesize(&self, request: &SynthesisRequest) -> Result<AudioChunk> {
-        let ssml = Self::build_ssml(request);
-        EdgeTtsClient::synthesize(request, &ssml)
-            .await
-            .map_err(|e| VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e)))
+        let runs = segment_malayalam_latin_runs(&request.voice_id, &request.text);
+        if runs.len() <= 1 {
+            let (seg_voice, seg_text) = runs
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| (normalize_edge_voice_id(&request.voice_id), request.text.clone()));
+            let mut seg_req = request.clone();
+            seg_req.voice_id = seg_voice;
+            seg_req.text = seg_text;
+            let ssml = Self::build_ssml(&seg_req);
+            return EdgeTtsClient::synthesize(&seg_req, &ssml)
+                .await
+                .map_err(|e| VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e)));
+        }
+
+        let mut segments: Vec<Vec<i16>> = Vec::with_capacity(runs.len());
+        let mut sample_rate = 24000u32;
+        let mut channels = 1u16;
+        for (seg_voice, seg_text) in runs {
+            let mut seg_req = request.clone();
+            seg_req.voice_id = seg_voice;
+            seg_req.text = seg_text;
+            let ssml = Self::build_ssml(&seg_req);
+            let chunk = EdgeTtsClient::synthesize(&seg_req, &ssml)
+                .await
+                .map_err(|e| VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e)))?;
+            sample_rate = chunk.sample_rate;
+            channels = chunk.channels;
+            if !chunk.pcm_data.is_empty() {
+                segments.push(chunk.pcm_data);
+            }
+        }
+
+        let refs: Vec<&[i16]> = segments.iter().map(|v| v.as_slice()).collect();
+        let joined = AudioMerger::silence_gap_join(&refs, sample_rate, 15, 35);
+        Ok(AudioChunk {
+            sample_rate,
+            channels,
+            pcm_data: joined,
+            is_final: true,
+        })
     }
 
     async fn synthesize_stream(
@@ -494,19 +636,33 @@ impl TtsEngine for EdgeTtsEngine {
         request: &SynthesisRequest,
     ) -> Result<mpsc::Receiver<Result<AudioChunk>>> {
         let (tx, rx) = mpsc::channel(16);
-        let ssml = Self::build_ssml(request);
         let request_clone = request.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = EdgeTtsClient::stream_synthesis(&request_clone, &ssml, tx.clone()).await
-            {
-                warn!("Live Edge-TTS streaming error: {}", e);
-                let _ = tx
-                    .send(Err(VoxForgeError::Engine(format!(
-                        "Edge-TTS neural streaming failed: {}",
-                        e
-                    ))))
-                    .await;
+            let engine = EdgeTtsEngine::new();
+            match engine.synthesize(&request_clone).await {
+                Ok(chunk) => {
+                    let chunk_size = 4800; // 200ms at 24kHz
+                    let mut offset = 0;
+                    let total = chunk.pcm_data.len();
+                    while offset < total {
+                        let end = (offset + chunk_size).min(total);
+                        let sub = AudioChunk {
+                            sample_rate: chunk.sample_rate,
+                            channels: chunk.channels,
+                            pcm_data: chunk.pcm_data[offset..end].to_vec(),
+                            is_final: end >= total,
+                        };
+                        if tx.send(Ok(sub)).await.is_err() {
+                            break;
+                        }
+                        offset = end;
+                    }
+                }
+                Err(e) => {
+                    warn!("Live Edge-TTS streaming error: {}", e);
+                    let _ = tx.send(Err(e)).await;
+                }
             }
         });
 
@@ -515,5 +671,52 @@ impl TtsEngine for EdgeTtsEngine {
 
     async fn health_check(&self) -> Result<bool> {
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_retired_edge_voice_ids() {
+        assert_eq!(normalize_edge_voice_id("de-DE-KatjaNeural"), "de-DE-TanjaNeural");
+        assert_eq!(normalize_edge_voice_id("de-DE-ConradNeural"), "de-DE-ChristophNeural");
+        assert_eq!(normalize_edge_voice_id("en-AU-WilliamNeural"), "en-AU-WilliamMultilingualNeural");
+        assert_eq!(normalize_edge_voice_id("pa-IN-VaaniNeural"), "hi-IN-SwaraNeural");
+        assert_eq!(normalize_edge_voice_id("en-US-AriaNeural"), "en-US-AriaNeural");
+    }
+
+    #[test]
+    fn test_segment_malayalam_latin_runs() {
+        let en_midhun = segment_malayalam_latin_runs("ml-IN-MidhunNeural", "What are you doing for me?");
+        assert_eq!(
+            en_midhun,
+            vec![("en-IN-PrabhatNeural".to_string(), "What are you doing for me?".to_string())]
+        );
+
+        let en_sobhana = segment_malayalam_latin_runs("ml-IN-SobhanaNeural", "Hello world");
+        assert_eq!(
+            en_sobhana,
+            vec![("en-IN-NeerjaExpressiveNeural".to_string(), "Hello world".to_string())]
+        );
+
+        let ml_native = segment_malayalam_latin_runs("ml-IN-SobhanaNeural", "നമസ്കാരം സുഖമാണോ");
+        assert_eq!(
+            ml_native,
+            vec![("ml-IN-SobhanaNeural".to_string(), "നമസ്കാരം സുഖമാണോ".to_string())]
+        );
+
+        let mixed = segment_malayalam_latin_runs("ml-IN-MidhunNeural", "ഇന്ന് weather വളരെ cold ആണ്");
+        assert_eq!(
+            mixed,
+            vec![
+                ("ml-IN-MidhunNeural".to_string(), "ഇന്ന്".to_string()),
+                ("en-IN-PrabhatNeural".to_string(), "weather".to_string()),
+                ("ml-IN-MidhunNeural".to_string(), "വളരെ".to_string()),
+                ("en-IN-PrabhatNeural".to_string(), "cold".to_string()),
+                ("ml-IN-MidhunNeural".to_string(), "ആണ്".to_string()),
+            ]
+        );
     }
 }

@@ -2440,6 +2440,38 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
               </div>
             )}
 
+            {/* Malayalam Voice + English Text Routing Notice */}
+            {!detectedLang.isRomanizedDialect &&
+              (selectedVoice?.id.startsWith('ml-IN-') ||
+                (selectedVoice?.language || '').toLowerCase().startsWith('ml')) &&
+              /[A-Za-z]/.test(text) &&
+              !/[\u0D00-\u0D7F]/.test(text) && (
+                <div className="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-200 text-[11px] flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Malayalam neural voices glitch on plain English characters — English segments automatically route via Indian-English prosody, or switch to a native Indian-English voice.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetId =
+                        selectedVoice?.gender === 'male'
+                          ? 'en-IN-PrabhatNeural'
+                          : 'en-IN-NeerjaExpressiveNeural';
+                      const match =
+                        localVoices.find((v) => v.id === targetId) ||
+                        localVoices.find((v) => v.id === 'en-US-AriaNeural');
+                      if (match) {
+                        manualVoiceOverrideRef.current = true;
+                        setSelectedVoiceId(match.id);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-100 border border-sky-400/40 font-semibold transition-colors"
+                  >
+                    Switch to Indian English
+                  </button>
+                </div>
+              )}
+
             {/* Transliteration Toast Alert */}
             {transliterateToast && (
               <div className="p-2 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center space-x-2 animate-in fade-in duration-100">

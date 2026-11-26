@@ -164,7 +164,7 @@ export const MULTILINGUAL_SLANG_PRESETS: SlangPreset[] = [
     title: 'German Colloquial Dialogue',
     description: 'Authentic German conversational style without stiff bureaucratic phrasing.',
     sampleText: "Na alter, das ist echt krass! Alles klar, kein Ding. Lass uns mal kurz reinhören und dann geht's direkt los.",
-    recommendedVoice: 'de-DE-KatjaNeural',
+    recommendedVoice: 'de-DE-TanjaNeural',
     speed: 1.03,
     pitch: 0.0,
     cadenceHints: 'Conversational contractions (mach es -> mach\'s), punchy consonants',
