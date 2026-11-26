@@ -8,6 +8,7 @@ import {
   HardwareInfo,
   PipelineDefinition,
   RefineVoicePayload,
+  RuntimeStatusResponse,
   SystemUpdateApplyResult,
   SystemUpdateInfo,
   Voice,
@@ -658,6 +659,48 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Server restart failed' }));
       throw new Error(err.detail || 'Server restart failed');
+    }
+    return res.json();
+  },
+
+  async getRuntimeStatus(): Promise<RuntimeStatusResponse> {
+    const res = await fetch(`${BASE_URL}/v1/system/runtimes`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed querying host runtimes' }));
+      throw new Error(err.detail || 'Failed querying host runtimes');
+    }
+    return res.json();
+  },
+
+  async startSidecar(
+    backend: 'auto' | 'omnivoice' | 'cosyvoice' | 'f5tts' | 'kokoro' = 'auto',
+    port?: number
+  ): Promise<{ status: string; backend: string; port: number; url: string; message: string }> {
+    const res = await fetch(`${BASE_URL}/v1/system/sidecar/start`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ backend, port }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Failed starting neural sidecar' }));
+      throw new Error(err.detail || 'Failed starting neural sidecar');
+    }
+    return res.json();
+  },
+
+  async installRuntimePackage(
+    pkg: 'kokoro' | 'piper' | 'whisper'
+  ): Promise<{ status: string; package: string; installed_specs: string[]; message: string }> {
+    const res = await fetch(`${BASE_URL}/v1/system/runtimes/install`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ package: pkg }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `Failed installing ${pkg} runtime` }));
+      throw new Error(err.detail || `Failed installing ${pkg} runtime`);
     }
     return res.json();
   },

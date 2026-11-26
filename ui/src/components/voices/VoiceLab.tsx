@@ -36,7 +36,7 @@ import {
   ShieldCheck,
   Gauge,
 } from 'lucide-react';
-import { Voice } from '../../types';
+import { RuntimeStatusResponse, Voice } from '../../types';
 import { api, isAbortError } from '../../services/api';
 import { AudioVisualizer } from '../common/AudioVisualizer';
 import { PronunciationModal } from './PronunciationModal';
@@ -90,10 +90,17 @@ interface VoiceLabProps {
   voices: Voice[];
   onVoiceCreated?: (voice: Voice) => void;
   onVoiceDeleted?: (voiceId: string) => void;
+  onNavigateTab?: (tab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
   initialText?: string;
 }
 
-export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVoiceDeleted, initialText }) => {
+export const VoiceLab: React.FC<VoiceLabProps> = ({
+  voices,
+  onVoiceCreated,
+  onVoiceDeleted,
+  onNavigateTab,
+  initialText,
+}) => {
   const [localVoices, setLocalVoices] = useState<Voice[]>(voices);
   useEffect(() => {
     setLocalVoices(voices);
@@ -141,23 +148,74 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
   const stsAbortRef = useRef<AbortController | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [sidecarStatus, setSidecarStatus] = useState<{ running: boolean; url?: string } | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatusResponse | null>(null);
+  const [runtimeActionBusy, setRuntimeActionBusy] = useState<string | null>(null);
+  const [runtimeActionInfo, setRuntimeActionInfo] = useState<string | null>(null);
+
+  const refreshRuntimeStatus = async () => {
+    try {
+      const [h, rt] = await Promise.all([api.getHealth(), api.getRuntimeStatus()]);
+      if (h.neural_sidecar) {
+        setSidecarStatus(h.neural_sidecar);
+      }
+      setRuntimeStatus(rt);
+    } catch {
+      // Non-fatal in offline mode
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    api
-      .getHealth()
-      .then((h) => {
-        if (active && h.neural_sidecar) {
-          setSidecarStatus(h.neural_sidecar);
-        }
-      })
-      .catch(() => {});
+    refreshRuntimeStatus();
     return () => {
-      active = false;
       synthAbortRef.current?.abort();
       stsAbortRef.current?.abort();
     };
   }, []);
+
+  const handleStartSidecarQuick = async (backend: 'auto' | 'omnivoice' | 'kokoro', port: number) => {
+    setRuntimeActionBusy(`start-${backend}`);
+    setRuntimeActionInfo(null);
+    setSynthError(null);
+    try {
+      const res = await api.startSidecar(backend, port);
+      setRuntimeActionInfo(res.message);
+      setTimeout(refreshRuntimeStatus, 1200);
+    } catch (err: any) {
+      setSynthError(err?.message || `Failed to start ${backend} sidecar`);
+    } finally {
+      setRuntimeActionBusy(null);
+    }
+  };
+
+  const handleInstallRuntimeQuick = async (pkg: 'kokoro' | 'piper' | 'whisper') => {
+    setRuntimeActionBusy(`install-${pkg}`);
+    setRuntimeActionInfo(null);
+    setSynthError(null);
+    try {
+      const res = await api.installRuntimePackage(pkg);
+      setRuntimeActionInfo(res.message);
+      await refreshRuntimeStatus();
+    } catch (err: any) {
+      setSynthError(err?.message || `Failed to install ${pkg} runtime`);
+    } finally {
+      setRuntimeActionBusy(null);
+    }
+  };
+
+  const handleInstallModelQuick = async (modelId: string) => {
+    setRuntimeActionBusy(`model-${modelId}`);
+    setRuntimeActionInfo(null);
+    setSynthError(null);
+    try {
+      await api.installModel(modelId);
+      setRuntimeActionInfo(`Downloaded '${modelId}' weights cleanly.`);
+      await refreshRuntimeStatus();
+    } catch (err: any) {
+      setSynthError(err?.message || `Failed to download '${modelId}'`);
+    } finally {
+      setRuntimeActionBusy(null);
+    }
+  };
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1620,7 +1678,13 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       case 'piper-tts':
         return (
           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            LOCAL NEURAL
+            PIPER ONNX
+          </span>
+        );
+      case 'kokoro':
+        return (
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+            KOKORO 82M
           </span>
         );
       case 'openai-router':
@@ -1639,7 +1703,7 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
       default:
         return (
           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400 border border-slate-500/20">
-            MOCK HARNESS
+            TEST TONE
           </span>
         );
     }
@@ -2012,20 +2076,34 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             <div className="hidden sm:flex items-center space-x-2 pr-2 text-[11px] font-mono text-[#64748B]">
               <span
                 className={`w-2 h-2 rounded-full animate-pulse ${
-                  sidecarStatus?.running ? 'bg-emerald-400' : 'bg-amber-400'
+                  runtimeStatus?.neural_sidecar.running || sidecarStatus?.running
+                    ? 'bg-emerald-400'
+                    : 'bg-amber-400'
                 }`}
               />
               <span
                 title={
-                  sidecarStatus?.running
-                    ? `Local neural sidecar connected at ${sidecarStatus.url}`
-                    : 'Running standalone Rust engine. Launch scripts/start-sidecar.bat (OmniVoice) on port 9000 for 646-lang zero-shot neural cloning.'
+                  runtimeStatus?.neural_sidecar.running || sidecarStatus?.running
+                    ? `Local neural sidecar connected at ${runtimeStatus?.neural_sidecar.url || sidecarStatus?.url}`
+                    : 'Running standalone Rust engine. Start local Neural Sidecar for OmniVoice 646-lang cloning & Whisper ASR.'
                 }
               >
-                {sidecarStatus?.running
-                  ? 'Neural Sidecar Connected (:9000)'
-                  : 'VoxForge AI Studio Online'}
+                {runtimeStatus?.neural_sidecar.running || sidecarStatus?.running
+                  ? 'Neural Sidecar Live (:9000)'
+                  : 'Standalone Rust Engine'}
               </span>
+              {!runtimeStatus?.neural_sidecar.running &&
+                !sidecarStatus?.running &&
+                runtimeStatus?.python_packages.omnivoice && (
+                  <button
+                    type="button"
+                    disabled={runtimeActionBusy !== null}
+                    onClick={() => handleStartSidecarQuick('omnivoice', 9000)}
+                    className="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-[10px] transition-colors"
+                  >
+                    {runtimeActionBusy === 'start-omnivoice' ? 'Starting...' : 'Start Sidecar'}
+                  </button>
+                )}
             </div>
           </div>
 
@@ -2238,16 +2316,141 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
             </div>
           )}
 
+          {runtimeActionInfo && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+              <span>{runtimeActionInfo}</span>
+              <button
+                type="button"
+                onClick={() => setRuntimeActionInfo(null)}
+                className="text-emerald-400 hover:text-white p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Contextual Engine Diagnostics & Actions */}
-          {selectedVoice?.engine_id === 'piper-tts' && (
-            <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-start space-x-3 text-xs">
-              <Layers className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-semibold text-amber-300">Piper Neural Voice Engine (Local ONNX)</div>
-                <p className="text-[#94A3B8] text-[11px] mt-0.5">
-                  Generates natural speech 100% offline. Ensure <strong>piper-en-lessac-medium</strong> weights are downloaded from the <strong>Model Catalog</strong> tab to enable local neural synthesis.
-                </p>
+          {selectedVoice?.engine_id === 'piper-tts' && (() => {
+            const voiceId = selectedVoice.id;
+            const catalogModelId = voiceId === 'en_US-lessac-medium' ? 'piper-en-lessac-medium' : voiceId;
+            const modelInstalled = Boolean(
+              runtimeStatus?.installed_model_files.some(
+                (f) => f === `${voiceId}.onnx` || f === `${catalogModelId}.onnx` || f === `piper-${voiceId}.onnx`
+              )
+            );
+            const cliReady = Boolean(runtimeStatus?.piper_cli_available);
+            return (
+              <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-start space-x-3">
+                  <Layers className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-amber-300">
+                      Piper ONNX Local Engine — {cliReady && modelInstalled ? 'Ready Offline' : 'Setup Required'}
+                    </div>
+                    <p className="text-[#94A3B8] text-[11px] mt-0.5">
+                      {!cliReady && !modelInstalled
+                        ? `Requires Piper CLI runtime and '${catalogModelId}' weights.`
+                        : !cliReady
+                        ? `Voice weights found, but Piper CLI runtime is not installed on this machine.`
+                        : !modelInstalled
+                        ? `Requires '${catalogModelId}' ONNX weights to synthesize speech locally.`
+                        : `Local Piper binary and '${catalogModelId}' weights detected cleanly.`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  {!cliReady && runtimeStatus?.python_available && (
+                    <button
+                      type="button"
+                      disabled={runtimeActionBusy !== null}
+                      onClick={() => handleInstallRuntimeQuick('piper')}
+                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-semibold text-[11px] transition-colors"
+                    >
+                      {runtimeActionBusy === 'install-piper' ? 'Installing CLI...' : 'Install Piper CLI'}
+                    </button>
+                  )}
+                  {!modelInstalled && (
+                    <button
+                      type="button"
+                      disabled={runtimeActionBusy !== null}
+                      onClick={() => handleInstallModelQuick(catalogModelId)}
+                      className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-semibold text-[11px] transition-colors"
+                    >
+                      {runtimeActionBusy === `model-${catalogModelId}` ? 'Downloading...' : `Download ${voiceId}`}
+                    </button>
+                  )}
+                  {onNavigateTab && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateTab('catalog')}
+                      className="px-2.5 py-1 rounded bg-[#1A222D] hover:bg-[#242E3D] text-white border border-[#242E3D] text-[11px]"
+                    >
+                      Model Catalog
+                    </button>
+                  )}
+                </div>
               </div>
+            );
+          })()}
+
+          {selectedVoice?.engine_id === 'kokoro' && (
+            <div
+              className={`p-3.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                runtimeStatus?.kokoro_sidecar.running
+                  ? 'bg-emerald-500/10 border-emerald-500/25'
+                  : 'bg-indigo-500/10 border-indigo-500/30'
+              }`}
+            >
+              <div className="flex items-start space-x-3">
+                <Layers className="w-4 h-4 text-indigo-300 flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-indigo-200">
+                    Kokoro-82M Neural Engine —{' '}
+                    {runtimeStatus?.kokoro_sidecar.running ? 'Sidecar Running (:8880)' : 'Local Runtime Required'}
+                  </div>
+                  <p className="text-[#94A3B8] text-[11px] mt-0.5">
+                    {runtimeStatus?.kokoro_sidecar.running
+                      ? 'Connected to Kokoro inference server at http://127.0.0.1:8880.'
+                      : 'Kokoro voices require the Kokoro Python package & sidecar server on port 8880 (no silent mock beep fallback).'}
+                  </p>
+                </div>
+              </div>
+              {!runtimeStatus?.kokoro_sidecar.running && (
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
+                  {runtimeStatus?.python_packages.kokoro ? (
+                    <button
+                      type="button"
+                      disabled={runtimeActionBusy !== null}
+                      onClick={() => handleStartSidecarQuick('kokoro', 8880)}
+                      className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[11px] transition-colors"
+                    >
+                      {runtimeActionBusy === 'start-kokoro' ? 'Starting...' : 'Start Kokoro Sidecar'}
+                    </button>
+                  ) : runtimeStatus?.python_available && (
+                    <button
+                      type="button"
+                      disabled={runtimeActionBusy !== null}
+                      onClick={() => handleInstallRuntimeQuick('kokoro')}
+                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-semibold text-[11px] transition-colors"
+                    >
+                      {runtimeActionBusy === 'install-kokoro' ? 'Installing...' : 'Install Kokoro Runtime'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const aria = localVoices.find((v) => v.id === 'en-US-AriaNeural');
+                      if (aria) {
+                        manualVoiceOverrideRef.current = true;
+                        setSelectedVoiceId(aria.id);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded bg-[#1A222D] hover:bg-[#242E3D] text-white border border-[#242E3D] text-[11px]"
+                  >
+                    Switch to Aria (Edge-TTS)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -2354,11 +2557,26 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
           )}
 
           {selectedVoice?.engine_id === 'mock-tts' && (
-            <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700 flex items-center space-x-2 text-xs text-[#94A3B8]">
-              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>
-                <strong>Synthetic Test Harness:</strong> Generates mathematical harmonic tones for buffer and latency testing. Use <strong>Edge-TTS</strong> for human speech.
-              </span>
+            <div className="p-3 rounded-lg bg-slate-800/60 border border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs text-[#94A3B8]">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>
+                  <strong>Calibration Test Tone Generator:</strong> Emits a 440 Hz mathematical sine tone for latency/DSP testing (not human speech).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const aria = localVoices.find((v) => v.id === 'en-US-AriaNeural');
+                  if (aria) {
+                    manualVoiceOverrideRef.current = true;
+                    setSelectedVoiceId(aria.id);
+                  }
+                }}
+                className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[11px] font-semibold"
+              >
+                Switch to Human Voice (Aria)
+              </button>
             </div>
           )}
 
@@ -4239,20 +4457,33 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
                         <span className="text-[#64748B] lowercase font-normal">(recommended for highest fidelity)</span>
                       )}
                     </label>
-                    <button
-                      type="button"
-                      onClick={handleServerTranscribeClone}
-                      disabled={!cloneAudioBase64 || isServerTranscribing}
-                      className="flex items-center space-x-1 px-2 py-0.5 rounded bg-[#121820] hover:bg-[#1E293B] border border-[#242E3D] hover:border-amber-500/50 text-[10px] font-mono text-amber-300 disabled:opacity-40 transition-colors"
-                      title="Transcribe reference audio via backend Whisper sidecar"
-                    >
-                      {isServerTranscribing ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Wand2 className="w-3 h-3" />
+                    <div className="flex items-center space-x-2">
+                      {!runtimeStatus?.neural_sidecar.running && runtimeStatus?.python_packages.omnivoice && (
+                        <button
+                          type="button"
+                          disabled={runtimeActionBusy !== null}
+                          onClick={() => handleStartSidecarQuick('omnivoice', 9000)}
+                          className="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 transition-colors"
+                          title="Start local OmniVoice/Whisper sidecar (:9000) for real Whisper transcription"
+                        >
+                          {runtimeActionBusy === 'start-omnivoice' ? 'Starting Sidecar...' : 'Start Whisper Sidecar'}
+                        </button>
                       )}
-                      <span>{isServerTranscribing ? 'Transcribing...' : 'Auto-Transcribe Clip'}</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={handleServerTranscribeClone}
+                        disabled={!cloneAudioBase64 || isServerTranscribing}
+                        className="flex items-center space-x-1 px-2 py-0.5 rounded bg-[#121820] hover:bg-[#1E293B] border border-[#242E3D] hover:border-amber-500/50 text-[10px] font-mono text-amber-300 disabled:opacity-40 transition-colors"
+                        title="Transcribe reference audio via backend Whisper sidecar"
+                      >
+                        {isServerTranscribing ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Wand2 className="w-3 h-3" />
+                        )}
+                        <span>{isServerTranscribing ? 'Transcribing...' : 'Auto-Transcribe Clip'}</span>
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     id="vox-clone-transcript"

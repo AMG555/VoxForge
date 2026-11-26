@@ -92,7 +92,11 @@ mod tests {
 
         let store = Arc::new(MemoryStore::new());
         let hardware = HardwareProbe::probe();
-        AppState::new(registry, store, hardware, api_key)
+        let catalog = Arc::new(
+            voxforge_catalog::ModelCatalogStore::with_curated_models()
+                .with_simulated_downloads(true),
+        );
+        AppState::new(registry, store, hardware, api_key).with_model_catalog(catalog)
     }
 
     #[tokio::test]

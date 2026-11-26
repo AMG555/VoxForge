@@ -284,6 +284,7 @@ export const App: React.FC = () => {
             voices={voices}
             onVoiceCreated={handleVoiceCreated}
             onVoiceDeleted={handleVoiceDeleted}
+            onNavigateTab={setActiveTab}
             initialText={voiceLabInitialText}
           />
         )}

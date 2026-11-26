@@ -1,10 +1,23 @@
-import React from 'react';
-import { Cpu, Server, Zap, CheckCircle2, Activity, ShieldCheck, ArrowUpCircle } from 'lucide-react';
-import { HardwareInfo, SystemUpdateInfo } from '../../types';
+import React, { useEffect, useState } from 'react';
+import {
+  Cpu,
+  Server,
+  Zap,
+  CheckCircle2,
+  Activity,
+  ShieldCheck,
+  ArrowUpCircle,
+  Loader2,
+  Play,
+  Download,
+  AlertTriangle,
+} from 'lucide-react';
+import { HardwareInfo, RuntimeStatusResponse, SystemUpdateInfo } from '../../types';
+import { api } from '../../services/api';
 
 interface HardwareInspectorProps {
   hardware: HardwareInfo | null;
-  onNavigateTab?: (tab: 'canvas' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
+  onNavigateTab?: (tab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
   updateInfo?: SystemUpdateInfo | null;
   onOpenUpdates?: () => void;
 }
@@ -49,6 +62,21 @@ const ENGINE_DESCRIPTORS: Record<string, EngineDescriptor> = {
     },
     action: {
       label: 'Manage in Catalog',
+      tab: 'catalog',
+    },
+  },
+  kokoro: {
+    name: 'Kokoro-82M Neural Engine',
+    category: 'Local ONNX / Python Sidecar',
+    description: '82M-parameter natural voice engine (af_heart, af_bella, etc.). Requires local Kokoro sidecar running on port 8880.',
+    statusBadge: {
+      label: 'SIDECAR REQUIRED',
+      bg: 'bg-amber-500/10',
+      text: 'text-amber-400',
+      border: 'border-amber-500/30',
+    },
+    action: {
+      label: 'Open Catalog',
       tab: 'catalog',
     },
   },
@@ -97,13 +125,63 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
   updateInfo,
   onOpenUpdates,
 }) => {
+  const [runtimes, setRuntimes] = useState<RuntimeStatusResponse | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const refreshRuntimes = async () => {
+    try {
+      const data = await api.getRuntimeStatus();
+      setRuntimes(data);
+    } catch {
+      // Non-fatal in offline dev
+    }
+  };
+
+  useEffect(() => {
+    refreshRuntimes();
+  }, []);
+
+  const handleStartSidecar = async (backend: 'auto' | 'omnivoice' | 'kokoro', port: number) => {
+    setBusyAction(`start-${backend}`);
+    setActionNotice(null);
+    try {
+      const res = await api.startSidecar(backend, port);
+      setActionNotice({ text: res.message });
+      setTimeout(refreshRuntimes, 1200);
+    } catch (err: any) {
+      setActionNotice({ text: err?.message || 'Failed starting sidecar', isError: true });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleInstallRuntime = async (pkg: 'kokoro' | 'piper' | 'whisper') => {
+    setBusyAction(`install-${pkg}`);
+    setActionNotice(null);
+    try {
+      const res = await api.installRuntimePackage(pkg);
+      setActionNotice({ text: res.message });
+      await refreshRuntimes();
+    } catch (err: any) {
+      setActionNotice({ text: err?.message || `Failed installing ${pkg}`, isError: true });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   const registeredEngines = hardware?.registered_engines || [
     'edge-tts',
+    'kokoro',
     'piper-tts',
     'openai-router',
     'qwen3-tts',
     'mock-tts',
   ];
+
+  const hasAnyPiperWeights = Boolean(
+    runtimes?.installed_model_files.some((f) => f.endsWith('.onnx') && !f.includes('whisper') && !f.includes('silero'))
+  );
 
   return (
     <div className="flex-1 p-6 lg:p-8 pb-36 overflow-y-auto bg-[#0B0E14] space-y-6">
@@ -166,7 +244,7 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
 
           <div className="divide-y divide-[#242E3D]">
             {registeredEngines.map((engineId) => {
-              const desc = ENGINE_DESCRIPTORS[engineId] || {
+              const baseDesc = ENGINE_DESCRIPTORS[engineId] || {
                 name: engineId,
                 category: 'Synthesis Engine',
                 description: 'Speech generation engine registered in kernel.',
@@ -178,42 +256,120 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
                 },
               };
 
+              let statusBadge = baseDesc.statusBadge;
+              let isReady = true;
+              if (engineId === 'kokoro' && runtimes) {
+                isReady = runtimes.kokoro_sidecar.running;
+                statusBadge = isReady
+                  ? { label: 'SIDECAR LIVE (:8880)', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' }
+                  : runtimes.python_packages.kokoro
+                  ? { label: 'INSTALLED (STOPPED)', bg: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/30' }
+                  : { label: 'NOT INSTALLED', bg: 'bg-red-500/10', text: 'text-red-300', border: 'border-red-500/30' };
+              } else if (engineId === 'piper-tts' && runtimes) {
+                isReady = runtimes.piper_cli_available && hasAnyPiperWeights;
+                statusBadge = isReady
+                  ? { label: 'RUNTIME & MODEL READY', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' }
+                  : !runtimes.piper_cli_available
+                  ? { label: 'PIPER CLI MISSING', bg: 'bg-red-500/10', text: 'text-red-300', border: 'border-red-500/30' }
+                  : { label: 'WEIGHTS MISSING', bg: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/30' };
+              } else if (engineId === 'qwen3-tts' && runtimes) {
+                statusBadge = runtimes.neural_sidecar.running
+                  ? { label: 'NEURAL SIDECAR LIVE (:9000)', bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30' }
+                  : runtimes.python_packages.omnivoice
+                  ? { label: 'OMNIVOICE READY (STOPPED)', bg: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/30' }
+                  : { label: 'CROSS-LINGUAL MODE', bg: 'bg-purple-500/10', text: 'text-purple-300', border: 'border-purple-500/30' };
+              }
+
               return (
                 <div key={engineId} className="px-4 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-[#1A222D]/40 transition-colors">
                   <div className="flex items-start space-x-3 min-w-0">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    {isReady ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                    )}
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-mono font-bold text-white">{desc.name}</span>
+                        <span className="text-xs font-mono font-bold text-white">{baseDesc.name}</span>
                         <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#0B0E14] text-[#94A3B8] border border-[#242E3D]">
                           {engineId}
                         </span>
                       </div>
                       <p className="text-[11px] text-[#94A3B8] mt-1 leading-relaxed">
-                        {desc.description}
+                        {baseDesc.description}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 flex-shrink-0 self-start md:self-auto">
-                    {desc.action && onNavigateTab && (
+                  <div className="flex items-center flex-wrap gap-2 flex-shrink-0 self-start md:self-auto">
+                    {engineId === 'kokoro' && runtimes && !runtimes.kokoro_sidecar.running && (
+                      runtimes.python_packages.kokoro ? (
+                        <button
+                          type="button"
+                          disabled={busyAction !== null}
+                          onClick={() => handleStartSidecar('kokoro', 8880)}
+                          className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40"
+                        >
+                          {busyAction === 'start-kokoro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                          <span>Start Kokoro</span>
+                        </button>
+                      ) : runtimes.python_available && (
+                        <button
+                          type="button"
+                          disabled={busyAction !== null}
+                          onClick={() => handleInstallRuntime('kokoro')}
+                          className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                        >
+                          {busyAction === 'install-kokoro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                          <span>Install Kokoro</span>
+                        </button>
+                      )
+                    )}
+                    {engineId === 'piper-tts' && runtimes && !runtimes.piper_cli_available && runtimes.python_available && (
                       <button
-                        onClick={() => onNavigateTab(desc.action!.tab)}
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={() => handleInstallRuntime('piper')}
+                        className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                      >
+                        {busyAction === 'install-piper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        <span>Install Piper CLI</span>
+                      </button>
+                    )}
+                    {engineId === 'qwen3-tts' && runtimes && !runtimes.neural_sidecar.running && runtimes.python_packages.omnivoice && (
+                      <button
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={() => handleStartSidecar('omnivoice', 9000)}
+                        className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-purple-500/15 hover:bg-purple-500/25 text-purple-200 border border-purple-500/40"
+                      >
+                        {busyAction === 'start-omnivoice' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        <span>Start OmniVoice</span>
+                      </button>
+                    )}
+                    {baseDesc.action && onNavigateTab && (
+                      <button
+                        onClick={() => onNavigateTab(baseDesc.action!.tab)}
                         className="text-[10px] font-mono px-2 py-1 rounded bg-[#1A222D] hover:bg-[#242E3D] text-amber-400 border border-amber-500/30 hover:border-amber-400 transition-colors"
                       >
-                        {desc.action.label}
+                        {baseDesc.action.label}
                       </button>
                     )}
                     <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${desc.statusBadge.bg} ${desc.statusBadge.text} ${desc.statusBadge.border}`}
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
                     >
-                      {desc.statusBadge.label}
+                      {statusBadge.label}
                     </span>
                   </div>
                 </div>
               );
             })}
           </div>
+          {actionNotice && (
+            <div className={`px-4 py-2.5 border-t border-[#242E3D] text-xs font-mono ${actionNotice.isError ? 'bg-red-950/30 text-red-300' : 'bg-emerald-950/30 text-emerald-300'}`}>
+              {actionNotice.text}
+            </div>
+          )}
         </div>
 
         {/* Software Release & Enterprise Self-Update Card */}

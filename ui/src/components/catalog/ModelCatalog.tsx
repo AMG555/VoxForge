@@ -1,149 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { Download, CheckCircle2, Cpu, HardDrive, Filter, AlertCircle, RefreshCw, Layers, Trash2 } from 'lucide-react';
-import { CatalogItem } from '../../types';
+import {
+  Download,
+  CheckCircle2,
+  Cpu,
+  HardDrive,
+  Filter,
+  AlertCircle,
+  RefreshCw,
+  Layers,
+  Trash2,
+  Play,
+  Loader2,
+  Terminal,
+} from 'lucide-react';
+import { CatalogItem, RuntimeStatusResponse } from '../../types';
 import { api } from '../../services/api';
 
 export const ModelCatalog: React.FC = () => {
   const [models, setModels] = useState<CatalogItem[]>([]);
+  const [runtimes, setRuntimes] = useState<RuntimeStatusResponse | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [installedOnly, setInstalledOnly] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [installingId, setInstallingId] = useState<string | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchRuntimes = async () => {
+    try {
+      const data = await api.getRuntimeStatus();
+      setRuntimes(data);
+    } catch {
+      // Non-fatal in offline dev
+    }
+  };
 
   const fetchModels = async () => {
     setLoading(true);
     try {
       const type = filterType === 'all' ? undefined : filterType;
-      const data = await api.getCatalogModels(type, installedOnly);
+      const [data] = await Promise.all([api.getCatalogModels(type, installedOnly), fetchRuntimes()]);
       setModels(data);
     } catch {
-      // Fallback offline curated models
-      setModels([
-        {
-          id: 'piper-en-lessac-medium',
-          name: 'Piper Lessac Medium',
-          description: 'Fast, natural offline English neural voice model based on VITS / ONNX architecture',
-          model_type: 'tts',
-          format: 'onnx',
-          size_bytes: 45 * 1024 * 1024,
-          min_ram_mb: 512,
-          requires_gpu: false,
-          supported_languages: ['en-US'],
-          status: 'Installed',
-          local_path: 'models/piper-en-lessac-medium.onnx',
-        },
-        {
-          id: 'kokoro-v0_19',
-          name: 'Kokoro 82M Multilingual',
-          description: 'Lightweight 82M parameter speech synthesis neural network with natural intonation',
-          model_type: 'tts',
-          format: 'onnx',
-          size_bytes: 320 * 1024 * 1024,
-          min_ram_mb: 2048,
-          requires_gpu: false,
-          supported_languages: ['en', 'es', 'fr', 'ja', 'zh'],
-          status: 'Available',
-        },
-        {
-          id: 'qwen3-tts-base',
-          name: 'Qwen3-TTS Zero-Shot Base',
-          description: 'Zero-shot voice cloning transformer conditioned on 512-dimensional speaker embeddings',
-          model_type: 'tts',
-          format: 'safetensors',
-          size_bytes: 1200 * 1024 * 1024,
-          min_ram_mb: 4096,
-          requires_gpu: false,
-          supported_languages: ['en', 'zh'],
-          status: 'Available',
-        },
-        {
-          id: 'whisper-base',
-          name: 'Whisper Base Multilingual',
-          description: 'General-purpose speech-to-text model with VAD segmentation and timestamp alignment',
-          model_type: 'asr',
-          format: 'onnx',
-          size_bytes: 140 * 1024 * 1024,
-          min_ram_mb: 1024,
-          requires_gpu: false,
-          supported_languages: ['en', 'es', 'fr', 'de', 'zh'],
-          status: 'Installed',
-          local_path: 'models/whisper-base.onnx',
-        },
-        {
-          id: 'silero-vad',
-          name: 'Silero Voice Activity Detector',
-          description: 'Enterprise voice presence and pause detector neural network',
-          model_type: 'vad',
-          format: 'onnx',
-          size_bytes: 5 * 1024 * 1024,
-          min_ram_mb: 256,
-          requires_gpu: false,
-          supported_languages: ['*'],
-          status: 'Installed',
-          local_path: 'models/silero_vad.onnx',
-        },
-        {
-          id: 'omnivoice-base',
-          name: 'OmniVoice 600+ Multilingual Zero-Shot',
-          description: 'Multilingual zero-shot voice cloning foundation model covering 600+ languages and regional dialects (k2-fsa/OmniVoice)',
-          model_type: 'tts',
-          format: 'safetensors',
-          size_bytes: 1800 * 1024 * 1024,
-          min_ram_mb: 4096,
-          requires_gpu: false,
-          supported_languages: ['*'],
-          status: 'Available',
-        },
-        {
-          id: 'pocket-tts',
-          name: 'PocketTTS Real-Time CPU Voice',
-          description: 'Ultra-fast ~100M parameter low-latency speech synthesis engine tuned for local CPU dictation and short utterances (Kyutai Labs)',
-          model_type: 'tts',
-          format: 'onnx',
-          size_bytes: 105 * 1024 * 1024,
-          min_ram_mb: 512,
-          requires_gpu: false,
-          supported_languages: ['en', 'fr', 'de', 'es', 'it', 'pt'],
-          status: 'Available',
-        },
-        {
-          id: 'supertonic-3',
-          name: 'Supertonic-3 High-Fidelity 44.1kHz',
-          description: '99M parameter ONNX speech engine with 31 languages at studio 44.1 kHz sampling rate (Supertone)',
-          model_type: 'tts',
-          format: 'onnx',
-          size_bytes: 198 * 1024 * 1024,
-          min_ram_mb: 1024,
-          requires_gpu: false,
-          supported_languages: ['en', 'es', 'fr', 'de', 'ja', 'ko', 'zh'],
-          status: 'Available',
-        },
-        {
-          id: 'indextts-2_5',
-          name: 'IndexTTS 2.5 Expressive Emotion Voice',
-          description: 'Multilingual expressive voice cloning with emotional prosody and pitch inflection conditioning (IndexTeam)',
-          model_type: 'tts',
-          format: 'safetensors',
-          size_bytes: 950 * 1024 * 1024,
-          min_ram_mb: 4096,
-          requires_gpu: false,
-          supported_languages: ['en', 'zh', 'ja', 'es', 'ar'],
-          status: 'Available',
-        },
-        {
-          id: 'sherpa-onnx-asr',
-          name: 'Sherpa-ONNX Streaming ASR',
-          description: 'Ultra-low-resource int8 quantized offline and streaming speech recognition for real-time dictation (k2-fsa)',
-          model_type: 'asr',
-          format: 'onnx',
-          size_bytes: 85 * 1024 * 1024,
-          min_ram_mb: 512,
-          requires_gpu: false,
-          supported_languages: ['en', 'es', 'fr', 'zh', 'de'],
-          status: 'Available',
-        },
-      ]);
+      // Offline fallback curated catalog
+      setModels([]);
     } finally {
       setLoading(false);
     }
@@ -152,6 +52,34 @@ export const ModelCatalog: React.FC = () => {
   useEffect(() => {
     fetchModels();
   }, [filterType, installedOnly]);
+
+  const handleInstallRuntime = async (pkg: 'kokoro' | 'piper' | 'whisper') => {
+    setRuntimeBusy(`install-${pkg}`);
+    setMessage(null);
+    try {
+      const res = await api.installRuntimePackage(pkg);
+      setMessage({ text: res.message, type: 'success' });
+      await fetchRuntimes();
+    } catch (err: any) {
+      setMessage({ text: err?.message || `Failed to install '${pkg}' runtime`, type: 'error' });
+    } finally {
+      setRuntimeBusy(null);
+    }
+  };
+
+  const handleStartSidecar = async (backend: 'auto' | 'omnivoice' | 'kokoro', port: number) => {
+    setRuntimeBusy(`start-${backend}`);
+    setMessage(null);
+    try {
+      const res = await api.startSidecar(backend, port);
+      setMessage({ text: res.message, type: 'success' });
+      setTimeout(fetchRuntimes, 1200);
+    } catch (err: any) {
+      setMessage({ text: err?.message || `Failed to start ${backend} sidecar`, type: 'error' });
+    } finally {
+      setRuntimeBusy(null);
+    }
+  };
 
   const handleInstall = async (id: string) => {
     setInstallingId(id);
@@ -234,6 +162,141 @@ export const ModelCatalog: React.FC = () => {
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
             )}
             <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* Host Runtimes & Inference Sidecars */}
+        {runtimes && (
+          <div className="bg-[#121820] border border-[#242E3D] rounded-lg p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 text-xs font-mono font-bold text-white uppercase">
+                <Terminal className="w-4 h-4 text-amber-400" />
+                <span>Local Neural Runtimes & Sidecars ({runtimes.python_executable || 'Python not detected'})</span>
+              </div>
+              <span className="text-[11px] font-mono text-[#94A3B8]">
+                {runtimes.installed_model_files.length} local weight file(s) in models/
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-[#0B0E14] border border-[#242E3D] flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">OmniVoice + Whisper Sidecar</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                      runtimes.neural_sidecar.running
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : runtimes.python_packages.omnivoice
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {runtimes.neural_sidecar.running ? 'RUNNING :9000' : runtimes.python_packages.omnivoice ? 'INSTALLED' : 'MISSING'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8] mt-1">
+                    Enables 646-language cloning, refinement steps, &amp; Auto-Transcribe Whisper ASR.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {!runtimes.neural_sidecar.running && runtimes.python_packages.omnivoice && (
+                    <button
+                      type="button"
+                      disabled={runtimeBusy !== null}
+                      onClick={() => handleStartSidecar('omnivoice', 9000)}
+                      className="flex-1 inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-mono text-[11px]"
+                    >
+                      {runtimeBusy === 'start-omnivoice' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                      <span>Start Sidecar (:9000)</span>
+                    </button>
+                  )}
+                  {!runtimes.python_packages.whisper && runtimes.python_available && (
+                    <button
+                      type="button"
+                      disabled={runtimeBusy !== null}
+                      onClick={() => handleInstallRuntime('whisper')}
+                      className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-mono text-[11px]"
+                    >
+                      {runtimeBusy === 'install-whisper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                      <span>Install Whisper</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#0B0E14] border border-[#242E3D] flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">Kokoro-82M Sidecar</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                      runtimes.kokoro_sidecar.running
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : runtimes.python_packages.kokoro
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                        : 'bg-red-500/10 text-red-300 border-red-500/30'
+                    }`}>
+                      {runtimes.kokoro_sidecar.running ? 'RUNNING :8880' : runtimes.python_packages.kokoro ? 'INSTALLED' : 'NOT INSTALLED'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8] mt-1">
+                    Required for Kokoro voices (Heart, Bella, Sarah, Adam).
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {!runtimes.kokoro_sidecar.running && (
+                    runtimes.python_packages.kokoro ? (
+                      <button
+                        type="button"
+                        disabled={runtimeBusy !== null}
+                        onClick={() => handleStartSidecar('kokoro', 8880)}
+                        className="flex-1 inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-mono text-[11px]"
+                      >
+                        {runtimeBusy === 'start-kokoro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                        <span>Start Kokoro (:8880)</span>
+                      </button>
+                    ) : runtimes.python_available && (
+                      <button
+                        type="button"
+                        disabled={runtimeBusy !== null}
+                        onClick={() => handleInstallRuntime('kokoro')}
+                        className="flex-1 inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-mono text-[11px]"
+                      >
+                        {runtimeBusy === 'install-kokoro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        <span>Install Kokoro Package</span>
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#0B0E14] border border-[#242E3D] flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">Piper Local ONNX CLI</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                      runtimes.piper_cli_available
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : 'bg-red-500/10 text-red-300 border-red-500/30'
+                    }`}>
+                      {runtimes.piper_cli_available ? 'CLI READY' : 'CLI MISSING'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8] mt-1">
+                    Required alongside downloaded `.onnx` voice weights for Piper voices.
+                  </p>
+                </div>
+                {!runtimes.piper_cli_available && runtimes.python_available && (
+                  <button
+                    type="button"
+                    disabled={runtimeBusy !== null}
+                    onClick={() => handleInstallRuntime('piper')}
+                    className="inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-mono text-[11px]"
+                  >
+                    {runtimeBusy === 'install-piper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                    <span>Install Piper Runtime</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

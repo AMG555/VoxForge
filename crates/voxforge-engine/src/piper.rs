@@ -29,9 +29,11 @@ impl Default for PiperTtsEngine {
 impl PiperTtsEngine {
     pub fn new() -> Self {
         let piper_path = std::env::var("VOXFORGE_PIPER_PATH").ok().or_else(|| {
-            // Check if piper or piper.exe is available in PATH
+            // Check standalone piper CLI first, then `python -m piper` module.
             if which_piper() {
                 Some("piper".to_string())
+            } else if which_python_piper() {
+                Some("python-module:piper".to_string())
             } else {
                 None
             }
@@ -72,14 +74,16 @@ impl PiperTtsEngine {
         self
     }
 
-    /// Resolve onnx model path for the given voice_id
+    /// Resolve onnx model path for the given voice_id (strictly per-voice so German/French voices never silently speak English Lessac).
     fn resolve_model_path(&self, voice_id: &str) -> Option<PathBuf> {
-        let candidates = [
+        let mut candidates = vec![
             self.models_dir.join(format!("{voice_id}.onnx")),
             self.models_dir.join(format!("piper-{voice_id}.onnx")),
-            self.models_dir.join("piper-en-lessac-medium.onnx"),
-            self.models_dir.join("en_US-lessac-medium.onnx"),
         ];
+        if voice_id == "en_US-lessac-medium" || voice_id == "piper-en-lessac-medium" {
+            candidates.push(self.models_dir.join("piper-en-lessac-medium.onnx"));
+            candidates.push(self.models_dir.join("en_US-lessac-medium.onnx"));
+        }
 
         for c in &candidates {
             if c.exists() {
@@ -142,7 +146,7 @@ impl PiperTtsEngine {
         })
     }
 
-    /// Synthesize via local CLI subprocess
+    /// Synthesize via local CLI subprocess (`piper` binary or `python -m piper`).
     fn synthesize_via_cli(
         &self,
         binary: &str,
@@ -151,7 +155,15 @@ impl PiperTtsEngine {
     ) -> Result<AudioChunk> {
         info!(binary = %binary, model = %model_path.display(), "Executing local Piper subprocess");
 
-        let mut child = Command::new(binary)
+        let mut cmd = if binary == "python-module:piper" {
+            let mut c = Command::new("python");
+            c.arg("-m").arg("piper");
+            c
+        } else {
+            Command::new(binary)
+        };
+
+        let mut child = cmd
             .arg("--model")
             .arg(model_path)
             .arg("--output-raw")
@@ -218,6 +230,16 @@ fn which_piper() -> bool {
     let cmd = if cfg!(windows) { "where" } else { "which" };
     Command::new(cmd)
         .arg("piper")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn which_python_piper() -> bool {
+    Command::new("python")
+        .args(["-m", "piper", "--help"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -381,16 +403,29 @@ impl TtsEngine for PiperTtsEngine {
                 match self.synthesize_via_cli(bin, &model_path, &req.text) {
                     Ok(chunk) => return Ok(chunk),
                     Err(e) => {
-                        warn!(error = %e, "Piper CLI invocation failed, falling back to embedded acoustic synthesizer");
+                        warn!(error = %e, "Piper CLI invocation failed");
+                        return Err(e);
                     }
                 }
             }
+            return Err(VoxForgeError::Engine(format!(
+                "Piper model for '{}' is not installed locally. Please download '{}' in Model Catalog.",
+                req.voice_id, req.voice_id
+            )));
         }
 
-        Err(VoxForgeError::Engine(format!(
-            "Piper model for '{}' is not installed locally. Please download the model in Model Catalog.",
-            req.voice_id
-        )))
+        let has_model = self.resolve_model_path(&req.voice_id).is_some();
+        if has_model {
+            Err(VoxForgeError::Engine(format!(
+                "Piper runtime ('piper' CLI / python 'piper-tts' package) is not installed locally for '{}'. Install the Piper runtime from Model Catalog / Hardware & Engines or start VOXFORGE_PIPER_URL.",
+                req.voice_id
+            )))
+        } else {
+            Err(VoxForgeError::Engine(format!(
+                "Piper runtime and model for '{}' are not installed locally. Install the Piper runtime and download '{}' in Model Catalog.",
+                req.voice_id, req.voice_id
+            )))
+        }
     }
 
     async fn synthesize_stream(

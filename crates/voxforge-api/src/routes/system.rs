@@ -774,6 +774,488 @@ pub async fn restart_server_handler() -> Result<Json<Value>, (StatusCode, Json<P
     })))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeEndpointStatus {
+    pub running: bool,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PythonPackagesStatus {
+    pub torch: bool,
+    pub whisper: bool,
+    pub omnivoice: bool,
+    pub kokoro: bool,
+    pub piper: bool,
+    pub edge_tts: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeStatusResponse {
+    pub python_available: bool,
+    pub python_executable: Option<String>,
+    pub sidecar_script_available: bool,
+    pub sidecar_script_path: Option<String>,
+    pub neural_sidecar: RuntimeEndpointStatus,
+    pub kokoro_sidecar: RuntimeEndpointStatus,
+    pub piper_cli_available: bool,
+    pub ffmpeg_available: bool,
+    pub python_packages: PythonPackagesStatus,
+    pub installed_model_files: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct StartSidecarRequest {
+    pub backend: Option<String>,
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct InstallRuntimePackageRequest {
+    pub package: String,
+}
+
+fn find_sidecar_script() -> Option<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        roots.push(cwd);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut cur = exe.parent().map(|p| p.to_path_buf());
+        for _ in 0..4 {
+            if let Some(dir) = cur {
+                roots.push(dir.clone());
+                cur = dir.parent().map(|p| p.to_path_buf());
+            }
+        }
+    }
+    for root in roots {
+        let candidate = root.join("scripts").join("neural_sidecar.py");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+async fn check_command_exists(cmd: &str, args: &[&str]) -> bool {
+    let future = tokio::process::Command::new(cmd)
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    tokio::time::timeout(Duration::from_secs(2), future)
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+async fn probe_python_executable() -> Option<String> {
+    let candidates = if cfg!(windows) {
+        ["python", "py"]
+    } else {
+        ["python3", "python"]
+    };
+    for cand in candidates {
+        if check_command_exists(cand, &["--version"]).await {
+            return Some(cand.to_string());
+        }
+    }
+    None
+}
+
+async fn probe_python_packages(python_exe: Option<&str>) -> PythonPackagesStatus {
+    let mut status = PythonPackagesStatus {
+        torch: false,
+        whisper: false,
+        omnivoice: false,
+        kokoro: false,
+        piper: false,
+        edge_tts: false,
+    };
+    let Some(exe) = python_exe else {
+        return status;
+    };
+
+    let snippet = "import importlib.util, json; print(json.dumps({p: importlib.util.find_spec(p) is not None for p in ('torch','whisper','omnivoice','kokoro','piper','edge_tts')}))";
+    let future = tokio::process::Command::new(exe)
+        .args(["-c", snippet])
+        .output();
+    if let Ok(Ok(output)) = tokio::time::timeout(Duration::from_secs(3), future).await {
+        if output.status.success() {
+            if let Ok(parsed) = serde_json::from_slice::<Value>(&output.stdout) {
+                status.torch = parsed["torch"].as_bool().unwrap_or(false);
+                status.whisper = parsed["whisper"].as_bool().unwrap_or(false);
+                status.omnivoice = parsed["omnivoice"].as_bool().unwrap_or(false);
+                status.kokoro = parsed["kokoro"].as_bool().unwrap_or(false);
+                status.piper = parsed["piper"].as_bool().unwrap_or(false);
+                status.edge_tts = parsed["edge_tts"].as_bool().unwrap_or(false);
+            }
+        }
+    }
+    status
+}
+
+async fn probe_http_health(url: &str) -> RuntimeEndpointStatus {
+    let health = format!("{}/health", url.trim_end_matches('/'));
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(Duration::from_millis(500))
+        .build()
+    else {
+        return RuntimeEndpointStatus {
+            running: false,
+            url: None,
+        };
+    };
+    match client.get(&health).send().await {
+        Ok(resp) if resp.status().is_success() => RuntimeEndpointStatus {
+            running: true,
+            url: Some(url.to_string()),
+        },
+        _ => RuntimeEndpointStatus {
+            running: false,
+            url: None,
+        },
+    }
+}
+
+pub fn resolve_sidecar_launch_args(
+    backend: Option<&str>,
+    port: Option<u16>,
+) -> Result<(String, u16), String> {
+    let chosen_backend = backend
+        .map(|b| b.trim().to_ascii_lowercase())
+        .filter(|b| !b.is_empty())
+        .unwrap_or_else(|| "auto".to_string());
+    if !matches!(
+        chosen_backend.as_str(),
+        "auto" | "omnivoice" | "cosyvoice" | "f5tts" | "kokoro"
+    ) {
+        return Err(format!(
+            "Unsupported sidecar backend '{chosen_backend}'. Allowed: auto, omnivoice, cosyvoice, f5tts, kokoro."
+        ));
+    }
+
+    let chosen_port = match port {
+        Some(p @ (9000 | 8880 | 9880 | 8000)) => p,
+        Some(other) => {
+            return Err(format!(
+                "Unsupported sidecar port {other}. Allowed ports: 9000, 8880, 9880, 8000."
+            ))
+        }
+        None if chosen_backend == "kokoro" => 8880,
+        None => 9000,
+    };
+
+    Ok((chosen_backend, chosen_port))
+}
+
+pub fn resolve_runtime_install_packages(target: &str) -> Result<Vec<&'static str>, String> {
+    match target.trim().to_ascii_lowercase().as_str() {
+        "kokoro" => Ok(vec!["kokoro>=0.9.4", "soundfile", "misaki[en]"]),
+        "piper" => Ok(vec!["piper-tts", "pathvalidate"]),
+        "whisper" => Ok(vec!["openai-whisper"]),
+        other => Err(format!(
+            "Unknown runtime package '{other}'. Allowed: kokoro, piper, whisper."
+        )),
+    }
+}
+
+/// GET /v1/system/runtimes — inspect Python libraries, CLI tools, sidecar state, and local model files.
+pub async fn get_runtime_status() -> Json<RuntimeStatusResponse> {
+    let neural_url = std::env::var("VOXFORGE_SIDECAR_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string());
+    let kokoro_url = std::env::var("VOXFORGE_KOKORO_URL")
+        .or_else(|_| std::env::var("KOKORO_API_URL"))
+        .unwrap_or_else(|_| "http://127.0.0.1:8880".to_string());
+
+    let (python_executable, piper_cli, ffmpeg_available, neural_sidecar, kokoro_sidecar) = tokio::join!(
+        probe_python_executable(),
+        check_command_exists("piper", &["--version"]),
+        check_command_exists("ffmpeg", &["-version"]),
+        probe_http_health(&neural_url),
+        probe_http_health(&kokoro_url),
+    );
+    let python_packages = probe_python_packages(python_executable.as_deref()).await;
+    let piper_cli_available = piper_cli || python_packages.piper;
+    let script_path = find_sidecar_script();
+
+    let models_dir = std::env::var("VOXFORGE_MODELS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("models"));
+    let mut installed_model_files = Vec::new();
+    if let Ok(mut entries) = tokio::fs::read_dir(&models_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Ok(ft) = entry.file_type().await {
+                if ft.is_file() {
+                    if let Some(name) = entry.file_name().to_str() {
+                        installed_model_files.push(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    installed_model_files.sort();
+
+    Json(RuntimeStatusResponse {
+        python_available: python_executable.is_some(),
+        python_executable,
+        sidecar_script_available: script_path.is_some(),
+        sidecar_script_path: script_path.map(|p| p.to_string_lossy().to_string()),
+        neural_sidecar,
+        kokoro_sidecar,
+        piper_cli_available,
+        ffmpeg_available,
+        python_packages,
+        installed_model_files,
+    })
+}
+
+/// POST /v1/system/sidecar/start — start the local Python neural sidecar in the background.
+pub async fn start_sidecar_handler(
+    body: axum::body::Bytes,
+) -> Result<Json<Value>, (StatusCode, Json<ProblemDetails>)> {
+    let req: StartSidecarRequest = if body.is_empty() {
+        StartSidecarRequest::default()
+    } else {
+        serde_json::from_slice(&body).unwrap_or_default()
+    };
+
+    let (backend, port) =
+        resolve_sidecar_launch_args(req.backend.as_deref(), req.port).map_err(|detail| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/invalid-sidecar-config".to_string(),
+                    title: "Invalid Sidecar Launch Config".to_string(),
+                    status: 400,
+                    detail,
+                    instance: "/v1/system/sidecar/start".to_string(),
+                }),
+            )
+        })?;
+
+    let target_url = format!("http://127.0.0.1:{port}");
+    if probe_http_health(&target_url).await.running {
+        return Ok(Json(json!({
+            "status": "already_running",
+            "backend": backend,
+            "port": port,
+            "url": target_url,
+            "message": format!("Neural sidecar ({backend}) is already active on {target_url}")
+        })));
+    }
+
+    let python_exe = probe_python_executable().await.ok_or_else(|| {
+        (
+            StatusCode::FAILED_DEPENDENCY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/python-not-found".to_string(),
+                title: "Python Runtime Missing".to_string(),
+                status: StatusCode::FAILED_DEPENDENCY.as_u16(),
+                detail: "Python executable was not found on PATH. Install Python 3.10+ to run the local neural sidecar.".to_string(),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        )
+    })?;
+
+    let script_path = find_sidecar_script().ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-script-missing".to_string(),
+                title: "Sidecar Script Not Found".to_string(),
+                status: 404,
+                detail: "Could not locate scripts/neural_sidecar.py relative to the executable or working directory.".to_string(),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        )
+    })?;
+
+    let log_dir = PathBuf::from("logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+    let log_path = log_dir.join(format!("neural_sidecar_{port}.log"));
+    let log_file_out = std::fs::File::create(&log_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
+                title: "Sidecar Launch Error".to_string(),
+                status: 500,
+                detail: format!("Failed to create sidecar log file {}: {e}", log_path.display()),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        )
+    })?;
+    let log_file_err = log_file_out
+        .try_clone()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
+                    title: "Sidecar Launch Error".to_string(),
+                    status: 500,
+                    detail: format!("Failed cloning sidecar log handle: {e}"),
+                    instance: "/v1/system/sidecar/start".to_string(),
+                }),
+            )
+        })?;
+
+    let mut cmd = std::process::Command::new(&python_exe);
+    cmd.arg(&script_path)
+        .arg("--port")
+        .arg(port.to_string());
+    if backend != "auto" {
+        cmd.arg("--backend").arg(&backend);
+    }
+    cmd.stdout(std::process::Stdio::from(log_file_out))
+        .stderr(std::process::Stdio::from(log_file_err));
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+
+    let mut child = cmd.spawn().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-spawn-failed".to_string(),
+                title: "Sidecar Spawn Failed".to_string(),
+                status: 500,
+                detail: format!("Failed spawning neural sidecar: {e}"),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        )
+    })?;
+
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    if let Ok(Some(exit_status)) = child.try_wait() {
+        let log_tail = tokio::fs::read_to_string(&log_path).await.unwrap_or_default();
+        return Err((
+            StatusCode::FAILED_DEPENDENCY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-exited-early".to_string(),
+                title: "Neural Sidecar Exited Immediately".to_string(),
+                status: StatusCode::FAILED_DEPENDENCY.as_u16(),
+                detail: format!(
+                    "Sidecar exited with status {exit_status}. Check dependencies or logs ({}): {}",
+                    log_path.display(),
+                    log_tail.lines().rev().take(6).collect::<Vec<_>>().join(" | ")
+                ),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        ));
+    }
+
+    let is_up = probe_http_health(&target_url).await.running;
+    Ok(Json(json!({
+        "status": if is_up { "running" } else { "starting" },
+        "backend": backend,
+        "port": port,
+        "url": target_url,
+        "log_path": log_path.to_string_lossy(),
+        "message": if is_up {
+            format!("Neural sidecar ({backend}) is live at {target_url}")
+        } else {
+            format!("Neural sidecar ({backend}) is starting & loading weights on {target_url}; check readiness shortly.")
+        }
+    })))
+}
+
+/// POST /v1/system/runtimes/install — install allowlisted Python speech runtime package via pip.
+pub async fn install_runtime_package_handler(
+    Json(payload): Json<InstallRuntimePackageRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<ProblemDetails>)> {
+    let packages = resolve_runtime_install_packages(&payload.package).map_err(|detail| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-runtime-package".to_string(),
+                title: "Invalid Runtime Package".to_string(),
+                status: 400,
+                detail,
+                instance: "/v1/system/runtimes/install".to_string(),
+            }),
+        )
+    })?;
+
+    let python_exe = probe_python_executable().await.ok_or_else(|| {
+        (
+            StatusCode::FAILED_DEPENDENCY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/python-not-found".to_string(),
+                title: "Python Runtime Missing".to_string(),
+                status: StatusCode::FAILED_DEPENDENCY.as_u16(),
+                detail: "Python executable not found on PATH; cannot install Python speech packages.".to_string(),
+                instance: "/v1/system/runtimes/install".to_string(),
+            }),
+        )
+    })?;
+
+    let mut args = vec!["-m", "pip", "install", "--quiet"];
+    args.extend(packages.iter().copied());
+
+    let output = tokio::time::timeout(
+        Duration::from_secs(180),
+        tokio::process::Command::new(&python_exe).args(&args).output(),
+    )
+    .await
+    .map_err(|_| {
+        (
+            StatusCode::GATEWAY_TIMEOUT,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/runtime-install-timeout".to_string(),
+                title: "Runtime Installation Timed Out".to_string(),
+                status: StatusCode::GATEWAY_TIMEOUT.as_u16(),
+                detail: format!("pip install for '{}' exceeded 180 seconds.", payload.package),
+                instance: "/v1/system/runtimes/install".to_string(),
+            }),
+        )
+    })?
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/runtime-install-error".to_string(),
+                title: "Runtime Installation Error".to_string(),
+                status: 500,
+                detail: format!("Failed invoking pip install: {e}"),
+                instance: "/v1/system/runtimes/install".to_string(),
+            }),
+        )
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/runtime-install-failed".to_string(),
+                title: "Runtime Package Install Failed".to_string(),
+                status: StatusCode::BAD_GATEWAY.as_u16(),
+                detail: format!(
+                    "pip install for '{}' failed ({}): {}",
+                    payload.package,
+                    output.status,
+                    stderr.lines().rev().take(6).collect::<Vec<_>>().join(" | ")
+                ),
+                instance: "/v1/system/runtimes/install".to_string(),
+            }),
+        ));
+    }
+
+    Ok(Json(json!({
+        "status": "installed",
+        "package": payload.package,
+        "installed_specs": packages,
+        "message": format!("Successfully installed runtime package '{}'.", payload.package)
+    })))
+}
+
 fn schedule_self_restart() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("Cannot locate exe: {e}"))?;
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -902,5 +1384,29 @@ f82d8e7479d0c4d0a55eb522abc4eed38bdc926a6f56c1f46c37ae59e3f79f0f  voxforge-windo
         assert!(res.update_available);
         assert_eq!(res.asset_name, primary);
         assert_eq!(res.checksum_sha256.as_deref(), Some(expected_hash.as_str()));
+    }
+
+    #[test]
+    fn test_runtime_allowlists() {
+        assert_eq!(
+            resolve_runtime_install_packages("kokoro").unwrap(),
+            vec!["kokoro>=0.9.4", "soundfile", "misaki[en]"]
+        );
+        assert_eq!(
+            resolve_runtime_install_packages("piper").unwrap(),
+            vec!["piper-tts", "pathvalidate"]
+        );
+        assert!(resolve_runtime_install_packages("arbitrary; rm -rf /").is_err());
+
+        assert_eq!(
+            resolve_sidecar_launch_args(Some("kokoro"), None).unwrap(),
+            ("kokoro".to_string(), 8880)
+        );
+        assert_eq!(
+            resolve_sidecar_launch_args(Some("omnivoice"), Some(9000)).unwrap(),
+            ("omnivoice".to_string(), 9000)
+        );
+        assert!(resolve_sidecar_launch_args(Some("bash"), Some(9000)).is_err());
+        assert!(resolve_sidecar_launch_args(Some("auto"), Some(22)).is_err());
     }
 }

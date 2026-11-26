@@ -185,6 +185,24 @@ impl KokoroTtsEngine {
         self
     }
 
+    /// Return `true` only when a real Kokoro inference sidecar responds healthy over HTTP.
+    pub async fn has_live_sidecar(&self) -> bool {
+        let Some(ref base_url) = self.endpoint_url else {
+            return false;
+        };
+        let health_url = format!("{}/health", base_url.trim_end_matches('/'));
+        let Ok(client) = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(600))
+            .build()
+        else {
+            return false;
+        };
+        match client.get(&health_url).send().await {
+            Ok(resp) => resp.status().is_success(),
+            Err(_) => false,
+        }
+    }
+
     /// Decode WAV or RAW PCM payload into 16-bit PCM samples.
     fn parse_audio_response(&self, bytes: &[u8]) -> Result<Vec<i16>> {
         if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {

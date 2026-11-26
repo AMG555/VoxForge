@@ -274,4 +274,31 @@ export interface SystemUpdateApplyResult {
   message: string;
 }
 
+export interface RuntimeEndpointStatus {
+  running: boolean;
+  url?: string;
+}
+
+export interface PythonPackagesStatus {
+  torch: boolean;
+  whisper: boolean;
+  omnivoice: boolean;
+  kokoro: boolean;
+  piper: boolean;
+  edge_tts: boolean;
+}
+
+export interface RuntimeStatusResponse {
+  python_available: boolean;
+  python_executable?: string;
+  sidecar_script_available: boolean;
+  sidecar_script_path?: string;
+  neural_sidecar: RuntimeEndpointStatus;
+  kokoro_sidecar: RuntimeEndpointStatus;
+  piper_cli_available: boolean;
+  ffmpeg_available: boolean;
+  python_packages: PythonPackagesStatus;
+  installed_model_files: string[];
+}
+
 

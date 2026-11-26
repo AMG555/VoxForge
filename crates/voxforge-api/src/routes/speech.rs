@@ -172,6 +172,30 @@ fn effective_pronunciation_language<'a>(
     requested_lang
 }
 
+async fn ensure_engine_runtime_ready(
+    engine: &dyn TtsEngine,
+    voice: &Voice,
+    instance: &str,
+) -> Result<(), (StatusCode, Json<ProblemDetails>)> {
+    if engine.id() == "kokoro" {
+        let probe = voxforge_engine::kokoro::KokoroTtsEngine::new();
+        if !probe.has_live_sidecar().await {
+            let err = ProblemDetails {
+                problem_type: "https://voxforge.org/errors/runtime-not-installed".to_string(),
+                title: "Kokoro Neural Runtime Not Active".to_string(),
+                status: StatusCode::FAILED_DEPENDENCY.as_u16(),
+                detail: format!(
+                    "Kokoro-82M voice '{}' requires a running Kokoro inference server at http://127.0.0.1:8880 (VOXFORGE_KOKORO_URL). Install 'kokoro' & start the Kokoro sidecar from Model Catalog / Hardware & Engines, or select an Edge-TTS neural voice.",
+                    voice.id
+                ),
+                instance: instance.to_string(),
+            };
+            return Err((StatusCode::FAILED_DEPENDENCY, Json(err)));
+        }
+    }
+    Ok(())
+}
+
 async fn resolve_engine_and_voice(
     state: &AppState,
     payload: &OpenAiSpeechRequest,
@@ -579,6 +603,7 @@ pub async fn synthesize_speech(
     }
 
     let (engine, voice) = resolve_engine_and_voice(&state, &payload).await?;
+    ensure_engine_runtime_ready(engine.as_ref(), &voice, "/v1/audio/speech").await?;
     let crossfade_ms = payload.crossfade_ms.unwrap_or(30);
 
     let start = std::time::Instant::now();
@@ -719,6 +744,7 @@ pub async fn synthesize_speech_stream(
 ) -> Result<Response, (StatusCode, Json<ProblemDetails>)> {
     validate_speech_request(&payload)?;
     let (engine, voice) = resolve_engine_and_voice(&state, &payload).await?;
+    ensure_engine_runtime_ready(engine.as_ref(), &voice, "/v1/audio/speech/stream").await?;
 
     let eff_lang = payload
         .language

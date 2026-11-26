@@ -103,4 +103,10 @@ impl AppState {
         self.rate_limiter = rate_limiter;
         self
     }
+
+    /// Override the model catalog store (e.g. simulated offline mode in tests).
+    pub fn with_model_catalog(mut self, catalog: Arc<ModelCatalogStore>) -> Self {
+        self.model_catalog = catalog;
+        self
+    }
 }

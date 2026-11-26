@@ -98,6 +98,11 @@ pub async fn install_catalog_model(
                 {
                     StatusCode::NOT_FOUND
                 }
+                voxforge_core::error::VoxForgeError::Engine(ref msg)
+                    if msg.contains("Failed to download") =>
+                {
+                    StatusCode::BAD_GATEWAY
+                }
                 _ => StatusCode::INTERNAL_SERVER_ERROR,
             };
             Err((

@@ -175,4 +175,11 @@ pub fn build_api_router() -> Router<AppState> {
             post(system::apply_update_handler),
         )
         .route("/v1/system/restart", post(system::restart_server_handler))
+        // Host runtime readiness diagnostics, sidecar launcher, and allowlisted runtime installs
+        .route("/v1/system/runtimes", get(system::get_runtime_status))
+        .route("/v1/system/sidecar/start", post(system::start_sidecar_handler))
+        .route(
+            "/v1/system/runtimes/install",
+            post(system::install_runtime_package_handler),
+        )
 }
