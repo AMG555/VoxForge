@@ -41,7 +41,13 @@ impl WhisperAsrEngine {
 
     /// Analyze audio energy in frames to detect active speech regions (simple VAD).
     fn detect_speech_regions(&self, pcm: &[i16], sample_rate: u32) -> Vec<(u64, u64)> {
-        if pcm.is_empty() {
+        if pcm.is_empty() || sample_rate == 0 {
+            return Vec::new();
+        }
+
+        // Completely silent or muted audio (e.g. disconnected mic capture) contains zero speech.
+        let max_abs = pcm.iter().map(|&s| s.unsigned_abs()).max().unwrap_or(0);
+        if max_abs <= 10 {
             return Vec::new();
         }
 
@@ -81,10 +87,14 @@ impl WhisperAsrEngine {
             regions.push((start_ms, end_ms));
         }
 
-        // If no speech detected above threshold, treat whole buffer as single region
+        // If no frame hit main energy threshold, keep whole region only when overall signal is non-silent.
         if regions.is_empty() {
-            let total_ms = (pcm.len() as f32 / sample_rate as f32 * 1000.0) as u64;
-            regions.push((0, total_ms.max(50)));
+            let overall_rms =
+                (pcm.iter().map(|&s| (s as f64) * (s as f64)).sum::<f64>() / pcm.len() as f64).sqrt();
+            if overall_rms >= 15.0 {
+                let total_ms = (pcm.len() as f32 / sample_rate as f32 * 1000.0) as u64;
+                regions.push((0, total_ms.max(50)));
+            }
         }
 
         regions
@@ -250,5 +260,16 @@ mod tests {
         assert!(!res.segments.is_empty());
         assert!(!res.words.is_empty());
         assert!(!res.text.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_whisper_silent_buffer_returns_empty() {
+        let engine = WhisperAsrEngine::default();
+        let silent = vec![0i16; 16000 * 5];
+        let opts = TranscriptionOptions::default();
+        let res = engine.transcribe(&silent, 16000, &opts).await.unwrap();
+        assert!(res.text.is_empty());
+        assert!(res.segments.is_empty());
+        assert!(res.words.is_empty());
     }
 }

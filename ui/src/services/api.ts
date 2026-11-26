@@ -259,7 +259,11 @@ export const api = {
     return res.json();
   },
 
-  async transcribeAudio(audioBase64: string, model = 'whisper-base', language?: string): Promise<{ text: string; duration_seconds?: number }> {
+  async transcribeAudio(
+    audioBase64: string,
+    model = 'whisper-base',
+    language?: string
+  ): Promise<{ text: string; duration_seconds?: number; source?: string }> {
     const res = await fetch(`${BASE_URL}/v1/audio/transcriptions`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
@@ -274,7 +278,9 @@ export const api = {
       const err = await res.json().catch(() => ({ detail: 'Audio transcription failed' }));
       throw new Error(err.detail || 'Audio transcription failed');
     }
-    return res.json();
+    const source = res.headers.get('X-VoxForge-ASR-Source') || undefined;
+    const data = await res.json();
+    return { ...data, source };
   },
 
   async refineText(

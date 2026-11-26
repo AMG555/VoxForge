@@ -76,6 +76,14 @@ pub struct SimpleTranscriptionResponse {
     pub text: String,
 }
 
+fn with_asr_source_header(mut res: Response, source: &'static str) -> Response {
+    res.headers_mut().insert(
+        header::HeaderName::from_static("x-voxforge-asr-source"),
+        HeaderValue::from_static(source),
+    );
+    res
+}
+
 /// `POST /v1/audio/transcriptions` — OpenAI-compatible transcription endpoint.
 pub async fn transcribe_audio(
     State(state): State<AppState>,
@@ -99,10 +107,13 @@ pub async fn transcribe_audio(
                         header::CONTENT_TYPE,
                         HeaderValue::from_static("text/plain; charset=utf-8"),
                     );
-                    return Ok(res);
+                    return Ok(with_asr_source_header(res, "neural-sidecar"));
                 }
                 let simple = SimpleTranscriptionResponse { text: neural_text };
-                return Ok(Json(simple).into_response());
+                return Ok(with_asr_source_header(
+                    Json(simple).into_response(),
+                    "neural-sidecar",
+                ));
             }
         }
     }
@@ -182,15 +193,15 @@ pub async fn transcribe_audio(
             )
         })?;
 
-    // 5. Serialize output according to response_format
-    match format_str.as_str() {
+    // 5. Serialize output according to response_format (mark fallback source honestly via header)
+    let response = match format_str.as_str() {
         "text" => {
             let mut res = Response::new(Body::from(result.text));
             res.headers_mut().insert(
                 header::CONTENT_TYPE,
                 HeaderValue::from_static("text/plain; charset=utf-8"),
             );
-            Ok(res)
+            res
         }
         "srt" => {
             let srt = result.to_srt();
@@ -199,7 +210,7 @@ pub async fn transcribe_audio(
                 header::CONTENT_TYPE,
                 HeaderValue::from_static("text/plain; charset=utf-8"),
             );
-            Ok(res)
+            res
         }
         "vtt" => {
             let vtt = result.to_vtt();
@@ -208,15 +219,16 @@ pub async fn transcribe_audio(
                 header::CONTENT_TYPE,
                 HeaderValue::from_static("text/vtt; charset=utf-8"),
             );
-            Ok(res)
+            res
         }
-        "verbose_json" => Ok(Json(result).into_response()),
+        "verbose_json" => Json(result).into_response(),
         _ => {
             // Default OpenAI simple json
             let simple = SimpleTranscriptionResponse { text: result.text };
-            Ok(Json(simple).into_response())
+            Json(simple).into_response()
         }
-    }
+    };
+    Ok(with_asr_source_header(response, "local-mock-fallback"))
 }
 
 fn is_safe_audio_path(path: &str) -> bool {

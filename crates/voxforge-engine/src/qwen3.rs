@@ -1431,18 +1431,11 @@ impl Qwen3TtsEngine {
             }
         }
 
-        // 4. Determine acoustic gender & base voice
-        let acoustic_gender = if let Some(ref f) = ref_features_opt {
-            if f.f0_mean_hz < 165.0 {
-                Gender::Male
-            } else {
-                Gender::Female
-            }
-        } else if let Some(ref gender) = request.profile.gender {
-            gender.clone()
-        } else {
-            Gender::Female
-        };
+        // 4. Determine acoustic gender & base voice (honor explicit Female/Male choice over F0 inference)
+        let acoustic_gender = resolve_cloned_profile_gender(
+            request.profile.gender.as_ref(),
+            ref_features_opt.as_ref().map(|f| f.f0_mean_hz),
+        );
 
         let fallback_voice =
             resolve_cross_lingual_base_voice(Some(&acoustic_gender), &request.text, &target_lang);
@@ -2173,6 +2166,17 @@ pub fn detect_script_lang(text: &str) -> &'static str {
     }
 }
 
+fn resolve_cloned_profile_gender(explicit: Option<&Gender>, f0_mean_hz: Option<f32>) -> Gender {
+    match explicit {
+        Some(Gender::Male) => Gender::Male,
+        Some(Gender::Female) => Gender::Female,
+        Some(Gender::Neutral) | None => match f0_mean_hz {
+            Some(f0) if f0 > 0.0 && f0 < 165.0 => Gender::Male,
+            _ => Gender::Female,
+        },
+    }
+}
+
 /// Resolve the best-matching Edge-TTS base voice for a given speaker gender + language tag.
 ///
 /// Resolution priority:
@@ -2442,6 +2446,30 @@ mod tests {
         assert_eq!(
             resolve_cross_lingual_base_voice(Some(&Gender::Male), "നമസ്കാരം", "ml-IN"),
             "ml-IN-MidhunNeural"
+        );
+    }
+
+    #[test]
+    fn test_resolve_cloned_profile_gender_honors_explicit_choice() {
+        assert_eq!(
+            resolve_cloned_profile_gender(Some(&Gender::Female), Some(0.0)),
+            Gender::Female
+        );
+        assert_eq!(
+            resolve_cloned_profile_gender(Some(&Gender::Female), Some(115.0)),
+            Gender::Female
+        );
+        assert_eq!(
+            resolve_cloned_profile_gender(Some(&Gender::Male), Some(215.0)),
+            Gender::Male
+        );
+        assert_eq!(
+            resolve_cloned_profile_gender(Some(&Gender::Neutral), Some(125.0)),
+            Gender::Male
+        );
+        assert_eq!(
+            resolve_cloned_profile_gender(None, Some(0.0)),
+            Gender::Female
         );
     }
 

@@ -1336,7 +1336,11 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({ voices, onVoiceCreated, onVo
     try {
       const langHint = cloneLanguage && cloneLanguage !== 'AUTO' ? cloneLanguage : undefined;
       const res = await api.transcribeAudio(cloneAudioBase64, 'whisper-base', langHint);
-      if (res?.text?.trim()) {
+      if (res?.source === 'local-mock-fallback') {
+        setCloneError(
+          'Neural Whisper sidecar is offline — automatic speech-to-text requires the Neural Sidecar (scripts/start-sidecar.bat). Start the sidecar or type your reference transcript manually.'
+        );
+      } else if (res?.text?.trim()) {
         setCloneTranscript(res.text.trim());
       } else {
         setCloneError('No speech detected in the uploaded reference clip.');
