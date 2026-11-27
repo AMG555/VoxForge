@@ -49,7 +49,7 @@ subtle = "2.5"
 tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
 sha2 = "0.10"
 hex = "0.4"
-symphonia = { version = "0.5", default-features = false, features = ["mp3"] }
+symphonia = { version = "0.6", default-features = false, features = ["mp3"] }
 
 # Internal workspace crates
 voxforge-core          = { path = "crates/voxforge-core" }
