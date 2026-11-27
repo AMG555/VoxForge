@@ -1,7 +1,7 @@
 {
   "name": "voxforge",
-  "version": "0.7.0",
-  "description": "Standalone Tauri v2 desktop app & Rust neural TTS/voice-cloning server with guided uv runtime setup",
+  "version": "0.7.1",
+  "description": "Standalone Tauri v2 desktop app & zero-Python Rust neural TTS/voice-cloning server with optional AI sidecar extensions",
   "main": "packages/voxforge/bin/voxforge.js",
   "bin": {
     "voxforge": "./packages/voxforge/bin/voxforge.js"

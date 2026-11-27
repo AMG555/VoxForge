@@ -6,6 +6,18 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.1] — 2026-11-27
+
+### 🦀 Rust-First Runtime Architecture & Zero-Python Offline TTS
+- **Removed Blocking Python/uv First-Run Popup**: VoxForge now boots straight into the Studio on **Native Rust Core** (zero Python required). `uv`/Python sidecar setup (`Optional Kokoro + Whisper`, `Full PyTorch Sidecar`) is now strictly opt-in from the **Runtime Extensions** drawer only when PyTorch-only sidecar models are desired.
+- **Standalone Native Piper C++ Installer (`POST /v1/system/runtimes/install-native`)**: Added 1-click cross-platform installation of official pre-built `rhasspy/piper` native binaries (Windows/macOS/Linux) with **zero Python dependency**, prioritized automatically by `voxforge-engine`.
+
+### 🎙️ Latest Open-Weight TTS Engines & Cantonese Support
+- **Chatterbox-Turbo 350M & Chatterbox-23Lang (`ResembleAI`)**: Added sub-150ms TTFB 5-second zero-shot cloning with paralinguistic emotion tags plus 23-language cross-lingual cloning in `voxforge-catalog` and `scripts/neural_sidecar.py`.
+- **KittenTTS 2, F5-TTS v1 & Canto-TTS Nano**: Added lightweight ultra-fast `kitten-tts-2` (534 MB), `f5-tts-v1` (1.34 GB), and CPU ONNX `canto-tts-nano` (441 MB Hong Kong Cantonese + English code-switching) models plus native zero-Python Hong Kong Cantonese (`zh-HK-HiuGaaiNeural`, `zh-HK-WanLungNeural`), Korean, Portuguese, and Arabic Edge-TTS voices.
+
+---
+
 ## [0.7.0] — 2026-11-27
 
 ### 🖥️ Standalone Native Desktop App & First-Run Runtime Wizard

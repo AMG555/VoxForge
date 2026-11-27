@@ -6,17 +6,17 @@
 
 **Standalone Rust + Tauri v2 Desktop App, Zero-Shot Voice Cloning & Neural TTS Studio**
 
-[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.7.0-20bf6b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
-[![Release](https://img.shields.io/badge/Release-v0.7.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.7.1-20bf6b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.7.1-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.7.0-brightgreen.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.7.1-brightgreen.svg)](docs/architecture.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
 [![Desktop](https://img.shields.io/badge/Desktop-Tauri_v2_%2B_React_19-61dafb.svg)](https://v2.tauri.app)
 [![API](https://img.shields.io/badge/API-OpenAI_TTS_Compatible-green.svg)](docs/api.md)
 [![Platform](https://img.shields.io/badge/Platform-Linux_%7C_macOS_%7C_Windows-lightgrey.svg)](docs/architecture.md)
 
-*An open-source, private, self-hosted neural speech workstation and native desktop app in Rust. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, guided `uv`/Python runtime wizard, broadcast DSP mastering, and MCP server.*
+*An open-source, private, self-hosted neural speech workstation and native desktop app in Rust. Zero-Python core startup with native Piper C++, 646+ language zero-shot cloning, Cantonese/global neural voices, optional PyTorch extensions (Chatterbox-Turbo, KittenTTS 2, F5-TTS, Canto-TTS, Kokoro), broadcast DSP mastering, and MCP server.*
 
 [Downloads](#-direct-downloads--instant-setup) • [Features](#-key-capabilities) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
@@ -25,8 +25,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: Standalone Desktop + API v0.7.0**  
-> Built as a 15-crate Rust workspace with a native **Tauri v2 Desktop App** (`voxforge-desktop`) + CLI/API daemon (`voxforge`): multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, first-run `uv` isolated runtime wizard, voice blend studio, Whisper ASR, visual DAG pipeline builder, 17-tool MCP server, SHA-256 verified auto-updater, and OpenAI-compatible API. All 15 crates pass automated tests.
+> **Project Status: Standalone Desktop + API v0.7.1**  
+> Built as a 15-crate Rust workspace with a native **Tauri v2 Desktop App** (`voxforge-desktop`) + CLI/API daemon (`voxforge`): zero-Python startup (`Native Rust Core` + 1-click standalone native Piper C++ runtime) plus optional PyTorch sidecar engines (Chatterbox-Turbo, Chatterbox-23Lang, KittenTTS 2, F5-TTS, Canto-TTS, OmniVoice, CosyVoice, Kokoro), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, visual DAG pipeline builder, 17-tool MCP server, SHA-256 verified auto-updater, and OpenAI-compatible API. All 15 crates pass automated tests.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  

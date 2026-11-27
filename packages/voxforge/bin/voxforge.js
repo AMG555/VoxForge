@@ -16,7 +16,7 @@ const { spawn } = require('child_process');
 
 const REPO = 'AMG555/VoxForge';
 const EXPLICIT_VERSION = process.env.VOXFORGE_VERSION || '';
-let PKG_VERSION = '0.7.0';
+let PKG_VERSION = '0.7.1';
 try {
   PKG_VERSION = require('../package.json').version || PKG_VERSION;
 } catch {
