@@ -15,6 +15,7 @@ members = [
     "crates/voxforge-mcp",
     "crates/voxforge-api",
     "crates/voxforge-cli",
+    "crates/voxforge-desktop",
 ]
 
 [workspace.package]
