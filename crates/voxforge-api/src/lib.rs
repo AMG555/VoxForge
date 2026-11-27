@@ -7,6 +7,7 @@
 pub mod metrics;
 pub mod middleware;
 pub mod routes;
+pub mod server;
 pub mod state;
 
 use axum::http::HeaderValue;
@@ -29,6 +30,9 @@ pub fn create_app(state: AppState) -> Router {
                         || origin_str.starts_with("http://127.0.0.1")
                         || origin_str.starts_with("https://127.0.0.1")
                         || origin_str.starts_with("http://[::1]")
+                        || origin_str.starts_with("tauri://localhost")
+                        || origin_str.starts_with("http://tauri.localhost")
+                        || origin_str.starts_with("https://tauri.localhost")
                         || origin_str.starts_with("vscode-webview://")
                         || origin_str.starts_with("app://")
                     {

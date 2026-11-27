@@ -1,7 +1,6 @@
 // VoxForge Speech Workstation CLI & HTTP Server
 
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -9,13 +8,14 @@ use clap::{Args, Parser, Subcommand};
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use voxforge_api::{create_app, AppState};
+use voxforge_api::server::{
+    configure_data_directories, initialize_engine_registry as initialize_registry,
+    resolve_default_data_dir, start_embedded_server, EmbeddedServerConfig,
+};
 use voxforge_audio::WavEncoder;
 use voxforge_core::models::AudioContainerFormat;
-use voxforge_core::store::memory::MemoryStore;
 use voxforge_engine::{
-    AbTestRunner, AbTestScenario, EdgeTtsEngine, EngineRegistry, KokoroTtsEngine,
-    OpenAiRouterEngine, PiperTtsEngine, Qwen3TtsEngine, SynthesisRequest, TtsEngine,
+    AbTestRunner, AbTestScenario, Qwen3TtsEngine, SynthesisRequest, TtsEngine,
 };
 use voxforge_hardware::HardwareProbe;
 
@@ -285,21 +285,8 @@ async fn main() -> Result<()> {
     // Default data directory: %APPDATA%\VoxForge on Windows, ~/.voxforge elsewhere.
     // This ensures the installed app has a stable writable location regardless
     // of where the exe lives (e.g. Downloads folder).
-    let default_data_dir = dirs_data_dir();
-
-    // Ensure downloaded neural weights always persist in stable app data folder
-    if std::env::var("VOXFORGE_MODELS_DIR").is_err() {
-        let models_dir = default_data_dir.join("models");
-        let _ = std::fs::create_dir_all(&models_dir);
-        std::env::set_var("VOXFORGE_MODELS_DIR", models_dir);
-    }
-
-    // Ensure cloned voice profiles always persist in stable app data folder
-    if std::env::var("VOXFORGE_PROFILES_DIR").is_err() {
-        let profiles_dir = default_data_dir.join("profiles");
-        let _ = std::fs::create_dir_all(&profiles_dir);
-        std::env::set_var("VOXFORGE_PROFILES_DIR", profiles_dir);
-    }
+    let default_data_dir = resolve_default_data_dir();
+    let _ = configure_data_directories(&default_data_dir);
 
     let command = cli.command.unwrap_or_else(|| {
         Commands::Serve(ServeArgs {
@@ -329,121 +316,30 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn initialize_registry(
-    router_url: Option<String>,
-    router_api_key: Option<String>,
-    router_model: Option<String>,
-) -> Arc<EngineRegistry> {
-    let registry = Arc::new(EngineRegistry::new());
-    registry.register(Arc::new(EdgeTtsEngine::new())).await;
-    registry.register(Arc::new(Qwen3TtsEngine::default())).await;
-    registry.register(Arc::new(PiperTtsEngine::new())).await;
-    registry.register(Arc::new(KokoroTtsEngine::new())).await;
-
-    let r_url = router_url.or_else(|| std::env::var("VOXFORGE_ROUTER_URL").ok());
-    let r_key = router_api_key.or_else(|| std::env::var("VOXFORGE_ROUTER_API_KEY").ok());
-    let r_model = router_model.or_else(|| std::env::var("VOXFORGE_ROUTER_MODEL").ok());
-
-    let router_engine = if let Some(url) = r_url {
-        OpenAiRouterEngine::new(url, r_key, r_model)
-    } else {
-        OpenAiRouterEngine::default_openai(r_key)
-    };
-    registry.register(Arc::new(router_engine)).await;
-
-    registry
-}
-
 async fn run_serve(args: ServeArgs) -> Result<()> {
-    info!(
-        "Starting VoxForge Workstation Server v{}",
-        env!("CARGO_PKG_VERSION")
-    );
-
-    if !args.data_dir.exists() {
-        let _ = std::fs::create_dir_all(&args.data_dir);
-    }
-
-    let profiles_dir = std::env::var("VOXFORGE_PROFILES_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| args.data_dir.join("profiles"));
-    let models_dir = std::env::var("VOXFORGE_MODELS_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| args.data_dir.join("models"));
-
-    let _ = std::fs::create_dir_all(&profiles_dir);
-    let _ = std::fs::create_dir_all(&models_dir);
-
-    std::env::set_var("VOXFORGE_PROFILES_DIR", &profiles_dir);
-    std::env::set_var("VOXFORGE_MODELS_DIR", &models_dir);
-
-    info!("Profiles directory: {}", profiles_dir.display());
-    info!("Models directory:   {}", models_dir.display());
-
-    let hardware = HardwareProbe::probe();
-    info!("Host Architecture: {} / {}", hardware.os, hardware.arch);
-    info!("Assigned Hardware Tier: {}", hardware.assigned_tier);
-    info!(
-        "CPU: {} ({} threads)",
-        hardware.cpu_brand, hardware.cpu_logical_threads
-    );
-
-    let registry =
-        initialize_registry(args.router_url, args.router_api_key, args.router_model).await;
-    let store = Arc::new(MemoryStore::new());
-    let state = AppState::new(registry, store, hardware, args.api_key.clone());
-
-    let app = create_app(state);
-    let mut selected_port = args.port;
-    let listener = match tokio::net::TcpListener::bind(format!("{}:{}", args.host, selected_port))
-        .await
-    {
-        Ok(l) => l,
-        Err(e) if args.port == 8080 => {
-            tracing::warn!("Port 8080 busy ({e}). Trying alternative port...");
-            let mut found = None;
-            for p in 8081..=8090 {
-                if let Ok(l) = tokio::net::TcpListener::bind(format!("{}:{}", args.host, p)).await {
-                    selected_port = p;
-                    found = Some(l);
-                    break;
-                }
-            }
-            match found {
-                Some(l) => l,
-                None => {
-                    anyhow::bail!("Failed to bind to port 8080 or fallback ports 8081-8090: {e}")
-                }
-            }
-        }
-        Err(e) => anyhow::bail!("Failed to bind to {}:{}: {e}", args.host, args.port),
-    };
-
-    let actual_addr = listener.local_addr()?;
-    info!("Listening for API requests on http://{}", actual_addr);
-    if args.api_key.is_some() {
-        info!("Authentication enabled (Bearer token enforced)");
-    } else {
-        info!("Open mode (No API key enforced)");
-    }
-
-    let browser_url = if args.host == "0.0.0.0" {
-        format!("http://localhost:{}", selected_port)
-    } else {
-        format!("http://{}", actual_addr)
-    };
+    let server = start_embedded_server(EmbeddedServerConfig {
+        host: args.host,
+        port: args.port,
+        allow_port_fallback: true,
+        api_key: args.api_key,
+        data_dir: Some(args.data_dir),
+        router_url: args.router_url,
+        router_api_key: args.router_api_key,
+        router_model: args.router_model,
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!(e))?;
 
     if args.open {
         info!(
             "Opening visual workstation in default browser: {}",
-            browser_url
+            server.browser_url
         );
-        open_browser(&browser_url);
+        open_browser(&server.browser_url);
     }
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    shutdown_signal().await;
+    server.shutdown().await.map_err(|e| anyhow::anyhow!(e))?;
     info!("VoxForge Server shut down cleanly.");
     Ok(())
 }
@@ -463,33 +359,6 @@ fn open_browser(url: &str) {
     {
         let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
-}
-
-/// Resolve a stable application data directory for VoxForge.
-///
-/// Windows : %APPDATA%\VoxForge  (e.g. C:\Users\Alice\AppData\Roaming\VoxForge)
-/// macOS   : ~/Library/Application Support/VoxForge
-/// Linux   : ~/.local/share/VoxForge
-fn dirs_data_dir() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            let dir = PathBuf::from(appdata).join("VoxForge");
-            let _ = std::fs::create_dir_all(&dir);
-            return dir;
-        }
-    }
-    // Fallback for all platforms
-    let fallback = dirs_home().join(".voxforge");
-    let _ = std::fs::create_dir_all(&fallback);
-    fallback
-}
-
-fn dirs_home() -> PathBuf {
-    std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."))
 }
 
 async fn shutdown_signal() {
