@@ -788,10 +788,17 @@ pub struct PythonPackagesStatus {
     pub kokoro: bool,
     pub piper: bool,
     pub edge_tts: bool,
+    #[serde(default)]
+    pub chatterbox: bool,
+    #[serde(default)]
+    pub kitten: bool,
+    #[serde(default)]
+    pub canto: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeStatusResponse {
+    pub rust_core_ready: bool,
     pub python_available: bool,
     pub python_executable: Option<String>,
     pub sidecar_script_available: bool,
@@ -799,6 +806,8 @@ pub struct RuntimeStatusResponse {
     pub neural_sidecar: RuntimeEndpointStatus,
     pub kokoro_sidecar: RuntimeEndpointStatus,
     pub piper_cli_available: bool,
+    pub piper_native_installed: bool,
+    pub piper_binary_path: Option<String>,
     pub ffmpeg_available: bool,
     pub python_packages: PythonPackagesStatus,
     pub installed_model_files: Vec<String>,
@@ -813,6 +822,11 @@ pub struct StartSidecarRequest {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InstallRuntimePackageRequest {
     pub package: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct InstallNativeRuntimeRequest {
+    pub target: String,
 }
 
 fn find_sidecar_script() -> Option<PathBuf> {
@@ -895,12 +909,15 @@ pub(crate) async fn probe_python_packages(python_exe: Option<&str>) -> PythonPac
         kokoro: false,
         piper: false,
         edge_tts: false,
+        chatterbox: false,
+        kitten: false,
+        canto: false,
     };
     let Some(exe) = python_exe else {
         return status;
     };
 
-    let snippet = "import importlib.util, json; print(json.dumps({p: importlib.util.find_spec(p) is not None for p in ('torch','whisper','omnivoice','kokoro','piper','edge_tts')}))";
+    let snippet = "import importlib.util, json; print(json.dumps({p: importlib.util.find_spec(p) is not None for p in ('torch','whisper','omnivoice','kokoro','piper','edge_tts','chatterbox','kittenml','canto_tts')}))";
     let mut command = tokio::process::Command::new(exe);
     suppress_console_window(&mut command);
     let future = command.args(["-c", snippet]).output();
@@ -913,6 +930,9 @@ pub(crate) async fn probe_python_packages(python_exe: Option<&str>) -> PythonPac
                 status.kokoro = parsed["kokoro"].as_bool().unwrap_or(false);
                 status.piper = parsed["piper"].as_bool().unwrap_or(false);
                 status.edge_tts = parsed["edge_tts"].as_bool().unwrap_or(false);
+                status.chatterbox = parsed["chatterbox"].as_bool().unwrap_or(false);
+                status.kitten = parsed["kittenml"].as_bool().unwrap_or(false);
+                status.canto = parsed["canto_tts"].as_bool().unwrap_or(false);
             }
         }
     }
@@ -952,10 +972,10 @@ pub fn resolve_sidecar_launch_args(
         .unwrap_or_else(|| "auto".to_string());
     if !matches!(
         chosen_backend.as_str(),
-        "auto" | "omnivoice" | "cosyvoice" | "f5tts" | "kokoro"
+        "auto" | "omnivoice" | "cosyvoice" | "f5tts" | "kokoro" | "chatterbox" | "kitten" | "canto"
     ) {
         return Err(format!(
-            "Unsupported sidecar backend '{chosen_backend}'. Allowed: auto, omnivoice, cosyvoice, f5tts, kokoro."
+            "Unsupported sidecar backend '{chosen_backend}'. Allowed: auto, omnivoice, cosyvoice, f5tts, kokoro, chatterbox, kitten, canto."
         ));
     }
 
@@ -978,8 +998,34 @@ pub fn resolve_runtime_install_packages(target: &str) -> Result<Vec<&'static str
         "kokoro" => Ok(vec!["kokoro>=0.9.4", "soundfile", "misaki[en]"]),
         "piper" => Ok(vec!["piper-tts", "pathvalidate"]),
         "whisper" => Ok(vec!["openai-whisper"]),
+        "chatterbox" => Ok(vec!["chatterbox-tts"]),
+        "kitten" => Ok(vec!["kittenml"]),
+        "canto" => Ok(vec!["canto-tts"]),
         other => Err(format!(
-            "Unknown runtime package '{other}'. Allowed: kokoro, piper, whisper."
+            "Unknown runtime package '{other}'. Allowed: kokoro, piper, whisper, chatterbox, kitten, canto."
+        )),
+    }
+}
+
+pub fn resolve_native_piper_archive_url(os: &str, arch: &str) -> Result<&'static str, String> {
+    match (os, arch) {
+        ("windows", "x86_64" | "aarch64") => {
+            Ok("https://github.com/rhasspy/piper/releases/latest/download/piper_windows_amd64.zip")
+        }
+        ("linux", "x86_64") => Ok(
+            "https://github.com/rhasspy/piper/releases/latest/download/piper_linux_x86_64.tar.gz",
+        ),
+        ("linux", "aarch64") => Ok(
+            "https://github.com/rhasspy/piper/releases/latest/download/piper_linux_aarch64.tar.gz",
+        ),
+        ("macos", "aarch64") => Ok(
+            "https://github.com/rhasspy/piper/releases/latest/download/piper_macos_aarch64.tar.gz",
+        ),
+        ("macos", "x86_64") => {
+            Ok("https://github.com/rhasspy/piper/releases/latest/download/piper_macos_x64.tar.gz")
+        }
+        _ => Err(format!(
+            "No standalone native Piper archive for platform {os}/{arch}."
         )),
     }
 }
@@ -1000,7 +1046,12 @@ pub async fn get_runtime_status() -> Json<RuntimeStatusResponse> {
         probe_http_health(&kokoro_url),
     );
     let python_packages = probe_python_packages(python_executable.as_deref()).await;
-    let piper_cli_available = piper_cli || python_packages.piper;
+    let managed_piper = voxforge_engine::piper::managed_piper_binary_path();
+    let piper_native_installed = managed_piper.is_some();
+    let resolved_piper_bin = managed_piper
+        .map(|p| p.to_string_lossy().to_string())
+        .or_else(|| piper_cli.then(|| "piper".to_string()));
+    let piper_cli_available = piper_native_installed || piper_cli || python_packages.piper;
     let script_path = find_sidecar_script();
 
     let models_dir = std::env::var("VOXFORGE_MODELS_DIR")
@@ -1021,6 +1072,7 @@ pub async fn get_runtime_status() -> Json<RuntimeStatusResponse> {
     installed_model_files.sort();
 
     Json(RuntimeStatusResponse {
+        rust_core_ready: true,
         python_available: python_executable.is_some(),
         python_executable,
         sidecar_script_available: script_path.is_some(),
@@ -1028,6 +1080,8 @@ pub async fn get_runtime_status() -> Json<RuntimeStatusResponse> {
         neural_sidecar,
         kokoro_sidecar,
         piper_cli_available,
+        piper_native_installed,
+        piper_binary_path: resolved_piper_bin,
         ffmpeg_available,
         python_packages,
         installed_model_files,
@@ -1290,6 +1344,224 @@ pub async fn install_runtime_package_handler(
     })))
 }
 
+/// POST /v1/system/runtimes/install-native — install zero-Python native runtime binary (e.g. Piper C++ engine).
+pub async fn install_native_runtime_handler(
+    Json(payload): Json<InstallNativeRuntimeRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<ProblemDetails>)> {
+    let target = payload.target.trim().to_ascii_lowercase();
+    if target != "piper" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/invalid-native-runtime".to_string(),
+                title: "Unsupported Native Runtime".to_string(),
+                status: 400,
+                detail: format!(
+                    "Unknown native binary target '{target}'. Supported targets: piper."
+                ),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        ));
+    }
+
+    if let Some(existing) = voxforge_engine::piper::managed_piper_binary_path() {
+        return Ok(Json(json!({
+            "status": "already_installed",
+            "target": "piper",
+            "python_required": false,
+            "binary_path": existing.to_string_lossy(),
+            "message": format!("Native Piper runtime already ready at {}", existing.display())
+        })));
+    }
+
+    let archive_url = resolve_native_piper_archive_url(
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
+    .map_err(|detail| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/unsupported-platform".to_string(),
+                title: "Unsupported Platform".to_string(),
+                status: 400,
+                detail,
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    let bin_root = crate::server::resolve_default_data_dir().join("bin");
+    tokio::fs::create_dir_all(&bin_root).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-install-dir".to_string(),
+                title: "Failed Creating Bin Directory".to_string(),
+                status: 500,
+                detail: format!("Failed creating {}: {e}", bin_root.display()),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    let client = reqwest::Client::builder()
+        .user_agent(concat!("VoxForge/", env!("CARGO_PKG_VERSION")))
+        .timeout(Duration::from_secs(180))
+        .build()
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemDetails {
+                    problem_type: "https://voxforge.org/errors/http-client".to_string(),
+                    title: "HTTP Client Error".to_string(),
+                    status: 500,
+                    detail: e.to_string(),
+                    instance: "/v1/system/runtimes/install-native".to_string(),
+                }),
+            )
+        })?;
+
+    let resp = client.get(archive_url).send().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-download-failed".to_string(),
+                title: "Native Binary Download Failed".to_string(),
+                status: StatusCode::BAD_GATEWAY.as_u16(),
+                detail: format!("Failed downloading Piper archive from {archive_url}: {e}"),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    if !resp.status().is_success() {
+        return Err((
+            StatusCode::BAD_GATEWAY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-download-failed".to_string(),
+                title: "Native Binary Download Failed".to_string(),
+                status: StatusCode::BAD_GATEWAY.as_u16(),
+                detail: format!("Piper release download returned HTTP {}", resp.status()),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        ));
+    }
+
+    let bytes = resp.bytes().await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-download-failed".to_string(),
+                title: "Native Binary Read Failed".to_string(),
+                status: StatusCode::BAD_GATEWAY.as_u16(),
+                detail: format!("Failed reading Piper archive payload: {e}"),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    let ext = if archive_url.ends_with(".zip") {
+        "zip"
+    } else {
+        "tar.gz"
+    };
+    let archive_path = bin_root.join(format!("piper_download.{ext}"));
+    tokio::fs::write(&archive_path, &bytes).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-extract-failed".to_string(),
+                title: "Archive Write Failed".to_string(),
+                status: 500,
+                detail: format!("Failed writing {}: {e}", archive_path.display()),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    let extract_res = if archive_url.ends_with(".zip") {
+        let script = format!(
+            "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
+            archive_path.display().to_string().replace('\'', "''"),
+            bin_root.display().to_string().replace('\'', "''")
+        );
+        let mut cmd = tokio::process::Command::new("powershell");
+        suppress_console_window(&mut cmd);
+        cmd.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ])
+        .output()
+        .await
+    } else {
+        let mut cmd = tokio::process::Command::new("tar");
+        suppress_console_window(&mut cmd);
+        cmd.arg("-xzf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(&bin_root)
+            .output()
+            .await
+    };
+
+    let _ = tokio::fs::remove_file(&archive_path).await;
+
+    let out = extract_res.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-extract-failed".to_string(),
+                title: "Archive Extract Failed".to_string(),
+                status: 500,
+                detail: format!("Failed extracting Piper archive: {e}"),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-extract-failed".to_string(),
+                title: "Archive Extract Failed".to_string(),
+                status: 500,
+                detail: format!("Extractor failed ({}): {stderr}", out.status),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        ));
+    }
+
+    let resolved = voxforge_engine::piper::managed_piper_binary_path().ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/native-binary-missing".to_string(),
+                title: "Binary Missing After Extract".to_string(),
+                status: 500,
+                detail: format!(
+                    "Extracted Piper archive into {}, but executable was not found.",
+                    bin_root.display()
+                ),
+                instance: "/v1/system/runtimes/install-native".to_string(),
+            }),
+        )
+    })?;
+
+    Ok(Json(json!({
+        "status": "installed",
+        "target": "piper",
+        "python_required": false,
+        "binary_path": resolved.to_string_lossy(),
+        "message": format!("Installed standalone native Piper binary (Zero Python) at {}", resolved.display())
+    })))
+}
+
 fn schedule_self_restart() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("Cannot locate exe: {e}"))?;
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -1430,6 +1702,18 @@ f82d8e7479d0c4d0a55eb522abc4eed38bdc926a6f56c1f46c37ae59e3f79f0f  voxforge-windo
             resolve_runtime_install_packages("piper").unwrap(),
             vec!["piper-tts", "pathvalidate"]
         );
+        assert_eq!(
+            resolve_runtime_install_packages("chatterbox").unwrap(),
+            vec!["chatterbox-tts"]
+        );
+        assert_eq!(
+            resolve_runtime_install_packages("kitten").unwrap(),
+            vec!["kittenml"]
+        );
+        assert_eq!(
+            resolve_runtime_install_packages("canto").unwrap(),
+            vec!["canto-tts"]
+        );
         assert!(resolve_runtime_install_packages("arbitrary; rm -rf /").is_err());
 
         assert_eq!(
@@ -1440,7 +1724,29 @@ f82d8e7479d0c4d0a55eb522abc4eed38bdc926a6f56c1f46c37ae59e3f79f0f  voxforge-windo
             resolve_sidecar_launch_args(Some("omnivoice"), Some(9000)).unwrap(),
             ("omnivoice".to_string(), 9000)
         );
+        assert_eq!(
+            resolve_sidecar_launch_args(Some("chatterbox"), Some(9000)).unwrap(),
+            ("chatterbox".to_string(), 9000)
+        );
+        assert_eq!(
+            resolve_sidecar_launch_args(Some("kitten"), Some(9000)).unwrap(),
+            ("kitten".to_string(), 9000)
+        );
+        assert_eq!(
+            resolve_sidecar_launch_args(Some("canto"), Some(9000)).unwrap(),
+            ("canto".to_string(), 9000)
+        );
         assert!(resolve_sidecar_launch_args(Some("bash"), Some(9000)).is_err());
         assert!(resolve_sidecar_launch_args(Some("auto"), Some(22)).is_err());
+
+        assert!(resolve_native_piper_archive_url("windows", "x86_64")
+            .unwrap()
+            .ends_with("piper_windows_amd64.zip"));
+        assert!(resolve_native_piper_archive_url("macos", "aarch64")
+            .unwrap()
+            .ends_with("piper_macos_aarch64.tar.gz"));
+        assert!(resolve_native_piper_archive_url("linux", "x86_64")
+            .unwrap()
+            .ends_with("piper_linux_x86_64.tar.gz"));
     }
 }

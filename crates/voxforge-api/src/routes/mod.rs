@@ -186,6 +186,10 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/system/runtimes/install",
             post(system::install_runtime_package_handler),
         )
+        .route(
+            "/v1/system/runtimes/install-native",
+            post(system::install_native_runtime_handler),
+        )
         // First-run runtime setup wizard & managed uv/Python environment provisioning
         .route("/v1/system/setup-status", get(setup::get_setup_status))
         .route(

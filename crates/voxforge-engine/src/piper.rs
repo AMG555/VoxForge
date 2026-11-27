@@ -29,9 +29,9 @@ impl Default for PiperTtsEngine {
 impl PiperTtsEngine {
     pub fn new() -> Self {
         let piper_path = std::env::var("VOXFORGE_PIPER_PATH").ok().or_else(|| {
-            // Check standalone piper CLI first, then managed/system `python -m piper` module.
-            if which_piper() {
-                Some("piper".to_string())
+            // Check standalone native piper CLI first, then managed/system `python -m piper` module.
+            if let Some(bin) = which_piper() {
+                Some(bin)
             } else {
                 which_python_piper().map(|py| format!("python-module:{py}"))
             }
@@ -218,7 +218,42 @@ impl PiperTtsEngine {
     }
 }
 
-fn which_piper() -> bool {
+/// Locate bundled standalone native `piper` binary inside VoxForge data directory (`<data_dir>/bin/piper/`).
+pub fn managed_piper_binary_path() -> Option<PathBuf> {
+    let mut bases = Vec::new();
+    if let Ok(dir) = std::env::var("VOXFORGE_DATA_DIR") {
+        let p = PathBuf::from(dir.trim());
+        if !p.as_os_str().is_empty() {
+            bases.push(p);
+        }
+    }
+    #[cfg(target_os = "windows")]
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        bases.push(PathBuf::from(appdata).join("VoxForge"));
+    }
+    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+        bases.push(PathBuf::from(home).join(".voxforge"));
+    }
+
+    let exe_name = if cfg!(windows) { "piper.exe" } else { "piper" };
+    for base in bases {
+        for cand in [
+            base.join("bin").join("piper").join(exe_name),
+            base.join("bin").join(exe_name),
+        ] {
+            if cand.is_file() {
+                return Some(cand);
+            }
+        }
+    }
+    None
+}
+
+fn which_piper() -> Option<String> {
+    if let Some(managed) = managed_piper_binary_path() {
+        return Some(managed.to_string_lossy().to_string());
+    }
+
     if Command::new("piper")
         .arg("--version")
         .stdout(Stdio::null())
@@ -227,17 +262,22 @@ fn which_piper() -> bool {
         .map(|s| s.success())
         .unwrap_or(false)
     {
-        return true;
+        return Some("piper".to_string());
     }
 
     let cmd = if cfg!(windows) { "where" } else { "which" };
-    Command::new(cmd)
+    let ok = Command::new(cmd)
         .arg("piper")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .map(|s| s.success())
-        .unwrap_or(false)
+        .unwrap_or(false);
+    if ok {
+        Some("piper".to_string())
+    } else {
+        None
+    }
 }
 
 fn resolve_python_executable() -> String {
@@ -270,14 +310,14 @@ fn which_python_piper() -> Option<String> {
     }
 }
 
-fn resolve_runtime_piper_binary() -> Option<String> {
+pub fn resolve_runtime_piper_binary() -> Option<String> {
     if let Ok(path) = std::env::var("VOXFORGE_PIPER_PATH") {
         if !path.trim().is_empty() {
             return Some(path);
         }
     }
-    if which_piper() {
-        Some("piper".to_string())
+    if let Some(bin) = which_piper() {
+        Some(bin)
     } else {
         which_python_piper().map(|py| format!("python-module:{py}"))
     }
