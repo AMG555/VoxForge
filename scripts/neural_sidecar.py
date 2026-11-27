@@ -519,15 +519,74 @@ def _load_kokoro(device: str) -> bool:
         return False
 
 
+def _load_chatterbox(device: str) -> bool:
+    """Load Resemble AI Chatterbox / Chatterbox-Turbo zero-shot cloning model."""
+    global _tts_model, ACTIVE_BACKEND
+    try:
+        try:
+            from chatterbox.tts_turbo import ChatterboxTurboTTS as CBCls
+        except ImportError:
+            from chatterbox.tts import ChatterboxTTS as CBCls
+
+        log.info("Loading Chatterbox TTS on %s...", device)
+        _tts_model = CBCls.from_pretrained(device=device)
+        ACTIVE_BACKEND = "chatterbox"
+        log.info("Chatterbox TTS loaded (%s)", device)
+        return True
+    except Exception as exc:
+        log.debug("Chatterbox unavailable: %s", exc)
+        return False
+
+
+def _load_kitten(device: str) -> bool:
+    """Load KittenML KittenTTS 2 lightweight local engine."""
+    global _tts_model, ACTIVE_BACKEND
+    try:
+        from kittenml import KittenTTS
+
+        model_id = os.environ.get("KITTEN_TTS_MODEL", "KittenML/kitten-tts-mini-0.8")
+        log.info("Loading KittenTTS (%s)...", model_id)
+        _tts_model = KittenTTS(model_id)
+        ACTIVE_BACKEND = "kitten"
+        log.info("KittenTTS loaded on %s", device)
+        return True
+    except Exception as exc:
+        log.debug("KittenTTS unavailable: %s", exc)
+        return False
+
+
+def _load_canto(_device: str) -> bool:
+    """Load Canto-TTS CPU-first Hong Kong Cantonese + English ONNX engine."""
+    global _tts_model, ACTIVE_BACKEND
+    try:
+        from canto_tts import CantoTTS
+
+        log.info("Loading Canto-TTS (typangaa/canto-tts-nano ONNX)...")
+        _tts_model = CantoTTS()
+        ACTIVE_BACKEND = "canto"
+        log.info("Canto-TTS loaded (CPU ONNX)")
+        return True
+    except Exception as exc:
+        log.debug("Canto-TTS unavailable: %s", exc)
+        return False
+
+
 def load_backend(preferred: Optional[str] = None) -> bool:
     device = detect_device()
-    order = [preferred] if preferred else ["omnivoice", "cosyvoice3", "cosyvoice", "f5tts", "kokoro"]
+    order = (
+        [preferred]
+        if preferred
+        else ["omnivoice", "chatterbox", "cosyvoice3", "cosyvoice", "f5tts", "kokoro", "kitten", "canto"]
+    )
     loaders = {
         "omnivoice": _load_omnivoice,
+        "chatterbox": _load_chatterbox,
         "cosyvoice3": _load_cosyvoice3,
         "cosyvoice": _load_cosyvoice3,
         "f5tts": _load_f5tts,
         "kokoro": _load_kokoro,
+        "kitten": _load_kitten,
+        "canto": _load_canto,
     }
     for name in order:
         loader = loaders.get(name)
@@ -535,10 +594,10 @@ def load_backend(preferred: Optional[str] = None) -> bool:
             return True
 
     log.warning("NO local neural TTS backend found in Python environment!")
-    log.info("Install one of the following for local zero-shot neural voice cloning:")
+    log.info("Install one of the following optional sidecar backends if desired:")
     log.info("  1. pip install omnivoice")
-    log.info("  2. pip install f5-tts")
-    log.info("  3. pip install git+https://github.com/FunAudioLLM/CosyVoice")
+    log.info("  2. pip install chatterbox-tts")
+    log.info("  3. pip install kittenml | pip install canto-tts")
     return False
 
 
@@ -1213,6 +1272,40 @@ def synthesize(body: Dict[str, Any]) -> Tuple[bytes, int]:
             audio_f32 = np.concatenate(parts) if parts else np.zeros(0, dtype=np.float32)
             sr_out = 24000
 
+        elif ACTIVE_BACKEND == "chatterbox":
+            kw: Dict[str, Any] = {}
+            if tmp_path:
+                kw["audio_prompt_path"] = tmp_path
+            wav = _tts_model.generate(text, **kw)
+            audio_f32 = _extract_audio_array(wav)
+            sr_out = int(getattr(_tts_model, "sr", 24000))
+
+        elif ACTIVE_BACKEND == "kitten":
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+                out_wav = tf.name
+            try:
+                _tts_model.generate_to_file(text, out_wav)
+                with wave.open(out_wav, "rb") as wf:
+                    sr_out = wf.getframerate()
+                    pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+                    audio_f32 = pcm.astype(np.float32) / 32768.0
+            finally:
+                if os.path.exists(out_wav):
+                    os.unlink(out_wav)
+
+        elif ACTIVE_BACKEND == "canto":
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+                out_wav = tf.name
+            try:
+                _tts_model.synthesize(text, out_wav, quality="duration_filter")
+                with wave.open(out_wav, "rb") as wf:
+                    sr_out = wf.getframerate()
+                    pcm = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
+                    audio_f32 = pcm.astype(np.float32) / 32768.0
+            finally:
+                if os.path.exists(out_wav):
+                    os.unlink(out_wav)
+
         else:
             raise RuntimeError(f"No active neural backend loaded (ACTIVE_BACKEND={ACTIVE_BACKEND})")
 
@@ -1329,7 +1422,7 @@ def main():
     parser = argparse.ArgumentParser(description="VoxForge Neural Sidecar")
     parser.add_argument(
         "--backend",
-        choices=["omnivoice", "cosyvoice", "cosyvoice3", "f5tts", "kokoro"],
+        choices=["omnivoice", "chatterbox", "cosyvoice", "cosyvoice3", "f5tts", "kokoro", "kitten", "canto"],
         default=None,
     )
     parser.add_argument(
