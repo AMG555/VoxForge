@@ -48,7 +48,7 @@ Installers:
   - Architecture: x64
     InstallerType: inno
     InstallerUrl: https://github.com/AMG555/VoxForge/releases/download/v0.7.2/VoxForge_Setup_x64.exe
-    InstallerSha256: C7B04E9CF35C5AA7074B370F865234A420640952935867591DE651510B13542E
+    InstallerSha256: 40C392EB44D56590F550AA1582C87E4E0E7EF6380175CFD910D605D27DF293BE
     Scope: user
 ManifestType: installer
 ManifestVersion: 1.6.0
