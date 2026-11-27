@@ -29,13 +29,11 @@ impl Default for PiperTtsEngine {
 impl PiperTtsEngine {
     pub fn new() -> Self {
         let piper_path = std::env::var("VOXFORGE_PIPER_PATH").ok().or_else(|| {
-            // Check standalone piper CLI first, then `python -m piper` module.
+            // Check standalone piper CLI first, then managed/system `python -m piper` module.
             if which_piper() {
                 Some("piper".to_string())
-            } else if which_python_piper() {
-                Some("python-module:piper".to_string())
             } else {
-                None
+                which_python_piper().map(|py| format!("python-module:{py}"))
             }
         });
 
@@ -155,8 +153,13 @@ impl PiperTtsEngine {
     ) -> Result<AudioChunk> {
         info!(binary = %binary, model = %model_path.display(), "Executing local Piper subprocess");
 
-        let mut cmd = if binary == "python-module:piper" {
-            let mut c = Command::new("python");
+        let mut cmd = if let Some(py_exe) = binary.strip_prefix("python-module:") {
+            let py = if py_exe == "piper" || py_exe.is_empty() {
+                "python"
+            } else {
+                py_exe
+            };
+            let mut c = Command::new(py);
             c.arg("-m").arg("piper");
             c
         } else {
@@ -237,14 +240,47 @@ fn which_piper() -> bool {
         .unwrap_or(false)
 }
 
-fn which_python_piper() -> bool {
-    Command::new("python")
+fn resolve_python_executable() -> String {
+    if let Ok(managed) = std::env::var("VOXFORGE_MANAGED_PYTHON") {
+        let trimmed = managed.trim();
+        if !trimmed.is_empty() && Path::new(trimmed).exists() {
+            return trimmed.to_string();
+        }
+    }
+    if cfg!(windows) {
+        "python".to_string()
+    } else {
+        "python3".to_string()
+    }
+}
+
+fn which_python_piper() -> Option<String> {
+    let py = resolve_python_executable();
+    let ok = Command::new(&py)
         .args(["-m", "piper", "--help"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .map(|s| s.success())
-        .unwrap_or(false)
+        .unwrap_or(false);
+    if ok {
+        Some(py)
+    } else {
+        None
+    }
+}
+
+fn resolve_runtime_piper_binary() -> Option<String> {
+    if let Ok(path) = std::env::var("VOXFORGE_PIPER_PATH") {
+        if !path.trim().is_empty() {
+            return Some(path);
+        }
+    }
+    if which_piper() {
+        Some("piper".to_string())
+    } else {
+        which_python_piper().map(|py| format!("python-module:{py}"))
+    }
 }
 
 #[async_trait]
@@ -398,7 +434,11 @@ impl TtsEngine for PiperTtsEngine {
             }
         }
 
-        if let Some(ref bin) = self.piper_path {
+        let resolved_bin = self
+            .piper_path
+            .clone()
+            .or_else(resolve_runtime_piper_binary);
+        if let Some(ref bin) = resolved_bin {
             if let Some(model_path) = self.resolve_model_path(&req.voice_id) {
                 match self.synthesize_via_cli(bin, &model_path, &req.text) {
                     Ok(chunk) => return Ok(chunk),

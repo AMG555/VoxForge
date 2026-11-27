@@ -13,7 +13,11 @@ use voxforge_engine::{
 };
 use voxforge_hardware::HardwareProbe;
 
-use crate::{create_app, routes::system, AppState};
+use crate::{
+    create_app,
+    routes::{setup, system},
+    AppState,
+};
 
 /// Configuration for booting the embedded VoxForge HTTP/WebSocket API server.
 #[derive(Debug, Clone)]
@@ -175,6 +179,7 @@ pub async fn start_embedded_server(
 
     let data_dir = config.data_dir.unwrap_or_else(resolve_default_data_dir);
     let (profiles_dir, models_dir) = configure_data_directories(&data_dir);
+    setup::apply_desktop_config_env();
 
     info!("Starting VoxForge Workstation Server v{}", env!("CARGO_PKG_VERSION"));
     info!("Profiles directory: {}", profiles_dir.display());

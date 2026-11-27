@@ -15,6 +15,7 @@ pub mod pipeline;
 pub mod pronunciation;
 pub mod qa;
 pub mod refine;
+pub mod setup;
 pub mod speech;
 pub mod system;
 pub mod telephony;
@@ -182,4 +183,12 @@ pub fn build_api_router() -> Router<AppState> {
             "/v1/system/runtimes/install",
             post(system::install_runtime_package_handler),
         )
+        // First-run runtime setup wizard & managed uv/Python environment provisioning
+        .route("/v1/system/setup-status", get(setup::get_setup_status))
+        .route("/v1/system/setup/config", post(setup::save_setup_config_handler))
+        .route("/v1/system/setup/probe-python", post(setup::probe_python_handler))
+        .route("/v1/system/setup/test-remote", post(setup::test_remote_handler))
+        .route("/v1/system/setup/install", post(setup::start_setup_install_handler))
+        .route("/v1/system/setup/progress", get(setup::get_setup_progress_handler))
+        .route("/v1/system/setup/cancel", post(setup::cancel_setup_install_handler))
 }

@@ -838,8 +838,19 @@ fn find_sidecar_script() -> Option<PathBuf> {
     None
 }
 
-async fn check_command_exists(cmd: &str, args: &[&str]) -> bool {
-    let future = tokio::process::Command::new(cmd)
+pub(crate) fn suppress_console_window(cmd: &mut tokio::process::Command) {
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    #[cfg(not(windows))]
+    let _ = cmd;
+}
+
+pub(crate) async fn check_command_exists(cmd: &str, args: &[&str]) -> bool {
+    let mut command = tokio::process::Command::new(cmd);
+    suppress_console_window(&mut command);
+    let future = command
         .args(args)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -852,7 +863,17 @@ async fn check_command_exists(cmd: &str, args: &[&str]) -> bool {
         .unwrap_or(false)
 }
 
-async fn probe_python_executable() -> Option<String> {
+pub(crate) async fn probe_python_executable() -> Option<String> {
+    if let Ok(managed) = std::env::var("VOXFORGE_MANAGED_PYTHON") {
+        let trimmed = managed.trim();
+        if !trimmed.is_empty()
+            && Path::new(trimmed).exists()
+            && check_command_exists(trimmed, &["--version"]).await
+        {
+            return Some(trimmed.to_string());
+        }
+    }
+
     let candidates = if cfg!(windows) {
         ["python", "py"]
     } else {
@@ -866,7 +887,7 @@ async fn probe_python_executable() -> Option<String> {
     None
 }
 
-async fn probe_python_packages(python_exe: Option<&str>) -> PythonPackagesStatus {
+pub(crate) async fn probe_python_packages(python_exe: Option<&str>) -> PythonPackagesStatus {
     let mut status = PythonPackagesStatus {
         torch: false,
         whisper: false,
@@ -880,9 +901,9 @@ async fn probe_python_packages(python_exe: Option<&str>) -> PythonPackagesStatus
     };
 
     let snippet = "import importlib.util, json; print(json.dumps({p: importlib.util.find_spec(p) is not None for p in ('torch','whisper','omnivoice','kokoro','piper','edge_tts')}))";
-    let future = tokio::process::Command::new(exe)
-        .args(["-c", snippet])
-        .output();
+    let mut command = tokio::process::Command::new(exe);
+    suppress_console_window(&mut command);
+    let future = command.args(["-c", snippet]).output();
     if let Ok(Ok(output)) = tokio::time::timeout(Duration::from_secs(3), future).await {
         if output.status.success() {
             if let Ok(parsed) = serde_json::from_slice::<Value>(&output.stdout) {
