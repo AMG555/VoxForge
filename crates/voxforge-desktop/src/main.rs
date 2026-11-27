@@ -137,6 +137,11 @@ async fn boot_backend() -> Result<StartedServer, String> {
 }
 
 fn main() {
+    if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
+        println!("voxforge-desktop {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_target(false)

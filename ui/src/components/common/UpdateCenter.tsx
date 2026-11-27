@@ -50,6 +50,7 @@ export const UpdateCenter: React.FC<UpdateCenterProps> = ({
 
   const handleApplyUpdate = async () => {
     setErrorMsg(null);
+    setApplyResult(null);
     setIsApplying(true);
     try {
       const res = await api.applySystemUpdate(false);
@@ -261,18 +262,30 @@ export const UpdateCenter: React.FC<UpdateCenterProps> = ({
           </button>
 
           <div className="flex items-center space-x-2">
-            {hasUpdate && updateInfo?.can_self_update && (
+            {applyResult?.status === 'applied' && applyResult.restart_required ? (
               <button
                 type="button"
-                onClick={handleApplyUpdate}
-                disabled={isApplying}
-                className="inline-flex items-center space-x-1.5 px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold disabled:opacity-50 transition-colors"
+                onClick={handleRestartServer}
+                className="inline-flex items-center space-x-1.5 px-4 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-mono font-bold transition-colors"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>
-                  {isApplying ? 'Verifying & Installing...' : `Install Update v${latestVersion}`}
-                </span>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restart Server Now</span>
               </button>
+            ) : (
+              hasUpdate &&
+              updateInfo?.can_self_update && (
+                <button
+                  type="button"
+                  onClick={handleApplyUpdate}
+                  disabled={isApplying}
+                  className="inline-flex items-center space-x-1.5 px-4 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black text-xs font-mono font-bold disabled:opacity-50 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>
+                    {isApplying ? 'Verifying & Installing...' : `Install Update v${latestVersion}`}
+                  </span>
+                </button>
+              )
             )}
             <button
               type="button"

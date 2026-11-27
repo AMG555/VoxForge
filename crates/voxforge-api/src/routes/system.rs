@@ -17,6 +17,7 @@ const MAX_UPDATE_BINARY_BYTES: usize = 128 * 1024 * 1024;
 
 static UPDATE_CACHE: OnceLock<RwLock<Option<(Instant, String, UpdateCheckResponse)>>> =
     OnceLock::new();
+static APPLIED_UPDATE: OnceLock<RwLock<Option<UpdateApplyResponse>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateCheckQuery {
@@ -146,11 +147,49 @@ pub fn parse_checksums_txt(content: &str, asset_name: &str) -> Option<String> {
     None
 }
 
+fn is_desktop_executable(exe_path: &Path) -> bool {
+    exe_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.to_ascii_lowercase().contains("voxforge-desktop"))
+        .unwrap_or(false)
+}
+
 /// Map runtime OS/CPU architecture to release asset preference list.
 pub fn resolve_platform_asset_candidates(
     os: &str,
     arch: &str,
 ) -> (&'static str, &'static [&'static str]) {
+    resolve_platform_asset_candidates_for_binary(os, arch, false)
+}
+
+pub fn resolve_platform_asset_candidates_for_binary(
+    os: &str,
+    arch: &str,
+    is_desktop: bool,
+) -> (&'static str, &'static [&'static str]) {
+    if is_desktop {
+        return match (os, arch) {
+            ("windows", "x86_64" | "aarch64") => (
+                "voxforge-desktop-windows-x86_64.exe",
+                &[
+                    "voxforge-desktop-windows-x86_64.exe",
+                    "voxforge-desktop.exe",
+                    "voxforge-windows-x86_64.exe",
+                ],
+            ),
+            ("macos", "aarch64" | "x86_64") => (
+                "voxforge-desktop-macos-universal",
+                &["voxforge-desktop-macos-universal", "voxforge-macos-universal"],
+            ),
+            ("linux", "x86_64") => (
+                "voxforge-desktop-linux-x86_64",
+                &["voxforge-desktop-linux-x86_64", "voxforge-linux-x86_64"],
+            ),
+            _ => ("voxforge-desktop", &["voxforge-desktop", "voxforge"]),
+        };
+    }
+
     match (os, arch) {
         ("windows", "x86_64" | "aarch64") => (
             "voxforge-windows-x86_64.exe",
@@ -187,7 +226,9 @@ pub fn detect_install_mode(exe_path: &Path) -> (&'static str, bool) {
     let parent_writable = exe_path.parent().map(is_dir_writable).unwrap_or(false);
 
     if cfg!(windows)
-        && (norm.contains("/program files/") || norm.ends_with("/voxforge/voxforge.exe"))
+        && (norm.contains("/program files/")
+            || norm.ends_with("/voxforge/voxforge.exe")
+            || norm.ends_with("/voxforge/voxforge-desktop.exe"))
     {
         return ("windows_installer", parent_writable);
     }
@@ -245,12 +286,31 @@ pub fn is_trusted_release_download_url(download_url: &str, api_url: &str) -> boo
     false
 }
 
+fn applied_update_store() -> &'static RwLock<Option<UpdateApplyResponse>> {
+    APPLIED_UPDATE.get_or_init(|| RwLock::new(None))
+}
+
 /// Remove `.old` backup left behind after a Windows self-update swap.
 pub fn cleanup_stale_update_backups() {
     if let Ok(exe) = std::env::current_exe() {
         let backup = backup_path_for(&exe);
         if backup.exists() {
             let _ = std::fs::remove_file(&backup);
+        }
+        if let (Some(parent), Some(file_name)) = (
+            exe.parent(),
+            exe.file_name().and_then(|n| n.to_str()),
+        ) {
+            let prefix = format!("{file_name}.");
+            if let Ok(entries) = std::fs::read_dir(parent) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if name_str.starts_with(&prefix) && name_str.ends_with(".old") {
+                        let _ = std::fs::remove_file(entry.path());
+                    }
+                }
+            }
         }
     }
 }
@@ -293,8 +353,9 @@ fn build_update_client() -> Result<reqwest::Client, String> {
 fn build_base_response(check_status: &str, error: Option<String>) -> UpdateCheckResponse {
     let os = std::env::consts::OS.to_string();
     let arch = std::env::consts::ARCH.to_string();
-    let (primary_asset, _) = resolve_platform_asset_candidates(&os, &arch);
     let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("voxforge"));
+    let is_desktop = is_desktop_executable(&exe_path);
+    let (primary_asset, _) = resolve_platform_asset_candidates_for_binary(&os, &arch, is_desktop);
     let (install_mode, writable) = detect_install_mode(&exe_path);
 
     let update_hint = match install_mode {
@@ -431,7 +492,12 @@ pub async fn check_for_updates_from_url(api_url: &str) -> UpdateCheckResponse {
     resp.release_notes = release.body.map(|b| b.chars().take(1600).collect());
     resp.published_at = release.published_at;
 
-    let (_, candidates) = resolve_platform_asset_candidates(&resp.platform, &resp.arch);
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("voxforge"));
+    let (_, candidates) = resolve_platform_asset_candidates_for_binary(
+        &resp.platform,
+        &resp.arch,
+        is_desktop_executable(&exe_path),
+    );
     let selected_asset = candidates
         .iter()
         .find_map(|name| release.assets.iter().find(|a| a.name == *name));
@@ -461,6 +527,10 @@ pub async fn check_for_updates_from_url(api_url: &str) -> UpdateCheckResponse {
 /// Download the latest verified release binary, verify SHA-256 and execute health check, then swap atomically.
 pub async fn download_verify_and_install_update(
 ) -> Result<UpdateApplyResponse, (StatusCode, String)> {
+    if let Some(existing) = applied_update_store().read().await.clone() {
+        return Ok(existing);
+    }
+
     let api_url = release_api_url();
     let check = check_for_updates(true).await;
     if check.check_status != "ok" {
@@ -602,7 +672,7 @@ pub async fn download_verify_and_install_update(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
-    Ok(UpdateApplyResponse {
+    let response = UpdateApplyResponse {
         status: "applied".to_string(),
         previous_version: check.current_version,
         new_version: latest_version.clone(),
@@ -615,7 +685,9 @@ pub async fn download_verify_and_install_update(
         message: format!(
             "Verified SHA-256 and installed VoxForge v{latest_version}. Restart VoxForge to activate."
         ),
-    })
+    };
+    *applied_update_store().write().await = Some(response.clone());
+    Ok(response)
 }
 
 async fn apply_binary_bytes_atomically(exe_path: &Path, bytes: &[u8]) -> Result<(), String> {
@@ -662,13 +734,24 @@ async fn apply_binary_bytes_atomically(exe_path: &Path, bytes: &[u8]) -> Result<
 
     #[cfg(windows)]
     {
-        let backup = backup_path_for(exe_path);
-        if backup.exists() {
-            let _ = std::fs::remove_file(&backup);
+        let mut backup = backup_path_for(exe_path);
+        if backup.exists() && std::fs::remove_file(&backup).is_err() {
+            let file_name = exe_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("voxforge.exe");
+            let tag = &uuid::Uuid::new_v4().simple().to_string()[..8];
+            backup = exe_path.with_file_name(format!("{file_name}.{tag}.old"));
         }
         std::fs::rename(exe_path, &backup).map_err(|e| {
             let _ = std::fs::remove_file(&staged);
-            format!("Failed moving active executable to backup: {e}")
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                format!(
+                    "Failed moving active executable to backup: {e}. Close any other running VoxForge instances or run the one-line installer as Administrator."
+                )
+            } else {
+                format!("Failed moving active executable to backup: {e}")
+            }
         })?;
         if let Err(e) = std::fs::rename(&staged, exe_path) {
             let _ = std::fs::rename(&backup, exe_path);
@@ -1601,8 +1684,30 @@ fn schedule_self_restart() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("Cannot locate exe: {e}"))?;
     let args: Vec<String> = std::env::args().skip(1).collect();
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(450)).await;
-        let _ = std::process::Command::new(&exe).args(&args).spawn();
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            let escaped_exe = exe.to_string_lossy().replace('"', "\"\"");
+            let escaped_args = args
+                .iter()
+                .map(|a| format!("\"{}\"", a.replace('"', "\"\"")))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let cmd_line = if escaped_args.is_empty() {
+                format!("ping -n 2 127.0.0.1 > nul & start \"\" \"{escaped_exe}\"")
+            } else {
+                format!("ping -n 2 127.0.0.1 > nul & start \"\" \"{escaped_exe}\" {escaped_args}")
+            };
+            let _ = std::process::Command::new("cmd")
+                .args(["/C", &cmd_line])
+                .creation_flags(0x0800_0000)
+                .spawn();
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = std::process::Command::new(&exe).args(&args).spawn();
+        }
         std::process::exit(0);
     });
     Ok(())
