@@ -6,7 +6,8 @@
 #define MyAppVersion "0.6.0"
 #define MyAppPublisher "VoxForge Contributors"
 #define MyAppURL "https://github.com/AMG555/VoxForge"
-#define MyAppExeName "voxforge.exe"
+#define MyAppExeName "voxforge-desktop.exe"
+#define MyCliExeName "voxforge.exe"
 #define MyAppDescription "Neural Speech Studio"
 
 [Setup]
@@ -47,22 +48,23 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-; Binary is copied to dist/ by the packaging step before Inno Setup runs
-Source: "..\..\dist\voxforge.exe"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
+; Binaries are copied to dist/ by the packaging step before Inno Setup runs
+Source: "..\..\dist\voxforge-desktop.exe"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
+Source: "..\..\dist\voxforge.exe"; DestDir: "{app}"; DestName: "{#MyCliExeName}"; Flags: ignoreversion
 Source: "..\..\assets\voxforge.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]
 ; Start Menu
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\voxforge.ico"; Comment: "Launch VoxForge Neural Speech Studio"
-Name: "{group}\{#MyAppName} (Open Studio)"; Filename: "{app}\{#MyAppExeName}"; Parameters: "serve --open"; IconFilename: "{app}\voxforge.ico"
+Name: "{group}\{#MyAppName} (Web Browser Mode)"; Filename: "{app}\{#MyCliExeName}"; Parameters: "serve --open"; IconFilename: "{app}\voxforge.ico"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 ; Desktop
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\voxforge.ico"; Comment: "Launch VoxForge Neural Speech Studio"; Tasks: desktopicon
 
 [Run]
-; Open the studio in browser right after install
+; Open the native desktop studio right after install
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} Studio now"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
