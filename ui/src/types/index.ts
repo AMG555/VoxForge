@@ -301,4 +301,87 @@ export interface RuntimeStatusResponse {
   installed_model_files: string[];
 }
 
+export interface DesktopConfig {
+  setup_completed: boolean;
+  runtime_profile: 'rust_core' | 'core_neural' | 'full_cloning' | 'remote' | string;
+  runtime_dir: string;
+  custom_python?: string | null;
+  remote_server_url?: string | null;
+  telemetry_opt_in: boolean;
+}
+
+export interface DiscoveredPython {
+  path: string;
+  version: string;
+  label: string;
+  is_managed: boolean;
+}
+
+export interface RuntimeProfileSpec {
+  id: 'rust_core' | 'core_neural' | 'full_cloning' | string;
+  title: string;
+  subtitle: string;
+  disk_estimate_gb: number;
+  requires_python: boolean;
+  packages: string[];
+  recommended: boolean;
+}
+
+export interface HardwareAccelerator {
+  name: string;
+  vram_mb: number;
+  has_cuda: boolean;
+  has_mps: boolean;
+  has_directml: boolean;
+}
+
+export interface HardwareProfileFull {
+  os: string;
+  arch: string;
+  cpu_brand: string;
+  cpu_physical_cores: number;
+  cpu_logical_threads: number;
+  total_memory_mb: number;
+  available_memory_mb: number;
+  gpus: HardwareAccelerator[];
+  assigned_tier: string;
+  recommended_engines: string[];
+}
+
+export interface SetupStatusResponse {
+  config: DesktopConfig;
+  default_runtime_dir: string;
+  managed_venv_python?: string | null;
+  managed_venv_ready: boolean;
+  uv_available: boolean;
+  uv_path?: string | null;
+  disk_available_bytes: number;
+  disk_total_bytes: number;
+  hardware: HardwareProfileFull;
+  discovered_pythons: DiscoveredPython[];
+  installed_packages: PythonPackagesStatus;
+  profiles: RuntimeProfileSpec[];
+}
+
+export interface SetupStepProgress {
+  id: string;
+  label: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled' | string;
+  detail?: string | null;
+}
+
+export interface InstallJobSnapshot {
+  job_id?: string | null;
+  status: 'idle' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
+  profile: string;
+  runtime_dir: string;
+  current_step: string;
+  percent: number;
+  elapsed_secs: number;
+  steps: SetupStepProgress[];
+  logs: string[];
+  error?: string | null;
+}
+
+
 

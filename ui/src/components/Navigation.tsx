@@ -1,8 +1,10 @@
 import React from 'react';
-import { Activity, Cpu, GitFork, Layers, Mic, Scale, LayoutGrid, Music2, ArrowUpCircle } from 'lucide-react';
+import { Activity, Cpu, GitFork, Layers, Mic, Scale, LayoutGrid, Music2, ArrowUpCircle, SlidersHorizontal } from 'lucide-react';
 import { HardwareInfo, SystemUpdateInfo } from '../types';
 import { Logo } from './common/Logo';
 import { AgentBeacon } from './common/AgentBeacon';
+import { getApiBaseUrl } from '../services/api';
+import { openExternalUrl } from '../services/desktopBridge';
 
 interface NavigationProps {
   activeTab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa';
@@ -12,6 +14,7 @@ interface NavigationProps {
   isDictationOpen?: boolean;
   updateInfo?: SystemUpdateInfo | null;
   onOpenUpdateCenter?: () => void;
+  onOpenRuntimeSetup?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -22,6 +25,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   isDictationOpen,
   updateInfo,
   onOpenUpdateCenter,
+  onOpenRuntimeSetup,
 }) => {
   return (
     <header className="h-14 border-b border-[#242E3D] bg-[#121820] flex items-center justify-between px-3 gap-2 select-none shrink-0 relative z-30">
@@ -106,16 +110,27 @@ export const Navigation: React.FC<NavigationProps> = ({
           </button>
         )}
 
-        <a
-          href="/docs"
-          target="_blank"
-          rel="noopener noreferrer"
+        {onOpenRuntimeSetup && (
+          <button
+            type="button"
+            onClick={onOpenRuntimeSetup}
+            className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-mono whitespace-nowrap transition-colors border bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white border-[#242E3D]"
+            title="Configure Local Neural Runtime or Remote Connection"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden xl:inline">Runtime</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => openExternalUrl(`${getApiBaseUrl()}/docs`)}
           className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-mono whitespace-nowrap text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors"
           title="Interactive Scalar OpenAPI Reference"
         >
           <Activity className="w-3.5 h-3.5" />
           <span className="hidden lg:inline">API Docs</span>
-        </a>
+        </button>
 
         {hardware && (
           <div

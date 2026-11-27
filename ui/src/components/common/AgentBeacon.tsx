@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Radio, CheckCircle, ExternalLink, X, Copy, Check } from 'lucide-react';
+import { getApiBaseUrl } from '../../services/api';
 
 interface AgentBeaconProps {
   serverUrl?: string;
@@ -15,8 +16,10 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
   const [snippetMode, setSnippetMode] = useState<McpSnippetMode>('npx');
   const [copiedConfig, setCopiedConfig] = useState<boolean>(false);
 
+  const effectiveBase = serverUrl || getApiBaseUrl();
   const origin =
-    serverUrl || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8080');
+    effectiveBase ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8080');
 
   const configSnippets: Record<McpSnippetMode, string> = {
     npx: JSON.stringify(
@@ -75,7 +78,7 @@ export const AgentBeacon: React.FC<AgentBeaconProps> = ({ serverUrl = '' }) => {
     window.addEventListener('voxforge:agent-start', handleAgentStart);
     window.addEventListener('voxforge:agent-end', handleAgentEnd);
 
-    const endpoint = serverUrl ? `${serverUrl}/mcp` : '/mcp';
+    const endpoint = effectiveBase ? `${effectiveBase}/mcp` : '/mcp';
     const token = typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;

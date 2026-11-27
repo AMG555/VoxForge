@@ -9,11 +9,16 @@ import { AbTestLab } from './components/qa/AbTestLab';
 import { ModelCatalog } from './components/catalog/ModelCatalog';
 import { DictationBar } from './components/dictation/DictationBar';
 import { UpdateCenter } from './components/common/UpdateCenter';
+import { TitleBar } from './components/desktop/TitleBar';
+import { FirstRunWizard } from './components/setup/FirstRunWizard';
 import { HardwareInfo, SystemUpdateInfo, Voice } from './types';
 import { api } from './services/api';
 import { WorkflowStorage } from './services/workflowStorage';
+import { useAppDispatch } from './store';
+import { setWizardOpen } from './store/setupSlice';
 
 export const App: React.FC = () => {
+  const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState<'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa'>('workflows');
   const [activeWorkflowId, setActiveWorkflowId] = useState<string>(() => WorkflowStorage.getActiveWorkflowId());
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
@@ -251,6 +256,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0B0E14]">
+      <TitleBar />
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -262,6 +268,7 @@ export const App: React.FC = () => {
           setIsUpdateModalOpen(true);
           refreshSystemUpdate(false);
         }}
+        onOpenRuntimeSetup={() => dispatch(setWizardOpen(true))}
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -298,6 +305,7 @@ export const App: React.FC = () => {
               setIsUpdateModalOpen(true);
               refreshSystemUpdate(true);
             }}
+            onOpenRuntimeSetup={() => dispatch(setWizardOpen(true))}
           />
         )}
         {activeTab === 'qa' && <AbTestLab voices={voices} />}
@@ -321,6 +329,8 @@ export const App: React.FC = () => {
           setIsDictationOpen(false);
         }}
       />
+
+      <FirstRunWizard />
     </div>
   );
 };

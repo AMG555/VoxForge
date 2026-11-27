@@ -15,9 +15,15 @@ import {
   VoiceProfile,
 } from '../types';
 
-const BASE_URL = '';
+let BASE_URL = '';
 
-const getHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
+export const getApiBaseUrl = (): string => BASE_URL;
+
+export const setApiBaseUrl = (url: string): void => {
+  BASE_URL = url.trim().replace(/\/+$/, '');
+};
+
+export const getHeaders = (customHeaders: Record<string, string> = {}): Record<string, string> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('voxforge_api_key') : null;
   const headers: Record<string, string> = { ...customHeaders };
   if (token) {

@@ -20,6 +20,7 @@ interface HardwareInspectorProps {
   onNavigateTab?: (tab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
   updateInfo?: SystemUpdateInfo | null;
   onOpenUpdates?: () => void;
+  onOpenRuntimeSetup?: () => void;
 }
 
 interface EngineDescriptor {
@@ -124,6 +125,7 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
   onNavigateTab,
   updateInfo,
   onOpenUpdates,
+  onOpenRuntimeSetup,
 }) => {
   const [runtimes, setRuntimes] = useState<RuntimeStatusResponse | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -186,14 +188,25 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
   return (
     <div className="flex-1 p-6 lg:p-8 pb-36 overflow-y-auto bg-[#0B0E14] space-y-6">
       <div className="w-full max-w-6xl mx-auto space-y-6">
-        <div>
-          <span className="text-[11px] font-mono uppercase text-amber-500 tracking-wider">
-            System Telemetry & Engines
-          </span>
-          <h2 className="text-xl font-bold text-white mt-0.5">Hardware Capability Profile</h2>
-          <p className="text-xs text-[#94A3B8] font-mono mt-1">
-            Automated host probe detecting SIMD vector extensions, accelerators, and active synthesis engines.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="text-[11px] font-mono uppercase text-amber-500 tracking-wider">
+              System Telemetry & Engines
+            </span>
+            <h2 className="text-xl font-bold text-white mt-0.5">Hardware Capability Profile</h2>
+            <p className="text-xs text-[#94A3B8] font-mono mt-1">
+              Automated host probe detecting SIMD vector extensions, accelerators, and active synthesis engines.
+            </p>
+          </div>
+          {onOpenRuntimeSetup && (
+            <button
+              type="button"
+              onClick={onOpenRuntimeSetup}
+              className="px-3 py-1.5 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] border border-[#3B485C] text-xs font-mono text-white transition-colors"
+            >
+              Runtime Setup Wizard
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
