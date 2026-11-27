@@ -395,8 +395,46 @@ impl EdgeTtsClient {
         Ok(())
     }
 
-    /// Direct synthesis returning single AudioChunk
-    pub async fn synthesize(_request: &SynthesisRequest, ssml: &str) -> Result<AudioChunk> {
+    /// Direct synthesis returning single AudioChunk, retrying transient WebSocket resets.
+    pub async fn synthesize(request: &SynthesisRequest, ssml: &str) -> Result<AudioChunk> {
+        const MAX_ATTEMPTS: usize = 3;
+        let mut last_err = None;
+
+        for attempt in 1..=MAX_ATTEMPTS {
+            match Self::synthesize_once(request, ssml).await {
+                Ok(mp3_bytes) => {
+                    let (sample_rate, channels, pcm_data) = decode_mp3_to_pcm(&mp3_bytes)?;
+                    return Ok(AudioChunk {
+                        sample_rate,
+                        channels,
+                        pcm_data,
+                        is_final: true,
+                    });
+                }
+                Err(err) if attempt < MAX_ATTEMPTS => {
+                    let delay_ms = (attempt as u64) * 250;
+                    warn!(
+                        attempt,
+                        max_attempts = MAX_ATTEMPTS,
+                        delay_ms,
+                        "Transient Edge-TTS synthesis failure ({}); retrying with fresh WebSocket",
+                        err
+                    );
+                    last_err = Some(err);
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                }
+                Err(err) => {
+                    last_err = Some(err);
+                }
+            }
+        }
+
+        Err(last_err.unwrap_or_else(|| {
+            VoxForgeError::AudioProcessing("Edge TTS synthesis failed after retries".to_string())
+        }))
+    }
+
+    async fn synthesize_once(_request: &SynthesisRequest, ssml: &str) -> Result<Vec<u8>> {
         let connection_id = Uuid::new_v4().simple().to_string();
         let request_id = Uuid::new_v4().simple().to_string();
         let url = Self::build_url(&connection_id);
@@ -533,14 +571,7 @@ impl EdgeTtsClient {
             ));
         }
 
-        let (sample_rate, channels, pcm_data) = decode_mp3_to_pcm(&mp3_bytes)?;
-
-        Ok(AudioChunk {
-            sample_rate,
-            channels,
-            pcm_data,
-            is_final: true,
-        })
+        Ok(mp3_bytes)
     }
 }
 
