@@ -19,7 +19,7 @@ export interface SetupState {
 const initialState: SetupState = {
   isDesktop: false,
   desktopPlatform: 'web',
-  desktopVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.0',
+  desktopVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.7.0',
   serverBaseUrl: '',
   isWizardOpen: false,
   selectedProfile: 'core_neural',

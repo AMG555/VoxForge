@@ -6,6 +6,18 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0] — 2026-11-27
+
+### 🖥️ Standalone Native Desktop App & First-Run Runtime Wizard
+- **Native Tauri v2 Desktop App (`voxforge-desktop`)**: Embedded Axum engine, multi-engine TTS dispatcher, WebView2 UI, frameless dark custom titlebar, system tray menu, and OS folder/file dialogs inside a standalone desktop executable (alongside headless/CLI `voxforge`).
+- **VoiceStudio-Style First-Run Setup Wizard**: Redux Toolkit + RTK Query onboarding flow letting users launch immediately with **Instant Rust Core (0 GB)**, install an isolated Python 3.11 runtime via `uv` (**Core Neural Studio** or **Full Cloning Studio**), change runtime storage directory with live free disk space & CUDA/GPU detection, discover/select Python interpreters, stream live install logs with cancellation, or connect to a remote VoxForge server.
+- **Synthesis, Cloning & Catalog Fixes**:
+  - Added generation **Cancel** buttons + `AbortController` across Voice Lab TTS/STS, Pipeline Canvas, A/B Lab, and Multi-Track Timeline.
+  - Fixed Malayalam neural voice English/mixed-script glitching via `segment_malayalam_latin_runs()` routing, repaired retired Edge-TTS voice IDs, and added transient WebSocket retry handling.
+  - Honored explicit clone Gender Target selection, stopped silent canned Whisper fallback transcripts, repaired model catalog URLs + all 7 Piper `.onnx`/`.onnx.json` entries, removed Kokoro silent beep fallback (returns HTTP `424` + inline runtime guide), fixed Voice Clone Reference Preview player across all input tabs, and floored subnormal `-676 dBFS` peaks to `-96 dBFS`.
+
+---
+
 ## [0.6.0] — 2026-11-25
 
 ### 🔄 Enterprise Auto-Updater, Unified Versioning & MCP Bridge

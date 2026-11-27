@@ -1,7 +1,7 @@
 {
   "name": "voxforge",
-  "version": "0.6.0",
-  "description": "Unified hardware-adaptive speech synthesis workstation & pipeline engine",
+  "version": "0.7.0",
+  "description": "Unified standalone Tauri desktop app, Rust neural speech workstation & pipeline engine",
   "bin": {
     "voxforge": "./bin/voxforge.js"
   },

@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.6.0
+PackageVersion: 0.7.0
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0
@@ -10,7 +10,7 @@ ManifestVersion: 1.6.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.6.0
+PackageVersion: 0.7.0
 PackageLocale: en-US
 Publisher: AMG555
 PublisherUrl: https://github.com/AMG555
@@ -37,7 +37,7 @@ ManifestVersion: 1.6.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 
 PackageIdentifier: AMG555.VoxForge
-PackageVersion: 0.6.0
+PackageVersion: 0.7.0
 Platform:
   - Windows.Desktop
 InstallModes:
@@ -47,8 +47,8 @@ InstallModes:
 Installers:
   - Architecture: x64
     InstallerType: inno
-    InstallerUrl: https://github.com/AMG555/VoxForge/releases/download/v0.6.0/VoxForge_Setup_x64.exe
-    InstallerSha256: F8E78B7EFBB87F217DF39ABF1B9D376904F242E01939B5EE8F720A36ED24586E
+    InstallerUrl: https://github.com/AMG555/VoxForge/releases/download/v0.7.0/VoxForge_Setup_x64.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
     Scope: user
 ManifestType: installer
 ManifestVersion: 1.6.0

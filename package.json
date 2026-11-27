@@ -1,7 +1,7 @@
 {
   "name": "voxforge",
-  "version": "0.6.0",
-  "description": "Hardware-adaptive neural speech synthesis workstation, voice cloning & visual pipeline engine",
+  "version": "0.7.0",
+  "description": "Standalone Tauri v2 desktop app & Rust neural TTS/voice-cloning server with guided uv runtime setup",
   "main": "packages/voxforge/bin/voxforge.js",
   "bin": {
     "voxforge": "./packages/voxforge/bin/voxforge.js"

@@ -4,19 +4,19 @@
 
 # VoxForge
 
-**Production Zero-Shot Voice Cloning, Studio TTS Server & Audio Workstation in Rust**
+**Standalone Rust + Tauri v2 Desktop App, Zero-Shot Voice Cloning & Neural TTS Studio**
 
-[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.6.0-20bf6b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
-[![Release](https://img.shields.io/badge/Release-v0.6.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
+[![Download VoxForge](https://img.shields.io/badge/⬇️_Download-VoxForge_v0.7.0-20bf6b?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==&logoColor=white)](https://github.com/AMG555/VoxForge/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v0.7.0-brightgreen.svg?style=for-the-badge)](https://github.com/AMG555/VoxForge/releases)
 
-[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.6.0-brightgreen.svg)](docs/architecture.md)
+[![Status](https://img.shields.io/badge/Status-Production_Ready_v0.7.0-brightgreen.svg)](docs/architecture.md)
 [![License](https://img.shields.io/badge/License-Apache_2.0_OR_MIT-blue.svg)](#license)
 [![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg)](https://www.rust-lang.org)
-[![Frontend](https://img.shields.io/badge/Frontend-React_19_%2B_TypeScript-61dafb.svg)](https://react.dev)
+[![Desktop](https://img.shields.io/badge/Desktop-Tauri_v2_%2B_React_19-61dafb.svg)](https://v2.tauri.app)
 [![API](https://img.shields.io/badge/API-OpenAI_TTS_Compatible-green.svg)](docs/api.md)
 [![Platform](https://img.shields.io/badge/Platform-Linux_%7C_macOS_%7C_Windows-lightgrey.svg)](docs/architecture.md)
 
-*An open-source, private, self-hosted neural speech workstation. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, voice blending, biometric verification, broadcast DSP mastering, and MCP server.*
+*An open-source, private, self-hosted neural speech workstation and native desktop app in Rust. Zero-shot voice cloning in 646+ languages, cross-lingual synthesis, guided `uv`/Python runtime wizard, broadcast DSP mastering, and MCP server.*
 
 [Downloads](#-direct-downloads--instant-setup) • [Features](#-key-capabilities) • [Installation Guide](docs/installation.md) • [User Manual](docs/user-guide.md) • [Architecture](docs/architecture.md) • [API Spec](docs/api.md) • [Wireframes](docs/wireframes.md) • [Hardware Tiers](#hardware-profiler)
 
@@ -25,8 +25,8 @@
 ---
 
 > [!NOTE]
-> **Project Status: Feature-Complete (v0.6.0 Stable)**  
-> All core features built, tested, and operational: multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, voice blend studio, Whisper ASR, infinite visual DAG pipeline builder, 17-tool Model Context Protocol (MCP) server, in-app SHA-256 verified auto-updater, double-blind A/B QA lab, audio watermarking, and OpenAI-compatible API. All 14 crates pass automated unit & integration tests.
+> **Project Status: Standalone Desktop + API v0.7.0**  
+> Built as a 15-crate Rust workspace with a native **Tauri v2 Desktop App** (`voxforge-desktop`) + CLI/API daemon (`voxforge`): multi-engine neural TTS (OmniVoice, CosyVoice, Kokoro, Piper, Edge-TTS), zero-shot voice cloning across 646 languages, first-run `uv` isolated runtime wizard, voice blend studio, Whisper ASR, visual DAG pipeline builder, 17-tool MCP server, SHA-256 verified auto-updater, and OpenAI-compatible API. All 15 crates pass automated tests.
 
 > [!TIP]
 > **100% Local & Privacy Guaranteed**  
@@ -93,11 +93,11 @@ Pre-compiled, standalone release binaries with the embedded React 19 UI:
 
 | Platform | Download | Package Format | Details |
 | :--- | :--- | :--- | :--- |
-| **Windows 10 / 11 (Portable .exe)** | [**Download voxforge.exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge.exe) | Portable Executable (~7.0 MB) | Single zero-install binary with embedded studio UI |
-| **Windows 10 / 11 (Zip Bundle)** | [**Download VoxForge-Windows-x64.zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes `voxforge.exe`, 1-click launcher, and desktop installer |
-| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard (`.exe`) | Professional installer with Start Menu, desktop shortcut & uninstaller |
-| **macOS (Universal)** | [**Download Universal (.tar.gz)**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal.tar.gz) | Standalone Binary | Universal binary with embedded studio UI (Apple Silicon & Intel) |
-| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | Zero-dependency standalone executable |
+| **Windows 10 / 11 (Installer)** | [**Download Setup (.exe)**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge_Setup_x64.exe) | Setup Wizard (`.exe`) | Installs native Desktop App (`voxforge-desktop.exe`), CLI (`voxforge.exe`) & Start Menu shortcuts |
+| **Windows 10 / 11 (Zip Bundle)** | [**Download VoxForge-Windows-x64.zip**](https://github.com/AMG555/VoxForge/releases/latest/download/VoxForge-Windows-x64.zip) | Portable Bundle (`.zip`) | Includes native Desktop App (`voxforge-desktop.exe`), CLI (`voxforge.exe`), and launcher |
+| **Windows 10 / 11 (Portable CLI .exe)** | [**Download voxforge.exe**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge.exe) | Portable Executable | Single zero-install headless/browser daemon & CLI binary with embedded studio UI |
+| **macOS (Universal)** | [**Download Universal (.tar.gz)**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-macos-universal.tar.gz) | Universal Tarball | Native Desktop (`voxforge-desktop-macos-universal`) & CLI (`voxforge-macos-universal`) for Apple Silicon + Intel |
+| **Linux (x86_64)** | [**Download .tar.gz**](https://github.com/AMG555/VoxForge/releases/latest/download/voxforge-linux-x86_64.tar.gz) | Tarball Archive | Native Desktop (`voxforge-desktop-linux-x86_64`) & CLI (`voxforge-linux-x86_64`) executables |
 | **Integrity Checksums** | [**checksums.txt**](https://github.com/AMG555/VoxForge/releases/latest/download/checksums.txt) | SHA-256 Signatures | Verify asset integrity across all releases |
 
 > **ℹ️ Note on Windows SmartScreen / Browser Warnings:**
