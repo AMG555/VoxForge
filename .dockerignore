@@ -8,7 +8,7 @@ verify/
 .github/
 *.md
 !README.md
-scripts/
+!scripts/neural_sidecar.py
 dist/
 .env
 .env.*
