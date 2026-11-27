@@ -25,7 +25,7 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.15.0",
     "@tauri-apps/api": "^2.12.5",
-    "lucide-react": "^0.428.0",
+    "lucide-react": "^1.79.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-redux": "^9.3.1"
