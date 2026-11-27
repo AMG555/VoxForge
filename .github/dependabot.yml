@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # Tauri v2 (wry / webkit2gtk / gtk 0.18 / libappindicator) locks Linux GUI
+      # builds onto glib ^0.18. The patched glib 0.20.0 (GHSA-wrw7-89jp-8q8g,
+      # VariantStrIter unsoundness — unused by VoxForge) belongs to gtk-rs 0.20 / Tauri v3.
+      # Ignoring < 0.20.0 prevents Dependabot from crashing every push with
+      # security_update_not_possible while allowing >= 0.20.0 once Tauri upgrades.
+      - dependency-name: "glib"
+        versions:
+          - "< 0.20.0"
+
+  - package-ecosystem: "npm"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

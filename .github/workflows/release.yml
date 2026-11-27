@@ -43,6 +43,7 @@ jobs:
       - name: Sync UI to Embedded API Crate
         shell: bash
         run: |
+          rm -rf crates/voxforge-api/ui_dist/*
           mkdir -p crates/voxforge-api/ui_dist
           cp -r ui/dist/* crates/voxforge-api/ui_dist/
 
