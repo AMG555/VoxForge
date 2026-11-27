@@ -21,12 +21,12 @@ export const TitleBar: React.FC = () => {
   const activeProfile = setupStatus?.config?.runtime_profile || 'rust_core';
   const profileLabel =
     activeProfile === 'full_cloning'
-      ? 'Full Cloning AI'
-      : activeProfile === 'core_neural'
-        ? 'Core Neural AI'
+      ? 'Native Rust + Full AI Sidecar'
+      : activeProfile === 'core_neural' && setupStatus?.managed_venv_ready
+        ? 'Native Rust + Neural Sidecar'
         : activeProfile === 'remote'
           ? 'Remote Server'
-          : 'Rust Core Ready';
+          : 'Native Rust Core';
 
   return (
     <div

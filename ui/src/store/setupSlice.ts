@@ -22,7 +22,7 @@ const initialState: SetupState = {
   desktopVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.7.0',
   serverBaseUrl: '',
   isWizardOpen: false,
-  selectedProfile: 'core_neural',
+  selectedProfile: 'rust_core',
   runtimeDirDraft: '',
   customPythonDraft: '',
   optionsExpanded: false,

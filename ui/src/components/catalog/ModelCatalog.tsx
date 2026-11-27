@@ -53,11 +53,14 @@ export const ModelCatalog: React.FC = () => {
     fetchModels();
   }, [filterType, installedOnly]);
 
-  const handleInstallRuntime = async (pkg: 'kokoro' | 'piper' | 'whisper') => {
+  const handleInstallRuntime = async (pkg: 'kokoro' | 'piper' | 'whisper' | 'chatterbox' | 'kitten' | 'canto') => {
     setRuntimeBusy(`install-${pkg}`);
     setMessage(null);
     try {
-      const res = await api.installRuntimePackage(pkg);
+      const res =
+        pkg === 'piper'
+          ? await api.installNativeRuntime('piper')
+          : await api.installRuntimePackage(pkg);
       setMessage({ text: res.message, type: 'success' });
       await fetchRuntimes();
     } catch (err: any) {
@@ -284,15 +287,15 @@ export const ModelCatalog: React.FC = () => {
                     Required alongside downloaded `.onnx` voice weights for Piper voices.
                   </p>
                 </div>
-                {!runtimes.piper_cli_available && runtimes.python_available && (
+                {!runtimes.piper_cli_available && (
                   <button
                     type="button"
                     disabled={runtimeBusy !== null}
                     onClick={() => handleInstallRuntime('piper')}
-                    className="inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 font-mono text-[11px]"
+                    className="inline-flex items-center justify-center space-x-1.5 px-2.5 py-1.5 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-mono text-[11px]"
                   >
                     {runtimeBusy === 'install-piper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                    <span>Install Piper Runtime</span>
+                    <span>Install Native Piper (No Python)</span>
                   </button>
                 )}
               </div>

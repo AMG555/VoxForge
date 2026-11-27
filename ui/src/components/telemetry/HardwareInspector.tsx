@@ -162,7 +162,10 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
     setBusyAction(`install-${pkg}`);
     setActionNotice(null);
     try {
-      const res = await api.installRuntimePackage(pkg);
+      const res =
+        pkg === 'piper'
+          ? await api.installNativeRuntime('piper')
+          : await api.installRuntimePackage(pkg);
       setActionNotice({ text: res.message });
       await refreshRuntimes();
     } catch (err: any) {
@@ -338,15 +341,15 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
                         </button>
                       )
                     )}
-                    {engineId === 'piper-tts' && runtimes && !runtimes.piper_cli_available && runtimes.python_available && (
+                    {engineId === 'piper-tts' && runtimes && !runtimes.piper_cli_available && (
                       <button
                         type="button"
                         disabled={busyAction !== null}
                         onClick={() => handleInstallRuntime('piper')}
-                        className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
+                        className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40"
                       >
                         {busyAction === 'install-piper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                        <span>Install Piper CLI</span>
+                        <span>Install Native Piper (No Python)</span>
                       </button>
                     )}
                     {engineId === 'qwen3-tts' && runtimes && !runtimes.neural_sidecar.running && runtimes.python_packages.omnivoice && (

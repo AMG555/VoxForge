@@ -681,7 +681,7 @@ export const api = {
   },
 
   async startSidecar(
-    backend: 'auto' | 'omnivoice' | 'cosyvoice' | 'f5tts' | 'kokoro' = 'auto',
+    backend: 'auto' | 'omnivoice' | 'chatterbox' | 'cosyvoice' | 'f5tts' | 'kokoro' | 'kitten' | 'canto' = 'auto',
     port?: number
   ): Promise<{ status: string; backend: string; port: number; url: string; message: string }> {
     const res = await fetch(`${BASE_URL}/v1/system/sidecar/start`, {
@@ -696,8 +696,23 @@ export const api = {
     return res.json();
   },
 
+  async installNativeRuntime(
+    target: 'piper'
+  ): Promise<{ status: string; target: string; python_required: boolean; binary_path: string; message: string }> {
+    const res = await fetch(`${BASE_URL}/v1/system/runtimes/install-native`, {
+      method: 'POST',
+      headers: getHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ target }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `Failed installing native ${target} binary` }));
+      throw new Error(err.detail || `Failed installing native ${target} binary`);
+    }
+    return res.json();
+  },
+
   async installRuntimePackage(
-    pkg: 'kokoro' | 'piper' | 'whisper'
+    pkg: 'kokoro' | 'piper' | 'whisper' | 'chatterbox' | 'kitten' | 'canto'
   ): Promise<{ status: string; package: string; installed_specs: string[]; message: string }> {
     const res = await fetch(`${BASE_URL}/v1/system/runtimes/install`, {
       method: 'POST',

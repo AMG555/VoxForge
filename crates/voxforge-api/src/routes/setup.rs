@@ -34,7 +34,7 @@ impl Default for DesktopConfig {
     fn default() -> Self {
         Self {
             setup_completed: false,
-            runtime_profile: "core_neural".to_string(),
+            runtime_profile: "rust_core".to_string(),
             runtime_dir: default_runtime_dir().to_string_lossy().to_string(),
             custom_python: None,
             remote_server_url: None,

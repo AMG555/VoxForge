@@ -105,6 +105,23 @@ export const setupApi = createApi({
       }),
       invalidatesTags: ['InstallProgress'],
     }),
+    installNativePiper: builder.mutation<
+      {
+        status: string;
+        target: string;
+        python_required: boolean;
+        binary_path: string;
+        message: string;
+      },
+      void
+    >({
+      query: () => ({
+        url: '/v1/system/runtimes/install-native',
+        method: 'POST',
+        body: { target: 'piper' },
+      }),
+      invalidatesTags: ['SetupStatus'],
+    }),
   }),
 });
 
@@ -116,4 +133,5 @@ export const {
   useTestRemoteServerMutation,
   useStartSetupInstallMutation,
   useCancelSetupInstallMutation,
+  useInstallNativePiperMutation,
 } = setupApi;

@@ -193,7 +193,10 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
     setRuntimeActionInfo(null);
     setSynthError(null);
     try {
-      const res = await api.installRuntimePackage(pkg);
+      const res =
+        pkg === 'piper'
+          ? await api.installNativeRuntime('piper')
+          : await api.installRuntimePackage(pkg);
       setRuntimeActionInfo(res.message);
       await refreshRuntimeStatus();
     } catch (err: any) {
@@ -2501,14 +2504,14 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center flex-wrap gap-2 shrink-0">
-                  {!cliReady && runtimeStatus?.python_available && (
+                  {!cliReady && (
                     <button
                       type="button"
                       disabled={runtimeActionBusy !== null}
                       onClick={() => handleInstallRuntimeQuick('piper')}
-                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-semibold text-[11px] transition-colors"
+                      className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[11px] transition-colors"
                     >
-                      {runtimeActionBusy === 'install-piper' ? 'Installing CLI...' : 'Install Piper CLI'}
+                      {runtimeActionBusy === 'install-piper' ? 'Installing Piper...' : 'Install Native Piper (No Python)'}
                     </button>
                   )}
                   {!modelInstalled && (

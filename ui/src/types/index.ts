@@ -286,9 +286,13 @@ export interface PythonPackagesStatus {
   kokoro: boolean;
   piper: boolean;
   edge_tts: boolean;
+  chatterbox?: boolean;
+  kitten?: boolean;
+  canto?: boolean;
 }
 
 export interface RuntimeStatusResponse {
+  rust_core_ready?: boolean;
   python_available: boolean;
   python_executable?: string;
   sidecar_script_available: boolean;
@@ -296,6 +300,8 @@ export interface RuntimeStatusResponse {
   neural_sidecar: RuntimeEndpointStatus;
   kokoro_sidecar: RuntimeEndpointStatus;
   piper_cli_available: boolean;
+  piper_native_installed?: boolean;
+  piper_binary_path?: string;
   ffmpeg_available: boolean;
   python_packages: PythonPackagesStatus;
   installed_model_files: string[];

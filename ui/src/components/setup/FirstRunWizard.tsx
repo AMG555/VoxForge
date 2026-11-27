@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
@@ -27,6 +27,7 @@ import {
   useCancelSetupInstallMutation,
   useGetInstallProgressQuery,
   useGetSetupStatusQuery,
+  useInstallNativePiperMutation,
   useProbePythonMutation,
   useSaveSetupConfigMutation,
   useStartSetupInstallMutation,
@@ -52,7 +53,6 @@ function formatGb(bytes: number): string {
 export const FirstRunWizard: React.FC = () => {
   const dispatch = useAppDispatch();
   const {
-    isDesktop,
     isWizardOpen,
     selectedProfile,
     runtimeDirDraft,
@@ -68,10 +68,12 @@ export const FirstRunWizard: React.FC = () => {
   const [saveConfig, { isLoading: isSavingConfig }] = useSaveSetupConfigMutation();
   const [startInstall, { isLoading: isStartingInstall }] = useStartSetupInstallMutation();
   const [cancelInstall, { isLoading: isCancelling }] = useCancelSetupInstallMutation();
+  const [installNativePiper, { isLoading: isInstallingPiper }] = useInstallNativePiperMutation();
   const [probePython, { isLoading: isProbingPython }] = useProbePythonMutation();
   const [testRemote, { isLoading: isTestingRemote }] = useTestRemoteServerMutation();
 
   const [isEditingPath, setIsEditingPath] = useState(false);
+  const [nativePiperMsg, setNativePiperMsg] = useState<string | null>(null);
   const [pythonProbeMsg, setPythonProbeMsg] = useState<string | null>(null);
   const [remoteTestResult, setRemoteTestResult] = useState<{
     reachable: boolean;
@@ -79,8 +81,6 @@ export const FirstRunWizard: React.FC = () => {
   } | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   const [hasTrackedJob, setHasTrackedJob] = useState(false);
-  const autoOpenedOnceRef = useRef(false);
-
   const { data: progress } = useGetInstallProgressQuery(undefined, {
     skip: !isWizardOpen,
     pollingInterval: hasTrackedJob ? 800 : 2500,
@@ -94,13 +94,7 @@ export const FirstRunWizard: React.FC = () => {
     if (!customPythonDraft && status.config.custom_python) {
       dispatch(setCustomPythonDraft(status.config.custom_python));
     }
-    if (!autoOpenedOnceRef.current) {
-      autoOpenedOnceRef.current = true;
-      if (!status.config.setup_completed && isDesktop) {
-        dispatch(setWizardOpen(true));
-      }
-    }
-  }, [status, runtimeDirDraft, customPythonDraft, isDesktop, dispatch]);
+  }, [status, runtimeDirDraft, customPythonDraft, dispatch]);
 
   useEffect(() => {
     if (progress?.status === 'running') {
@@ -258,18 +252,18 @@ export const FirstRunWizard: React.FC = () => {
               <h2 id="voxforge-setup-title" className="text-base font-bold text-white">
                 {showProgressScreen
                   ? isRunning
-                    ? 'Setting up local neural runtime...'
+                    ? 'Installing optional Python AI sidecar...'
                     : progress?.status === 'completed'
-                      ? 'Local neural runtime ready'
+                      ? 'Optional Python AI sidecar ready'
                       : progress?.status === 'cancelled'
                         ? 'Runtime installation cancelled'
                         : 'Runtime installation interrupted'
-                  : 'Set Up VoxForge Runtime'}
+                  : 'VoxForge Runtime & Optional AI Extensions'}
               </h2>
               <p className="text-xs text-[#94A3B8]">
                 {showProgressScreen
-                  ? 'First-run isolated Python 3.11 + AI library setup via Rust-speed uv.'
-                  : 'Rust speech core & Cloud Relay work immediately. Pick optional local AI engines below.'}
+                  ? 'Isolated Python 3.11 + PyTorch sidecar setup via uv.'
+                  : 'Core VoxForge runs 100% natively in Rust (zero Python). Add native Piper or optional PyTorch sidecars below.'}
               </p>
             </div>
           </div>
@@ -292,30 +286,63 @@ export const FirstRunWizard: React.FC = () => {
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {!showProgressScreen ? (
             <>
+              {/* Standalone Zero-Python Piper Native Binary Banner */}
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-emerald-300 flex items-center space-x-1.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Zero-Python Native Engine Ready</span>
+                  </div>
+                  <p className="text-[11px] text-[#CBD5E1]">
+                    Edge-TTS (130+ langs incl. Cantonese), Broadcast DSP &amp; Acoustic Cloning run directly in Rust. Install native Piper C++ (~22 MB) for offline ONNX synthesis with zero Python.
+                  </p>
+                  {nativePiperMsg && (
+                    <p className="text-[11px] font-mono text-emerald-300 pt-1">{nativePiperMsg}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={isInstallingPiper}
+                  onClick={async () => {
+                    setNativePiperMsg(null);
+                    setInstallError(null);
+                    try {
+                      const res = await installNativePiper().unwrap();
+                      setNativePiperMsg(res.message);
+                    } catch (err: any) {
+                      setInstallError(err?.data?.detail || err?.message || 'Native Piper install failed');
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0B0E14] text-xs font-semibold shrink-0 disabled:opacity-50"
+                >
+                  {isInstallingPiper ? 'Downloading Piper...' : 'Install Native Piper'}
+                </button>
+              </div>
+
               {/* 3 Runtime Tier Choices */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {[
                   {
                     id: 'rust_core' as const,
-                    title: 'Instant Rust Core',
-                    badge: '0 GB · READY NOW',
-                    desc: 'Edge-TTS (130+ langs), broadcast mastering & acoustic voice cloning with zero Python downloads.',
+                    title: 'Native Rust Core',
+                    badge: '0 GB · ZERO PYTHON',
+                    desc: 'Edge-TTS (130+ langs), native Piper ONNX, DSP mastering & acoustic voice cloning with zero Python.',
                     icon: Zap,
                     accent: 'text-emerald-400',
                   },
                   {
                     id: 'core_neural' as const,
-                    title: 'Core Neural Studio',
-                    badge: '~1.4 GB · RECOMMENDED',
-                    desc: 'Isolated uv Python 3.11 + Kokoro-82M + Piper ONNX + Whisper ASR for offline synthesis.',
+                    title: 'Optional Kokoro + Whisper',
+                    badge: '~1.4 GB · PYTHON SIDECAR',
+                    desc: 'Optional uv Python 3.11 + Kokoro-82M + Whisper ASR + KittenTTS / Canto-TTS support.',
                     icon: Sparkles,
                     accent: 'text-amber-400',
                   },
                   {
                     id: 'full_cloning' as const,
-                    title: 'Full Cloning Studio',
-                    badge: '~4.5 GB · COMPLETE',
-                    desc: 'Core Neural plus PyTorch & OmniVoice 646-language local neural cloning.',
+                    title: 'Full PyTorch Sidecar',
+                    badge: '~4.5 GB · PYTHON SIDECAR',
+                    desc: 'Optional PyTorch stack for OmniVoice 646-Lang, Chatterbox-Turbo, and heavy GPU cloning.',
                     icon: Cpu,
                     accent: 'text-sky-400',
                   },
@@ -407,8 +434,8 @@ export const FirstRunWizard: React.FC = () => {
                   )}
                   <span>
                     {selectedProfile === 'rust_core'
-                      ? 'Continue with Instant Rust Core'
-                      : 'Install local runtime'}
+                      ? 'Continue with Native Rust Core'
+                      : 'Install Optional Python Sidecar'}
                   </span>
                 </button>
 
