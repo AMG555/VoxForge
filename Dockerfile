@@ -15,6 +15,7 @@ WORKDIR /usr/src/voxforge
 COPY Cargo.toml Cargo.lock ./
 COPY assets ./assets
 COPY crates ./crates
+COPY scripts ./scripts
 
 # Copy freshly compiled UI assets into voxforge-api embedded location
 COPY --from=ui-builder /app/ui/dist ./crates/voxforge-api/ui_dist
