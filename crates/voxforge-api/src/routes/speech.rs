@@ -493,7 +493,9 @@ pub async fn synthesize_speech(
                 for chunk_text in chunks {
                     let norm_lang = effective_pronunciation_language(
                         &chunk_text,
-                        effective_lang.as_deref().or(Some(profile.language.as_str())),
+                        effective_lang
+                            .as_deref()
+                            .or(Some(profile.language.as_str())),
                     );
                     let cloned_req = voxforge_core::models::ClonedSynthesisRequest {
                         text: state

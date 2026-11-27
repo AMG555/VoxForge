@@ -1105,30 +1105,29 @@ pub async fn start_sidecar_handler(
                 problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
                 title: "Sidecar Launch Error".to_string(),
                 status: 500,
-                detail: format!("Failed to create sidecar log file {}: {e}", log_path.display()),
+                detail: format!(
+                    "Failed to create sidecar log file {}: {e}",
+                    log_path.display()
+                ),
                 instance: "/v1/system/sidecar/start".to_string(),
             }),
         )
     })?;
-    let log_file_err = log_file_out
-        .try_clone()
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ProblemDetails {
-                    problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
-                    title: "Sidecar Launch Error".to_string(),
-                    status: 500,
-                    detail: format!("Failed cloning sidecar log handle: {e}"),
-                    instance: "/v1/system/sidecar/start".to_string(),
-                }),
-            )
-        })?;
+    let log_file_err = log_file_out.try_clone().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
+                title: "Sidecar Launch Error".to_string(),
+                status: 500,
+                detail: format!("Failed cloning sidecar log handle: {e}"),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        )
+    })?;
 
     let mut cmd = std::process::Command::new(&python_exe);
-    cmd.arg(&script_path)
-        .arg("--port")
-        .arg(port.to_string());
+    cmd.arg(&script_path).arg("--port").arg(port.to_string());
     if backend != "auto" {
         cmd.arg("--backend").arg(&backend);
     }
@@ -1155,7 +1154,9 @@ pub async fn start_sidecar_handler(
 
     tokio::time::sleep(Duration::from_millis(800)).await;
     if let Ok(Some(exit_status)) = child.try_wait() {
-        let log_tail = tokio::fs::read_to_string(&log_path).await.unwrap_or_default();
+        let log_tail = tokio::fs::read_to_string(&log_path)
+            .await
+            .unwrap_or_default();
         return Err((
             StatusCode::FAILED_DEPENDENCY,
             Json(ProblemDetails {
@@ -1165,7 +1166,12 @@ pub async fn start_sidecar_handler(
                 detail: format!(
                     "Sidecar exited with status {exit_status}. Check dependencies or logs ({}): {}",
                     log_path.display(),
-                    log_tail.lines().rev().take(6).collect::<Vec<_>>().join(" | ")
+                    log_tail
+                        .lines()
+                        .rev()
+                        .take(6)
+                        .collect::<Vec<_>>()
+                        .join(" | ")
                 ),
                 instance: "/v1/system/sidecar/start".to_string(),
             }),
@@ -1211,7 +1217,9 @@ pub async fn install_runtime_package_handler(
                 problem_type: "https://voxforge.org/errors/python-not-found".to_string(),
                 title: "Python Runtime Missing".to_string(),
                 status: StatusCode::FAILED_DEPENDENCY.as_u16(),
-                detail: "Python executable not found on PATH; cannot install Python speech packages.".to_string(),
+                detail:
+                    "Python executable not found on PATH; cannot install Python speech packages."
+                        .to_string(),
                 instance: "/v1/system/runtimes/install".to_string(),
             }),
         )
@@ -1222,7 +1230,9 @@ pub async fn install_runtime_package_handler(
 
     let output = tokio::time::timeout(
         Duration::from_secs(180),
-        tokio::process::Command::new(&python_exe).args(&args).output(),
+        tokio::process::Command::new(&python_exe)
+            .args(&args)
+            .output(),
     )
     .await
     .map_err(|_| {
@@ -1232,7 +1242,10 @@ pub async fn install_runtime_package_handler(
                 problem_type: "https://voxforge.org/errors/runtime-install-timeout".to_string(),
                 title: "Runtime Installation Timed Out".to_string(),
                 status: StatusCode::GATEWAY_TIMEOUT.as_u16(),
-                detail: format!("pip install for '{}' exceeded 180 seconds.", payload.package),
+                detail: format!(
+                    "pip install for '{}' exceeded 180 seconds.",
+                    payload.package
+                ),
                 instance: "/v1/system/runtimes/install".to_string(),
             }),
         )

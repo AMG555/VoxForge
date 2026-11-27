@@ -89,8 +89,9 @@ impl WhisperAsrEngine {
 
         // If no frame hit main energy threshold, keep whole region only when overall signal is non-silent.
         if regions.is_empty() {
-            let overall_rms =
-                (pcm.iter().map(|&s| (s as f64) * (s as f64)).sum::<f64>() / pcm.len() as f64).sqrt();
+            let overall_rms = (pcm.iter().map(|&s| (s as f64) * (s as f64)).sum::<f64>()
+                / pcm.len() as f64)
+                .sqrt();
             if overall_rms >= 15.0 {
                 let total_ms = (pcm.len() as f32 / sample_rate as f32 * 1000.0) as u64;
                 regions.push((0, total_ms.max(50)));

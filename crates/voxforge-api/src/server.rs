@@ -172,16 +172,17 @@ async fn bind_listener(
 }
 
 /// Boot the full VoxForge API + embedded UI server in a background Tokio task.
-pub async fn start_embedded_server(
-    config: EmbeddedServerConfig,
-) -> Result<StartedServer, String> {
+pub async fn start_embedded_server(config: EmbeddedServerConfig) -> Result<StartedServer, String> {
     system::cleanup_stale_update_backups();
 
     let data_dir = config.data_dir.unwrap_or_else(resolve_default_data_dir);
     let (profiles_dir, models_dir) = configure_data_directories(&data_dir);
     setup::apply_desktop_config_env();
 
-    info!("Starting VoxForge Workstation Server v{}", env!("CARGO_PKG_VERSION"));
+    info!(
+        "Starting VoxForge Workstation Server v{}",
+        env!("CARGO_PKG_VERSION")
+    );
     info!("Profiles directory: {}", profiles_dir.display());
     info!("Models directory:   {}", models_dir.display());
 
@@ -269,7 +270,10 @@ mod tests {
             .expect("health request should succeed");
         assert!(resp.status().is_success());
 
-        server.shutdown().await.expect("server should shutdown cleanly");
+        server
+            .shutdown()
+            .await
+            .expect("server should shutdown cleanly");
         let _ = std::fs::remove_dir_all(tmp);
     }
 }

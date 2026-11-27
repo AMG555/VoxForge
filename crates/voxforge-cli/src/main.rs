@@ -14,9 +14,7 @@ use voxforge_api::server::{
 };
 use voxforge_audio::WavEncoder;
 use voxforge_core::models::AudioContainerFormat;
-use voxforge_engine::{
-    AbTestRunner, AbTestScenario, Qwen3TtsEngine, SynthesisRequest, TtsEngine,
-};
+use voxforge_engine::{AbTestRunner, AbTestScenario, Qwen3TtsEngine, SynthesisRequest, TtsEngine};
 use voxforge_hardware::HardwareProbe;
 
 #[derive(Parser)]

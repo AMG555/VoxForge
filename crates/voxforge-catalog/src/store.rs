@@ -57,24 +57,27 @@ impl ModelCatalogStore {
     pub fn with_curated_models() -> Self {
         let models_dir = Self::models_dir();
 
-        let piper_voice_entry = |id: &str, name: &str, desc: &str, lang: &str, repo_path: &str, size_mb: u64| {
-            CatalogItem {
-                id: id.to_string(),
-                name: name.to_string(),
-                description: desc.to_string(),
-                model_type: ModelType::Tts,
-                format: ModelFormat::Onnx,
-                size_bytes: size_mb * 1024 * 1024,
-                sha256: String::new(),
-                download_url: format!("https://huggingface.co/rhasspy/piper-voices/resolve/main/{repo_path}"),
-                min_ram_mb: 512,
-                requires_gpu: false,
-                supported_languages: vec![lang.to_string()],
-                status: ModelStatus::Available,
-                installed_at: None,
-                local_path: None,
-            }
-        };
+        let piper_voice_entry =
+            |id: &str, name: &str, desc: &str, lang: &str, repo_path: &str, size_mb: u64| {
+                CatalogItem {
+                    id: id.to_string(),
+                    name: name.to_string(),
+                    description: desc.to_string(),
+                    model_type: ModelType::Tts,
+                    format: ModelFormat::Onnx,
+                    size_bytes: size_mb * 1024 * 1024,
+                    sha256: String::new(),
+                    download_url: format!(
+                        "https://huggingface.co/rhasspy/piper-voices/resolve/main/{repo_path}"
+                    ),
+                    min_ram_mb: 512,
+                    requires_gpu: false,
+                    supported_languages: vec![lang.to_string()],
+                    status: ModelStatus::Available,
+                    installed_at: None,
+                    local_path: None,
+                }
+            };
 
         let mut models = vec![
             piper_voice_entry(
@@ -296,7 +299,8 @@ impl ModelCatalogStore {
         ];
 
         for item in &mut models {
-            let local_file = models_dir.join(Self::target_filename_for_model(&item.id, item.format));
+            let local_file =
+                models_dir.join(Self::target_filename_for_model(&item.id, item.format));
             if local_file.exists() {
                 item.status = ModelStatus::Installed;
                 item.installed_at = Some(Utc::now());

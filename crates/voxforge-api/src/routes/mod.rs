@@ -178,17 +178,38 @@ pub fn build_api_router() -> Router<AppState> {
         .route("/v1/system/restart", post(system::restart_server_handler))
         // Host runtime readiness diagnostics, sidecar launcher, and allowlisted runtime installs
         .route("/v1/system/runtimes", get(system::get_runtime_status))
-        .route("/v1/system/sidecar/start", post(system::start_sidecar_handler))
+        .route(
+            "/v1/system/sidecar/start",
+            post(system::start_sidecar_handler),
+        )
         .route(
             "/v1/system/runtimes/install",
             post(system::install_runtime_package_handler),
         )
         // First-run runtime setup wizard & managed uv/Python environment provisioning
         .route("/v1/system/setup-status", get(setup::get_setup_status))
-        .route("/v1/system/setup/config", post(setup::save_setup_config_handler))
-        .route("/v1/system/setup/probe-python", post(setup::probe_python_handler))
-        .route("/v1/system/setup/test-remote", post(setup::test_remote_handler))
-        .route("/v1/system/setup/install", post(setup::start_setup_install_handler))
-        .route("/v1/system/setup/progress", get(setup::get_setup_progress_handler))
-        .route("/v1/system/setup/cancel", post(setup::cancel_setup_install_handler))
+        .route(
+            "/v1/system/setup/config",
+            post(setup::save_setup_config_handler),
+        )
+        .route(
+            "/v1/system/setup/probe-python",
+            post(setup::probe_python_handler),
+        )
+        .route(
+            "/v1/system/setup/test-remote",
+            post(setup::test_remote_handler),
+        )
+        .route(
+            "/v1/system/setup/install",
+            post(setup::start_setup_install_handler),
+        )
+        .route(
+            "/v1/system/setup/progress",
+            get(setup::get_setup_progress_handler),
+        )
+        .route(
+            "/v1/system/setup/cancel",
+            post(setup::cancel_setup_install_handler),
+        )
 }

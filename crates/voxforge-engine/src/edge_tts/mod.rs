@@ -333,7 +333,9 @@ impl TtsEngine for EdgeTtsEngine {
                     "indian-english".to_string(),
                     "narration".to_string(),
                 ],
-                description: Some("Clear Indian-English male voice for narration and tech".to_string()),
+                description: Some(
+                    "Clear Indian-English male voice for narration and tech".to_string(),
+                ),
             },
             // --- Indian Languages Neural Voices ---
             Voice {
@@ -590,17 +592,21 @@ impl TtsEngine for EdgeTtsEngine {
     async fn synthesize(&self, request: &SynthesisRequest) -> Result<AudioChunk> {
         let runs = segment_malayalam_latin_runs(&request.voice_id, &request.text);
         if runs.len() <= 1 {
-            let (seg_voice, seg_text) = runs
-                .into_iter()
-                .next()
-                .unwrap_or_else(|| (normalize_edge_voice_id(&request.voice_id), request.text.clone()));
+            let (seg_voice, seg_text) = runs.into_iter().next().unwrap_or_else(|| {
+                (
+                    normalize_edge_voice_id(&request.voice_id),
+                    request.text.clone(),
+                )
+            });
             let mut seg_req = request.clone();
             seg_req.voice_id = seg_voice;
             seg_req.text = seg_text;
             let ssml = Self::build_ssml(&seg_req);
             return EdgeTtsClient::synthesize(&seg_req, &ssml)
                 .await
-                .map_err(|e| VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e)));
+                .map_err(|e| {
+                    VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e))
+                });
         }
 
         let mut segments: Vec<Vec<i16>> = Vec::with_capacity(runs.len());
@@ -613,7 +619,9 @@ impl TtsEngine for EdgeTtsEngine {
             let ssml = Self::build_ssml(&seg_req);
             let chunk = EdgeTtsClient::synthesize(&seg_req, &ssml)
                 .await
-                .map_err(|e| VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e)))?;
+                .map_err(|e| {
+                    VoxForgeError::Engine(format!("Edge-TTS neural synthesis failed: {}", e))
+                })?;
             sample_rate = chunk.sample_rate;
             channels = chunk.channels;
             if !chunk.pcm_data.is_empty() {
@@ -680,31 +688,56 @@ mod tests {
 
     #[test]
     fn test_normalize_retired_edge_voice_ids() {
-        assert_eq!(normalize_edge_voice_id("de-DE-KatjaNeural"), "de-DE-TanjaNeural");
-        assert_eq!(normalize_edge_voice_id("de-DE-ConradNeural"), "de-DE-ChristophNeural");
-        assert_eq!(normalize_edge_voice_id("en-AU-WilliamNeural"), "en-AU-WilliamMultilingualNeural");
-        assert_eq!(normalize_edge_voice_id("pa-IN-VaaniNeural"), "hi-IN-SwaraNeural");
-        assert_eq!(normalize_edge_voice_id("en-US-AriaNeural"), "en-US-AriaNeural");
+        assert_eq!(
+            normalize_edge_voice_id("de-DE-KatjaNeural"),
+            "de-DE-TanjaNeural"
+        );
+        assert_eq!(
+            normalize_edge_voice_id("de-DE-ConradNeural"),
+            "de-DE-ChristophNeural"
+        );
+        assert_eq!(
+            normalize_edge_voice_id("en-AU-WilliamNeural"),
+            "en-AU-WilliamMultilingualNeural"
+        );
+        assert_eq!(
+            normalize_edge_voice_id("pa-IN-VaaniNeural"),
+            "hi-IN-SwaraNeural"
+        );
+        assert_eq!(
+            normalize_edge_voice_id("en-US-AriaNeural"),
+            "en-US-AriaNeural"
+        );
     }
 
     #[test]
     fn test_segment_malayalam_latin_runs() {
-        let en_midhun = segment_malayalam_latin_runs("ml-IN-MidhunNeural", "What are you doing for me?");
+        let en_midhun =
+            segment_malayalam_latin_runs("ml-IN-MidhunNeural", "What are you doing for me?");
         assert_eq!(
             en_midhun,
-            vec![("en-IN-PrabhatNeural".to_string(), "What are you doing for me?".to_string())]
+            vec![(
+                "en-IN-PrabhatNeural".to_string(),
+                "What are you doing for me?".to_string()
+            )]
         );
 
         let en_sobhana = segment_malayalam_latin_runs("ml-IN-SobhanaNeural", "Hello world");
         assert_eq!(
             en_sobhana,
-            vec![("en-IN-NeerjaExpressiveNeural".to_string(), "Hello world".to_string())]
+            vec![(
+                "en-IN-NeerjaExpressiveNeural".to_string(),
+                "Hello world".to_string()
+            )]
         );
 
         let ml_native = segment_malayalam_latin_runs("ml-IN-SobhanaNeural", "നമസ്കാരം സുഖമാണോ");
         assert_eq!(
             ml_native,
-            vec![("ml-IN-SobhanaNeural".to_string(), "നമസ്കാരം സുഖമാണോ".to_string())]
+            vec![(
+                "ml-IN-SobhanaNeural".to_string(),
+                "നമസ്കാരം സുഖമാണോ".to_string()
+            )]
         );
 
         let mixed = segment_malayalam_latin_runs("ml-IN-MidhunNeural", "ഇന്ന് weather വളരെ cold ആണ്");

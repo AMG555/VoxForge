@@ -1891,7 +1891,11 @@ pub(crate) static EDGE_TTS_LANG_TABLE: &[(&str, &str, &str)] = &[
     // ── English variants ──────────────────────────────────────────────────
     ("en-US", "en-US-GuyNeural", "en-US-AriaNeural"),
     ("en-GB", "en-GB-RyanNeural", "en-GB-SoniaNeural"),
-    ("en-AU", "en-AU-WilliamMultilingualNeural", "en-AU-NatashaNeural"),
+    (
+        "en-AU",
+        "en-AU-WilliamMultilingualNeural",
+        "en-AU-NatashaNeural",
+    ),
     ("en-CA", "en-CA-LiamNeural", "en-CA-ClaraNeural"),
     ("en-NZ", "en-NZ-MitchellNeural", "en-NZ-MollyNeural"),
     ("en-IN", "en-IN-PrabhatNeural", "en-IN-NeerjaNeural"),

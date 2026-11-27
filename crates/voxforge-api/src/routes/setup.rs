@@ -678,7 +678,10 @@ pub async fn test_remote_handler(
 }
 
 async fn append_log(line: impl Into<String>) {
-    let mut guard = JOB_MANAGER.get_or_init(|| Mutex::new(InstallJobManager::default())).lock().await;
+    let mut guard = JOB_MANAGER
+        .get_or_init(|| Mutex::new(InstallJobManager::default()))
+        .lock()
+        .await;
     let mut deque: VecDeque<String> = guard.snapshot.logs.iter().cloned().collect();
     deque.push_back(line.into());
     while deque.len() > MAX_LOG_LINES {
@@ -789,8 +792,7 @@ async fn bootstrap_uv_if_missing() -> Result<String, String> {
 
     append_log("uv not found on PATH; bootstrapping official Astral uv binary...").await;
     let bin_dir = active_data_dir().join("bin");
-    std::fs::create_dir_all(&bin_dir)
-        .map_err(|e| format!("Failed creating bin directory: {e}"))?;
+    std::fs::create_dir_all(&bin_dir).map_err(|e| format!("Failed creating bin directory: {e}"))?;
 
     #[cfg(target_os = "windows")]
     {
@@ -800,7 +802,13 @@ async fn bootstrap_uv_if_missing() -> Result<String, String> {
         );
         run_logged_command(
             "powershell",
-            &["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script],
+            &[
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ],
             &[],
         )
         .await?;
@@ -830,8 +838,12 @@ async fn execute_install_pipeline(
     let result: Result<(), String> = async {
         update_step("checking_env", "running", None, 8).await;
         append_log(format!("Target environment: {}", runtime_dir.display())).await;
-        std::fs::create_dir_all(&runtime_dir)
-            .map_err(|e| format!("Cannot create runtime directory '{}': {e}", runtime_dir.display()))?;
+        std::fs::create_dir_all(&runtime_dir).map_err(|e| {
+            format!(
+                "Cannot create runtime directory '{}': {e}",
+                runtime_dir.display()
+            )
+        })?;
 
         let packages = resolve_profile_packages(&profile)?;
         if packages.is_empty() {
@@ -860,8 +872,17 @@ async fn execute_install_pipeline(
                 Some(uv)
             }
             Err(err) => {
-                append_log(format!("uv unavailable ({err}); trying Python venv fallback...")).await;
-                update_step("preparing_uv", "done", Some("Python venv fallback".to_string()), 38).await;
+                append_log(format!(
+                    "uv unavailable ({err}); trying Python venv fallback..."
+                ))
+                .await;
+                update_step(
+                    "preparing_uv",
+                    "done",
+                    Some("Python venv fallback".to_string()),
+                    38,
+                )
+                .await;
                 None
             }
         };
@@ -881,13 +902,12 @@ async fn execute_install_pipeline(
                     .as_deref()
                     .filter(|s| !s.trim().is_empty())
                     .unwrap_or("3.11");
-                append_log(format!("Creating isolated venv at {venv_str} (Python {py_spec})...")).await;
-                run_logged_command(
-                    uv,
-                    &["venv", &venv_str, "--python", py_spec, "--seed"],
-                    &[],
-                )
-                .await?;
+                append_log(format!(
+                    "Creating isolated venv at {venv_str} (Python {py_spec})..."
+                ))
+                .await;
+                run_logged_command(uv, &["venv", &venv_str, "--python", py_spec, "--seed"], &[])
+                    .await?;
             } else {
                 let fallback_py = custom_python
                     .clone()
@@ -903,7 +923,11 @@ async fn execute_install_pipeline(
                 run_logged_command(&fallback_py, &["-m", "venv", &venv_str], &[]).await?;
             }
         } else {
-            append_log(format!("Reusing existing venv Python: {}", venv_py.display())).await;
+            append_log(format!(
+                "Reusing existing venv Python: {}",
+                venv_py.display()
+            ))
+            .await;
         }
         if !venv_py.is_file() {
             return Err(format!(
@@ -1095,7 +1119,10 @@ pub async fn cancel_setup_install_handler() -> Json<InstallJobSnapshot> {
     let mut guard = job_manager().lock().await;
     if guard.snapshot.status == "running" {
         guard.cancel_requested = true;
-        guard.snapshot.logs.push("Cancellation requested by user...".to_string());
+        guard
+            .snapshot
+            .logs
+            .push("Cancellation requested by user...".to_string());
     }
     Json(guard.snapshot.clone())
 }
@@ -1145,14 +1172,20 @@ mod tests {
         let fake_py = venv_python_path(&rt);
         std::fs::create_dir_all(fake_py.parent().unwrap()).unwrap();
         std::fs::write(&fake_py, b"stub").unwrap();
-        assert_eq!(resolve_managed_python(&reloaded).as_deref(), Some(fake_py.as_path()));
+        assert_eq!(
+            resolve_managed_python(&reloaded).as_deref(),
+            Some(fake_py.as_path())
+        );
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[tokio::test]
     async fn test_setup_endpoints_and_validation() {
-        use axum::{body::Body, http::{Request, StatusCode}};
+        use axum::{
+            body::Body,
+            http::{Request, StatusCode},
+        };
         use std::sync::Arc;
         use tower::ServiceExt;
         use voxforge_core::store::memory::MemoryStore;

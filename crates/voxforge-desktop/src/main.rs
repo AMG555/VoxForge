@@ -47,7 +47,10 @@ async fn pick_runtime_directory(
     initial_path: Option<String>,
 ) -> Result<Option<String>, String> {
     let (tx, rx) = oneshot::channel();
-    let mut builder = app.dialog().file().set_title("Choose VoxForge App Environment Folder");
+    let mut builder = app
+        .dialog()
+        .file()
+        .set_title("Choose VoxForge App Environment Folder");
     if let Some(ref p) = initial_path {
         let path = std::path::Path::new(p);
         if path.exists() {
@@ -55,10 +58,13 @@ async fn pick_runtime_directory(
         }
     }
     builder.pick_folder(move |folder| {
-        let resolved = folder.and_then(|f| f.into_path().ok()).map(|p| p.to_string_lossy().to_string());
+        let resolved = folder
+            .and_then(|f| f.into_path().ok())
+            .map(|p| p.to_string_lossy().to_string());
         let _ = tx.send(resolved);
     });
-    rx.await.map_err(|e| format!("Folder dialog cancelled: {e}"))
+    rx.await
+        .map_err(|e| format!("Folder dialog cancelled: {e}"))
 }
 
 #[tauri::command]
@@ -69,7 +75,9 @@ async fn pick_python_executable(app: tauri::AppHandle) -> Result<Option<String>,
         builder = builder.add_filter("Python Executable", &["exe"]);
     }
     builder.pick_file(move |file| {
-        let resolved = file.and_then(|f| f.into_path().ok()).map(|p| p.to_string_lossy().to_string());
+        let resolved = file
+            .and_then(|f| f.into_path().ok())
+            .map(|p| p.to_string_lossy().to_string());
         let _ = tx.send(resolved);
     });
     rx.await.map_err(|e| format!("File dialog cancelled: {e}"))
