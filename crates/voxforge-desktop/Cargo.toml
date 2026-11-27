@@ -10,6 +10,10 @@ description = "Native Tauri v2 desktop workstation for VoxForge"
 name = "voxforge-desktop"
 path = "src/main.rs"
 
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

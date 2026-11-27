@@ -36,9 +36,18 @@ import {
   Dice5,
   ShieldCheck,
   Gauge,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { RuntimeStatusResponse, Voice } from '../../types';
+import { HardwareInfo, RuntimeStatusResponse, Voice } from '../../types';
+import { isTauriRuntime, openExternalUrl } from '../../services/desktopBridge';
 import { api, isAbortError } from '../../services/api';
+import {
+  assessEngineSystemFit,
+  ENGINE_REFERENCE_MAP,
+  getFitBadgeClasses,
+} from '../../services/engineMetadata';
 import { AudioVisualizer } from '../common/AudioVisualizer';
 import { PronunciationModal } from './PronunciationModal';
 import { VoiceTipsModal } from './VoiceTipsModal';
@@ -89,6 +98,7 @@ export interface VoiceTake {
 
 interface VoiceLabProps {
   voices: Voice[];
+  hardware?: HardwareInfo | null;
   onVoiceCreated?: (voice: Voice) => void;
   onVoiceDeleted?: (voiceId: string) => void;
   onNavigateTab?: (tab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa') => void;
@@ -97,11 +107,13 @@ interface VoiceLabProps {
 
 export const VoiceLab: React.FC<VoiceLabProps> = ({
   voices,
+  hardware,
   onVoiceCreated,
   onVoiceDeleted,
   onNavigateTab,
   initialText,
 }) => {
+  const [showEngineGuide, setShowEngineGuide] = useState<boolean>(false);
   const [localVoices, setLocalVoices] = useState<Voice[]>(voices);
   useEffect(() => {
     setLocalVoices(voices);
@@ -2187,6 +2199,79 @@ export const VoiceLab: React.FC<VoiceLabProps> = ({
               {selectedVoice && getEngineBadge(selectedVoice.engine_id)}
             </div>
           </div>
+
+          {/* Selected Engine Reference Strip: System Fit, Size, Pros/Cons & Official Docs */}
+          {selectedVoice && (() => {
+            const engRef = ENGINE_REFERENCE_MAP[selectedVoice.engine_id];
+            const fit = assessEngineSystemFit(selectedVoice.engine_id, hardware);
+            if (!engRef) return null;
+            return (
+              <div className="bg-[#0D1219] border border-[#242E3D] rounded-xl px-3.5 py-2.5 text-xs space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${getFitBadgeClasses(fit.tier)}`}>
+                      {fit.label}
+                    </span>
+                    <span className="font-semibold text-white">{engRef.name}</span>
+                    <span className="text-[11px] font-mono text-[#94A3B8]">{engRef.footprint}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <a
+                      href={engRef.docsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        if (isTauriRuntime()) {
+                          e.preventDefault();
+                          void openExternalUrl(engRef.docsUrl);
+                        }
+                      }}
+                      className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-[#121820] hover:bg-[#1A222D] text-sky-300 border border-[#242E3D] text-[10px] font-mono"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>{engRef.docsLabel}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setShowEngineGuide((v) => !v)}
+                      className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-[#121820] hover:bg-[#1A222D] text-[#CBD5E1] border border-[#242E3D] text-[10px] font-mono"
+                    >
+                      <span>{showEngineGuide ? 'Hide Guide' : 'Pros / Cons & Fit'}</span>
+                      {showEngineGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+                {showEngineGuide && (
+                  <div className="pt-2 border-t border-[#1E2633] space-y-2 text-[11px]">
+                    <p className="text-[#CBD5E1] leading-relaxed">{engRef.description}</p>
+                    <p className="text-[10px] font-mono text-[#94A3B8]">
+                      Your System Match: <strong className="text-white">{fit.reason}</strong>
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 bg-[#0B0E14] border border-[#1E2633] rounded-lg p-2.5">
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono uppercase text-emerald-400">Pros</div>
+                        {engRef.pros.map((p) => (
+                          <div key={p} className="text-[#CBD5E1]">+ {p}</div>
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono uppercase text-amber-400">Cons</div>
+                        {engRef.cons.map((c) => (
+                          <div key={c} className="text-[#94A3B8]">− {c}</div>
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono uppercase text-sky-400">Best For</div>
+                        {engRef.bestFor.map((b) => (
+                          <div key={b} className="text-[#CBD5E1]">• {b}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Studio Playground Mode Switcher: TTS vs Voice Changer (Speech-to-Speech) */}
           <div className="flex items-center justify-between p-1.5 bg-[#0D1219] border border-[#242E3D] rounded-xl shadow-lg">

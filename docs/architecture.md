@@ -1,6 +1,6 @@
 # VoxForge Architecture Specification
 
-**Version:** 0.7.1  
+**Version:** 0.7.2  
 **Status:** Stable / Active  
 **Author:** VoxForge Core Engineering  
 

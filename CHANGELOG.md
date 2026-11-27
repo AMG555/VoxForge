@@ -6,6 +6,19 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.2] — 2026-11-27
+
+### 🛠️ Desktop WebView Boot Fix & Installer Polish
+- **Fixed Standalone Desktop `localhost refused to connect` Bug**: Enabled `custom-protocol` by default in `crates/voxforge-desktop/Cargo.toml` and pointed `frontendDist` to embedded `../voxforge-api/ui_dist` in `tauri.conf.json`, so `voxforge-desktop` always serves bundled React UI assets offline without hitting `localhost:3000`.
+- **Disabled Post-Install README Auto-Open**: Removed `isreadme` flag from `scripts/installer/voxforge.iss` so `VoxForge_Setup_x64.exe` launches cleanly straight into the Studio without popping `README.md`.
+
+### 📚 TTS Official Docs, Pros/Cons & System Fit Recommendations
+- **Enriched `voxforge-catalog` & Hardware Profiler**: Added verified official documentation URLs (`docs_url`), `license`, `pros`, `cons`, `best_for`, `min_vram_mb`, `runtime_requirement`, and live host `assess_system_fit()` scoring (`Optimal` / `Good` / `CpuSlow` / `Insufficient`) to `GET /v1/catalog/models` and `/health/ready`.
+- **Upgraded Model Catalog, Hardware & Engines & Voice Lab UI**: Displays full TTS descriptions, sizes (Disk/RAM/VRAM), Pros/Cons, Best For tags, live System Fit badges with hardware reasons, `"Recommended for my system"` filter, and OS browser-opening **Official Docs** links (`openExternalUrl` in Desktop), plus [`docs/tts-engines.md`](docs/tts-engines.md).
+- **Dependabot Cargo Config**: Added `.github/dependabot.yml` documenting and ignoring `glib < 0.20.0` (locked transitively by Tauri v2's `gtk 0.18` Linux stack) so Dependabot stops failing with `security_update_not_possible` on every push.
+
+---
+
 ## [0.7.1] — 2026-11-27
 
 ### 🦀 Rust-First Runtime Architecture & Zero-Python Offline TTS

@@ -15,6 +15,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use voxforge_catalog::{CatalogItem, ModelType};
 use voxforge_core::error::ProblemDetails;
+use voxforge_hardware::HardwareProfile;
 
 use crate::state::AppState;
 
@@ -29,6 +30,7 @@ pub struct CatalogQuery {
 #[derive(Debug, Serialize)]
 pub struct CatalogListResponse {
     pub count: usize,
+    pub hardware: HardwareProfile,
     pub models: Vec<CatalogItem>,
 }
 
@@ -49,10 +51,14 @@ pub async fn list_catalog_models(
         });
 
     let installed_only = query.installed_only.unwrap_or(false);
-    let models = state.model_catalog.list(filter_type, installed_only).await;
+    let models = state
+        .model_catalog
+        .list_for_hardware(filter_type, installed_only, &state.hardware_profile)
+        .await;
 
     Json(CatalogListResponse {
         count: models.len(),
+        hardware: state.hardware_profile.clone(),
         models,
     })
 }
@@ -62,7 +68,11 @@ pub async fn get_catalog_model(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<CatalogItem>, (StatusCode, Json<ProblemDetails>)> {
-    match state.model_catalog.get(&id).await {
+    match state
+        .model_catalog
+        .get_for_hardware(&id, &state.hardware_profile)
+        .await
+    {
         Some(item) => Ok(Json(item)),
         None => Err((
             StatusCode::NOT_FOUND,

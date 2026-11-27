@@ -289,6 +289,7 @@ export const App: React.FC = () => {
         {activeTab === 'voices' && (
           <VoiceLab
             voices={voices}
+            hardware={hardware}
             onVoiceCreated={handleVoiceCreated}
             onVoiceDeleted={handleVoiceDeleted}
             onNavigateTab={setActiveTab}

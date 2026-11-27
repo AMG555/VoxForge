@@ -12,15 +12,30 @@ import {
   Play,
   Loader2,
   Terminal,
+  ExternalLink,
+  Sparkles,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
-import { CatalogItem, RuntimeStatusResponse } from '../../types';
+import { CatalogItem, HardwareProfile, RuntimeStatusResponse } from '../../types';
+import { getFitBadgeClasses } from '../../services/engineMetadata';
+import { isTauriRuntime, openExternalUrl } from '../../services/desktopBridge';
 import { api } from '../../services/api';
+
+const RUNTIME_LABELS: Record<string, string> = {
+  native_piper_cli: 'Zero-Python Native C++',
+  python_kokoro: 'Optional Kokoro Sidecar',
+  python_sidecar: 'Optional Python Sidecar',
+  onnx_runtime: 'ONNX Weights',
+};
 
 export const ModelCatalog: React.FC = () => {
   const [models, setModels] = useState<CatalogItem[]>([]);
+  const [hostHardware, setHostHardware] = useState<HardwareProfile | null>(null);
   const [runtimes, setRuntimes] = useState<RuntimeStatusResponse | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [installedOnly, setInstalledOnly] = useState<boolean>(false);
+  const [bestFitOnly, setBestFitOnly] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [runtimeBusy, setRuntimeBusy] = useState<string | null>(null);
@@ -39,8 +54,11 @@ export const ModelCatalog: React.FC = () => {
     setLoading(true);
     try {
       const type = filterType === 'all' ? undefined : filterType;
-      const [data] = await Promise.all([api.getCatalogModels(type, installedOnly), fetchRuntimes()]);
-      setModels(data);
+      const [payload] = await Promise.all([api.getCatalogDetails(type, installedOnly), fetchRuntimes()]);
+      setModels(payload.models || []);
+      if (payload.hardware) {
+        setHostHardware(payload.hardware);
+      }
     } catch {
       // Offline fallback curated catalog
       setModels([]);
@@ -303,6 +321,33 @@ export const ModelCatalog: React.FC = () => {
           </div>
         )}
 
+        {/* Host Hardware Fit Telemetry Banner */}
+        {hostHardware && (
+          <div className="bg-[#121820] border border-[#242E3D] rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[#CBD5E1]">
+              <span className="inline-flex items-center space-x-1.5">
+                <Cpu className="w-3.5 h-3.5 text-amber-400" />
+                <span>{hostHardware.cpu_brand} ({hostHardware.cpu_logical_threads} threads)</span>
+              </span>
+              <span className="inline-flex items-center space-x-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{(hostHardware.total_memory_mb / 1024).toFixed(1)} GB RAM</span>
+              </span>
+              <span>
+                GPU:{' '}
+                <strong className="text-sky-300">
+                  {hostHardware.gpus.length > 0
+                    ? `${hostHardware.gpus[0].name} (${(hostHardware.gpus[0].vram_mb / 1024).toFixed(1)} GB VRAM)`
+                    : 'CPU-Only Host'}
+                </strong>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+              Models sorted best fit first ({hostHardware.assigned_tier})
+            </span>
+          </div>
+        )}
+
         {/* Filter Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-[#121820] p-3 rounded-lg border border-[#242E3D]">
           <div className="flex items-center space-x-2">
@@ -323,38 +368,67 @@ export const ModelCatalog: React.FC = () => {
             ))}
           </div>
 
-          <label className="flex items-center space-x-2 text-xs text-[#94A3B8] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={installedOnly}
-              onChange={(e) => setInstalledOnly(e.target.checked)}
-              className="rounded bg-[#1A222D] border-[#242E3D] text-amber-500 focus:ring-0 focus:ring-offset-0"
-            />
-            <span>Show installed models only</span>
-          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center space-x-2 text-xs text-[#94A3B8] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={bestFitOnly}
+                onChange={(e) => setBestFitOnly(e.target.checked)}
+                className="rounded bg-[#1A222D] border-[#242E3D] text-emerald-500 focus:ring-0 focus:ring-offset-0"
+              />
+              <span>Recommended for my system</span>
+            </label>
+
+            <label className="flex items-center space-x-2 text-xs text-[#94A3B8] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={installedOnly}
+                onChange={(e) => setInstalledOnly(e.target.checked)}
+                className="rounded bg-[#1A222D] border-[#242E3D] text-amber-500 focus:ring-0 focus:ring-offset-0"
+              />
+              <span>Show installed models only</span>
+            </label>
+          </div>
         </div>
 
         {/* Models Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {models.map((model) => {
+          {models
+            .filter((model) =>
+              !bestFitOnly ||
+              model.system_fit?.tier === 'optimal' ||
+              model.system_fit?.tier === 'good'
+            )
+            .map((model) => {
             const isInstalled = model.status?.toLowerCase() === 'installed';
             const isInstalling = installingId === model.id;
             const sizeMb = Math.round(model.size_bytes / (1024 * 1024));
+            const fit = model.system_fit;
+            const vramRecommended = (model.min_vram_mb ?? 0) > 0
+              ? `${((model.min_vram_mb ?? 0) / 1024).toFixed(1)} GB VRAM`
+              : 'CPU Ready';
 
             return (
               <div
                 key={model.id}
                 className="bg-[#121820] rounded-lg border border-[#242E3D] p-5 flex flex-col justify-between hover:border-[#3B485C] transition-colors group"
               >
-                <div>
+                <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold bg-[#1A222D] text-amber-400 border border-[#242E3D]">
-                        {model.model_type}
-                      </span>
-                      <span className="ml-2 text-[10px] font-mono uppercase text-[#64748B]">
-                        {model.format}
-                      </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold bg-[#1A222D] text-amber-400 border border-[#242E3D]">
+                          {model.model_type}
+                        </span>
+                        <span className="text-[10px] font-mono uppercase text-[#64748B]">
+                          {model.format}
+                        </span>
+                        {model.license && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#0B0E14] text-[#94A3B8] border border-[#242E3D]">
+                            {model.license}
+                          </span>
+                        )}
+                      </div>
                       <h3 className="font-bold text-sm text-white mt-2 group-hover:text-amber-400 transition-colors">
                         {model.name}
                       </h3>
@@ -362,31 +436,92 @@ export const ModelCatalog: React.FC = () => {
                     </div>
 
                     {isInstalled ? (
-                      <span className="flex items-center space-x-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <span className="flex items-center space-x-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
                         <CheckCircle2 className="w-3 h-3" />
                         <span>READY</span>
                       </span>
                     ) : (
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#1A222D] text-[#94A3B8] border border-[#242E3D]">
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#1A222D] text-[#94A3B8] border border-[#242E3D] shrink-0">
                         AVAILABLE
                       </span>
                     )}
                   </div>
 
-                  <p className="text-xs text-[#94A3B8] mt-3 leading-relaxed">{model.description}</p>
+                  {/* Live Host Hardware Compatibility Badge & Reason */}
+                  {fit && (
+                    <div className={`p-2.5 rounded border text-[11px] space-y-1 ${getFitBadgeClasses(fit.tier)}`}>
+                      <div className="flex items-center justify-between font-mono font-bold">
+                        <span className="inline-flex items-center space-x-1">
+                          {fit.tier === 'optimal' || fit.tier === 'good' ? (
+                            <Sparkles className="w-3 h-3" />
+                          ) : (
+                            <AlertTriangle className="w-3 h-3" />
+                          )}
+                          <span>{fit.label}</span>
+                        </span>
+                        <span>Fit {fit.score}/100</span>
+                      </div>
+                      <p className="text-[10px] opacity-90 leading-snug">{fit.reason}</p>
+                    </div>
+                  )}
 
-                  <div className="mt-4 pt-3 border-t border-[#242E3D]/50 flex flex-wrap gap-3 text-xs text-[#64748B] font-mono">
+                  <p className="text-xs text-[#CBD5E1] leading-relaxed">{model.description}</p>
+
+                  {/* Size, RAM, VRAM & Runtime Strip */}
+                  <div className="pt-2.5 border-t border-[#242E3D]/60 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-[#94A3B8] font-mono">
                     <div className="flex items-center space-x-1">
                       <HardDrive className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{sizeMb} MB</span>
+                      <span>Size: {sizeMb} MB</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Cpu className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Min {model.min_ram_mb} MB</span>
+                      <span>Min {(model.min_ram_mb / 1024).toFixed(1)} GB RAM</span>
                     </div>
+                    <span className="text-sky-300">{vramRecommended}</span>
+                    {model.runtime_requirement && (
+                      <span className="text-[#64748B]">
+                        · {RUNTIME_LABELS[model.runtime_requirement] || model.runtime_requirement}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-1">
+                  {/* Best For Pills */}
+                  {model.best_for && model.best_for.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-mono uppercase text-[#64748B]">Best For</div>
+                      <div className="flex flex-wrap gap-1">
+                        {model.best_for.map((use) => (
+                          <span
+                            key={use}
+                            className="text-[10px] px-2 py-0.5 rounded bg-[#0B0E14] text-[#CBD5E1] border border-[#242E3D]"
+                          >
+                            {use}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pros & Cons */}
+                  {((model.pros && model.pros.length > 0) || (model.cons && model.cons.length > 0)) && (
+                    <div className="grid grid-cols-1 gap-1.5 bg-[#0B0E14] border border-[#1E2633] rounded p-2.5 text-[11px]">
+                      {model.pros?.map((p) => (
+                        <div key={p} className="flex items-start space-x-1.5 text-emerald-300/90">
+                          <Check className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span>{p}</span>
+                        </div>
+                      ))}
+                      {model.cons?.map((c) => (
+                        <div key={c} className="flex items-start space-x-1.5 text-amber-300/80">
+                          <span className="font-mono font-bold shrink-0">−</span>
+                          <span>{c}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Supported Languages */}
+                  <div className="flex flex-wrap gap-1">
                     {model.supported_languages.map((lang) => (
                       <span
                         key={lang}
@@ -398,7 +533,24 @@ export const ModelCatalog: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-[#242E3D]">
+                <div className="mt-5 pt-4 border-t border-[#242E3D] space-y-2">
+                  {model.docs_url && (
+                    <a
+                      href={model.docs_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => {
+                        if (isTauriRuntime()) {
+                          e.preventDefault();
+                          void openExternalUrl(model.docs_url!);
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-sky-300 hover:text-sky-200 border border-[#242E3D] font-mono text-[11px] transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Official Docs &amp; Model Card</span>
+                    </a>
+                  )}
                   {isInstalled ? (
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-mono text-emerald-400/90 flex items-center space-x-1.5 min-w-0">

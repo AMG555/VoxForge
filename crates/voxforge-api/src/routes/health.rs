@@ -106,7 +106,8 @@ pub async fn readiness_check(State(state): State<AppState>) -> Response {
         "engine_health": health_map,
         "hardware_tier": state.hardware_profile.assigned_tier.to_string(),
         "arch": state.hardware_profile.arch,
-        "os": state.hardware_profile.os
+        "os": state.hardware_profile.os,
+        "hardware_profile": &state.hardware_profile
     });
 
     (status_code, Json(body)).into_response()

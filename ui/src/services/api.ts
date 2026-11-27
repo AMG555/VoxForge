@@ -4,6 +4,7 @@ import {
   BlendVoicesPayload,
   BlendVoicesResponse,
   CatalogItem,
+  CatalogListPayload,
   CloneVoicePayload,
   HardwareInfo,
   PipelineDefinition,
@@ -183,7 +184,7 @@ export const api = {
     return res.json();
   },
 
-  async getCatalogModels(type?: string, installedOnly?: boolean): Promise<CatalogItem[]> {
+  async getCatalogDetails(type?: string, installedOnly?: boolean): Promise<CatalogListPayload> {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
     if (installedOnly) params.append('installed_only', 'true');
@@ -192,7 +193,11 @@ export const api = {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch catalog models');
-    const data = await res.json();
+    return res.json();
+  },
+
+  async getCatalogModels(type?: string, installedOnly?: boolean): Promise<CatalogItem[]> {
+    const data = await this.getCatalogDetails(type, installedOnly);
     return data.models;
   },
 

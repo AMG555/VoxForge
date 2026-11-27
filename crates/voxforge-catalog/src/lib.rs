@@ -9,5 +9,8 @@ pub mod models;
 pub mod store;
 
 pub use mirror_race::{MirrorCandidate, MirrorProbeResult, MirrorRaceManager, MirrorRaceResult};
-pub use models::{CatalogItem, ModelFormat, ModelStatus, ModelType};
+pub use models::{
+    assess_system_fit, CatalogItem, ModelFormat, ModelStatus, ModelType, SystemFitAssessment,
+    SystemFitTier,
+};
 pub use store::ModelCatalogStore;

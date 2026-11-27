@@ -68,12 +68,42 @@ export interface Voice {
   refined_at?: string;
 }
 
+export interface SimdSupport {
+  avx: boolean;
+  avx2: boolean;
+  avx512: boolean;
+  neon: boolean;
+}
+
+export interface GpuAccelerator {
+  name: string;
+  vram_mb: number;
+  has_cuda: boolean;
+  has_mps: boolean;
+  has_directml: boolean;
+}
+
+export interface HardwareProfile {
+  os: string;
+  arch: string;
+  cpu_brand: string;
+  cpu_physical_cores: number;
+  cpu_logical_threads: number;
+  total_memory_mb: number;
+  available_memory_mb: number;
+  simd: SimdSupport;
+  gpus: GpuAccelerator[];
+  assigned_tier: string;
+  recommended_engines: string[];
+}
+
 export interface HardwareInfo {
   status: string;
   hardware_tier: string;
   registered_engines: string[];
   arch: string;
   os: string;
+  hardware_profile?: HardwareProfile;
 }
 
 export interface AudioQualityMetrics {
@@ -125,6 +155,13 @@ export interface AbTestScenario {
   };
 }
 
+export interface SystemFitAssessment {
+  tier: 'optimal' | 'good' | 'cpu_slow' | 'insufficient';
+  score: number;
+  label: string;
+  reason: string;
+}
+
 export interface CatalogItem {
   id: string;
   name: string;
@@ -132,12 +169,26 @@ export interface CatalogItem {
   model_type: 'tts' | 'asr' | 'vad' | 'diarizer';
   format: string;
   size_bytes: number;
+  docs_url?: string;
+  license?: string;
+  pros?: string[];
+  cons?: string[];
+  best_for?: string[];
   min_ram_mb: number;
+  min_vram_mb?: number;
   requires_gpu: boolean;
+  runtime_requirement?: string;
   supported_languages: string[];
   status: 'available' | 'downloading' | 'installed' | 'error' | 'Available' | 'Downloading' | 'Installed' | 'Error' | string;
   installed_at?: string;
   local_path?: string;
+  system_fit?: SystemFitAssessment;
+}
+
+export interface CatalogListPayload {
+  count: number;
+  hardware?: HardwareProfile;
+  models: CatalogItem[];
 }
 
 export interface EngineHealthInfo {
