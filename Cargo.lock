@@ -5203,7 +5203,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voxforge-api"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "axum",
  "chrono",
@@ -5241,7 +5241,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-asr"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5259,7 +5259,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-audio"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "hound",
  "serde",
@@ -5271,7 +5271,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-benchmark"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5286,7 +5286,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-catalog"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5305,7 +5305,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-cli"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "axum",
@@ -5330,7 +5330,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-core"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5343,7 +5343,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-desktop"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -5358,7 +5358,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-engine"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5380,7 +5380,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-hardware"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -5389,7 +5389,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-mcp"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5415,7 +5415,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-pipeline"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5435,7 +5435,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-pronunciation"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "regex",
  "serde",
@@ -5443,7 +5443,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-router"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "serde",
@@ -5457,7 +5457,7 @@ dependencies = [
 
 [[package]]
 name = "voxforge-worker"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "async-trait",
  "chrono",

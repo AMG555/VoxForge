@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigation } from './components/Navigation';
 import { WorkflowsDashboard } from './components/workflows/WorkflowsDashboard';
 import { PipelineCanvas } from './components/canvas/PipelineCanvas';
@@ -9,12 +9,14 @@ import { AbTestLab } from './components/qa/AbTestLab';
 import { ModelCatalog } from './components/catalog/ModelCatalog';
 import { DictationBar } from './components/dictation/DictationBar';
 import { UpdateCenter } from './components/common/UpdateCenter';
+import { ApiDocsModal } from './components/common/ApiDocsModal';
 import { TitleBar } from './components/desktop/TitleBar';
 import { FirstRunWizard } from './components/setup/FirstRunWizard';
 import { HardwareInfo, SystemUpdateInfo, Voice } from './types';
 import { api } from './services/api';
 import { WorkflowStorage } from './services/workflowStorage';
 import { useAppDispatch } from './store';
+import { useGetSetupStatusQuery } from './store/setupApi';
 import { setWizardOpen } from './store/setupSlice';
 
 export const App: React.FC = () => {
@@ -28,6 +30,17 @@ export const App: React.FC = () => {
   const [updateInfo, setUpdateInfo] = useState<SystemUpdateInfo | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState<boolean>(false);
+  const [isApiDocsOpen, setIsApiDocsOpen] = useState<boolean>(false);
+  const autoOpenedWizardRef = useRef<boolean>(false);
+
+  const { data: setupStatus } = useGetSetupStatusQuery();
+
+  useEffect(() => {
+    if (setupStatus && !setupStatus.config.setup_completed && !autoOpenedWizardRef.current) {
+      autoOpenedWizardRef.current = true;
+      dispatch(setWizardOpen(true));
+    }
+  }, [setupStatus, dispatch]);
 
   const refreshSystemUpdate = async (force = false) => {
     setIsCheckingUpdates(true);
@@ -269,6 +282,7 @@ export const App: React.FC = () => {
           refreshSystemUpdate(false);
         }}
         onOpenRuntimeSetup={() => dispatch(setWizardOpen(true))}
+        onOpenApiDocs={() => setIsApiDocsOpen(true)}
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -332,6 +346,7 @@ export const App: React.FC = () => {
       />
 
       <FirstRunWizard />
+      <ApiDocsModal isOpen={isApiDocsOpen} onClose={() => setIsApiDocsOpen(false)} />
     </div>
   );
 };

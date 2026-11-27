@@ -28,25 +28,125 @@ pub async fn scalar_docs_html() -> impl IntoResponse {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VoxForge API Reference | Studio Neural Speech & DSP</title>
-    <meta name="description" content="Interactive API documentation for VoxForge neural audio synthesis, graph pipelines, and automated QA." />
+    <title>VoxForge API Reference | Neural Speech & Voice Cloning</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <style>
-      body {
-        margin: 0;
-        padding: 0;
-        background-color: #0b0f19;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      }
+      :root { color-scheme: dark; }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace, sans-serif; background: #0b0e14; color: #f0f4f8; }
+      .vf-shell { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+      .vf-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #242e3d; padding-bottom: 16px; margin-bottom: 20px; }
+      .vf-title { font-size: 20px; font-weight: 700; color: #f59e0b; margin: 0; }
+      .vf-sub { font-size: 12px; color: #94a3b8; margin: 4px 0 0; }
+      .vf-btn { background: #1a222d; color: #cbd5e1; border: 1px solid #3b485c; padding: 7px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+      .vf-btn:hover { border-color: #f59e0b; color: #fff; }
+      .vf-card { background: #121820; border: 1px solid #242e3d; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+      .vf-row { padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+      .vf-method { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; }
+      .get { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
+      .post { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.35); }
+      .delete { background: rgba(244,63,94,.15); color: #fb7185; border: 1px solid rgba(244,63,94,.35); }
+      .vf-path { font-size: 13px; font-weight: 600; color: #fff; font-family: monospace; }
+      .vf-summary { font-size: 12px; color: #94a3b8; }
+      .vf-body { border-top: 1px solid #1e2633; padding: 14px 16px; background: #0d1219; display: none; font-size: 12px; }
+      .vf-card.open .vf-body { display: block; }
+      textarea.vf-json { width: 100%; box-sizing: border-box; background: #080b10; color: #e2e8f0; border: 1px solid #242e3d; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 12px; min-height: 96px; margin-top: 8px; }
+      pre.vf-out { background: #080b10; border: 1px solid #242e3d; border-radius: 6px; padding: 10px; font-size: 11px; overflow: auto; max-height: 220px; color: #a7f3d0; }
     </style>
   </head>
   <body>
-    <script
-      id="api-reference"
-      data-url="/openapi.json"
-      data-configuration='{"theme":"purple","layout":"modern","darkMode":true,"showSidebar":true,"showDeveloperTools":"never","withDefaultFonts":false,"telemetry":false}'
-    ></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <div id="vf-offline-docs" class="vf-shell">
+      <div class="vf-head">
+        <div>
+          <h1 class="vf-title">VoxForge REST &amp; MCP API Reference</h1>
+          <p class="vf-sub" id="vf-base-url">Loading OpenAPI 3.1 schema...</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a class="vf-btn" href="/openapi.json" target="_blank">OpenAPI JSON</a>
+          <button class="vf-btn" id="vf-scalar-toggle" type="button">Scalar UI</button>
+        </div>
+      </div>
+      <div id="vf-endpoints"></div>
+    </div>
+    <div id="vf-scalar-mount" style="display:none;">
+      <script id="api-reference" data-url="/openapi.json" data-configuration='{"theme":"purple","layout":"modern","darkMode":true}'></script>
+    </div>
+    <script>
+      document.getElementById('vf-scalar-toggle').onclick = function() {
+        document.getElementById('vf-offline-docs').style.display = 'none';
+        document.getElementById('vf-scalar-mount').style.display = 'block';
+        if (!document.getElementById('vf-scalar-cdn')) {
+          const s = document.createElement('script');
+          s.id = 'vf-scalar-cdn';
+          s.src = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference';
+          document.body.appendChild(s);
+        }
+      };
+      (async function() {
+        const origin = window.location.origin;
+        document.getElementById('vf-base-url').textContent = 'Live Server: ' + origin + ' · Interactive zero-dependency explorer';
+        try {
+          const res = await fetch('/openapi.json');
+          const spec = await res.json();
+          const root = document.getElementById('vf-endpoints');
+          const entries = Object.entries(spec.paths || {});
+          entries.forEach(([path, methods]) => {
+            Object.entries(methods).forEach(([method, op]) => {
+              const card = document.createElement('div');
+              card.className = 'vf-card';
+              const reqSchema = op.requestBody?.content?.['application/json']?.schema;
+              const sample = reqSchema?.example ? JSON.stringify(reqSchema.example, null, 2) : '{}';
+              card.innerHTML = `
+                <div class="vf-row">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span class="vf-method ${method}">${method}</span>
+                    <span class="vf-path">${path}</span>
+                  </div>
+                  <span class="vf-summary">${op.summary || ''}</span>
+                </div>
+                <div class="vf-body">
+                  <p style="margin:0 0 8px;color:#cbd5e1;">${op.description || ''}</p>
+                  ${method === 'post' ? `<label style="color:#94a3b8;font-size:11px;">JSON Request Body</label><textarea class="vf-json">${sample}</textarea>` : ''}
+                  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;">
+                    <button class="vf-btn vf-try" type="button">Try Request</button>
+                    <span class="vf-status" style="color:#94a3b8;"></span>
+                  </div>
+                  <pre class="vf-out" style="display:none;"></pre>
+                </div>`;
+              card.querySelector('.vf-row').onclick = () => card.classList.toggle('open');
+              card.querySelector('.vf-try').onclick = async () => {
+                const statusEl = card.querySelector('.vf-status');
+                const outEl = card.querySelector('.vf-out');
+                statusEl.textContent = 'Sending...';
+                try {
+                  const opts = { method: method.toUpperCase(), headers: {} };
+                  if (method === 'post') {
+                    opts.headers['Content-Type'] = 'application/json';
+                    opts.body = card.querySelector('textarea.vf-json').value;
+                  }
+                  const r = await fetch(origin + path, opts);
+                  statusEl.textContent = r.status + ' ' + r.statusText;
+                  outEl.style.display = 'block';
+                  const ct = r.headers.get('content-type') || '';
+                  if (ct.includes('audio/') || ct.includes('octet-stream')) {
+                    const blob = await r.blob();
+                    outEl.textContent = 'Binary response: ' + blob.size + ' bytes (' + ct + ')';
+                  } else {
+                    const txt = await r.text();
+                    try { outEl.textContent = JSON.stringify(JSON.parse(txt), null, 2); }
+                    catch { outEl.textContent = txt.slice(0, 4000); }
+                  }
+                } catch (e) {
+                  statusEl.textContent = 'Error: ' + e.message;
+                }
+              };
+              root.appendChild(card);
+            });
+          });
+        } catch (err) {
+          document.getElementById('vf-endpoints').innerHTML = '<p style="color:#f87171;">Failed loading /openapi.json: ' + err.message + '</p>';
+        }
+      })();
+    </script>
   </body>
 </html>"#;
 
@@ -364,6 +464,51 @@ pub async fn openapi_spec() -> Json<serde_json::Value> {
                         "401": { "$ref": "#/components/responses/Unauthorized" },
                         "404": { "$ref": "#/components/responses/NotFound" }
                     }
+                }
+            },
+            "/v1/audio/transcriptions": {
+                "post": {
+                    "tags": ["Speech"],
+                    "summary": "Transcribe audio to text (Whisper / ASR)",
+                    "description": "Transcribes base64-encoded WAV/PCM audio using connected Whisper neural sidecar or local ASR engine.",
+                    "security": [{ "BearerAuth": [] }],
+                    "responses": {
+                        "200": { "description": "Transcription result" },
+                        "400": { "$ref": "#/components/responses/BadRequest" }
+                    }
+                }
+            },
+            "/v1/audio/refine": {
+                "post": {
+                    "tags": ["Speech"],
+                    "summary": "Strip verbal fillers & Whisper loops from text",
+                    "description": "Cleans filler words (um, uh, like) and repetition artifacts from dictated transcripts.",
+                    "security": [{ "BearerAuth": [] }],
+                    "responses": { "200": { "description": "Refined transcript" } }
+                }
+            },
+            "/v1/catalog/models": {
+                "get": {
+                    "tags": ["Models"],
+                    "summary": "List catalog models with live hardware fit scores",
+                    "description": "Returns downloadable models scored for local CPU/RAM/GPU capabilities.",
+                    "responses": { "200": { "description": "Catalog entries" } }
+                }
+            },
+            "/v1/voices/profiles": {
+                "get": {
+                    "tags": ["Voice Cloning"],
+                    "summary": "List persisted zero-shot voice cloning profiles",
+                    "description": "Returns all cloned speaker profiles stored on disk.",
+                    "responses": { "200": { "description": "Cloned voice profiles" } }
+                }
+            },
+            "/v1/system/runtimes": {
+                "get": {
+                    "tags": ["Health"],
+                    "summary": "Inspect local Python, Piper, and sidecar status",
+                    "description": "Reports detected Python executables, installed packages, native Piper CLI, and active sidecars.",
+                    "responses": { "200": { "description": "Runtime diagnostics" } }
                 }
             },
             "/mcp": {

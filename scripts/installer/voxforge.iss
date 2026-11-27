@@ -3,7 +3,7 @@
 ; Requires Inno Setup 6.x: https://jrsoftware.org/isinfo.php
 
 #define MyAppName "VoxForge"
-#define MyAppVersion "0.7.2"
+#define MyAppVersion "0.7.3"
 #define MyAppPublisher "VoxForge Contributors"
 #define MyAppURL "https://github.com/AMG555/VoxForge"
 #define MyAppExeName "voxforge-desktop.exe"
@@ -53,6 +53,7 @@ Source: "..\..\dist\voxforge-desktop.exe"; DestDir: "{app}"; DestName: "{#MyAppE
 Source: "..\..\dist\voxforge.exe"; DestDir: "{app}"; DestName: "{#MyCliExeName}"; Flags: ignoreversion
 Source: "..\..\assets\voxforge.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\scripts\neural_sidecar.py"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu

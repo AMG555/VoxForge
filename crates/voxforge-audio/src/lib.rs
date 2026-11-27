@@ -8,10 +8,11 @@ pub mod wav;
 
 pub use dsp::{
     AcousticEchoCanceller, AcousticFeatures, AlgorithmicReverb, AudioWatermark, BrickwallLimiter,
-    DeEsser, DynamicCompressor, EchoDelay, HarmonicWarmth, HumanMicroTremor, MasteringProfile,
-    NaturalBreath, ParametricEq, PhraseLeveler, ProsodyMirror, Resampler, RoomToneGapFill,
-    SilenceTrimmer, SmartFitPlanner, SoftEnvelope, VocalChorus, VocalTractResonator,
-    WatermarkDetectionResult, WsolaTimeStretch, DEFAULT_SIGNATURE_PAYLOAD,
+    DeEsser, DynamicCompressor, EchoDelay, HarmonicWarmth, HumanMicroTremor, InstructModulation,
+    MasteringProfile, ModulationTransfer, NaturalBreath, ParametricEq, PhraseLeveler,
+    ProsodyMirror, Resampler, RoomToneGapFill, SilenceTrimmer, SmartFitPlanner, SoftEnvelope,
+    VocalChorus, VocalTractResonator, WatermarkDetectionResult, WsolaTimeStretch,
+    DEFAULT_SIGNATURE_PAYLOAD,
 };
 pub use media::MediaProcessor;
 pub use merge::AudioMerger;

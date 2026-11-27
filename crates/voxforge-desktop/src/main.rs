@@ -91,8 +91,10 @@ fn open_external_url(url: String) -> Result<(), String> {
     }
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         std::process::Command::new("cmd")
             .args(["/C", "start", "", trimmed])
+            .creation_flags(0x0800_0000)
             .spawn()
             .map_err(|e| format!("Failed opening URL: {e}"))?;
     }

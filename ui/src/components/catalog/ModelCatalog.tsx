@@ -16,6 +16,8 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { CatalogItem, HardwareProfile, RuntimeStatusResponse } from '../../types';
 import { getFitBadgeClasses } from '../../services/engineMetadata';
@@ -39,7 +41,18 @@ export const ModelCatalog: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [runtimeBusy, setRuntimeBusy] = useState<string | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [confirmUninstallId, setConfirmUninstallId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const fetchRuntimes = async () => {
     try {
@@ -128,7 +141,12 @@ export const ModelCatalog: React.FC = () => {
   };
 
   const handleUninstall = async (id: string) => {
-    if (!confirm(`Remove local neural weights for '${id}'?`)) return;
+    if (confirmUninstallId !== id) {
+      setConfirmUninstallId(id);
+      setMessage({ text: `Click uninstall again on '${id}' to confirm deleting local weights.`, type: 'success' });
+      return;
+    }
+    setConfirmUninstallId(null);
     try {
       await api.uninstallModel(id);
       setModels((prev) =>
@@ -447,143 +465,149 @@ export const ModelCatalog: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Live Host Hardware Compatibility Badge & Reason */}
-                  {fit && (
-                    <div className={`p-2.5 rounded border text-[11px] space-y-1 ${getFitBadgeClasses(fit.tier)}`}>
-                      <div className="flex items-center justify-between font-mono font-bold">
-                        <span className="inline-flex items-center space-x-1">
-                          {fit.tier === 'optimal' || fit.tier === 'good' ? (
-                            <Sparkles className="w-3 h-3" />
-                          ) : (
-                            <AlertTriangle className="w-3 h-3" />
-                          )}
-                          <span>{fit.label}</span>
-                        </span>
-                        <span>Fit {fit.score}/100</span>
-                      </div>
-                      <p className="text-[10px] opacity-90 leading-snug">{fit.reason}</p>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-[#CBD5E1] leading-relaxed">{model.description}</p>
-
-                  {/* Size, RAM, VRAM & Runtime Strip */}
-                  <div className="pt-2.5 border-t border-[#242E3D]/60 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-[#94A3B8] font-mono">
-                    <div className="flex items-center space-x-1">
-                      <HardDrive className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Size: {sizeMb} MB</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Cpu className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Min {(model.min_ram_mb / 1024).toFixed(1)} GB RAM</span>
-                    </div>
-                    <span className="text-sky-300">{vramRecommended}</span>
-                    {model.runtime_requirement && (
-                      <span className="text-[#64748B]">
-                        · {RUNTIME_LABELS[model.runtime_requirement] || model.runtime_requirement}
+                  {/* Compact System Fit Pill + Primary Summary */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                    {fit && (
+                      <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded border font-semibold ${getFitBadgeClasses(fit.tier)}`}>
+                        {fit.tier === 'optimal' || fit.tier === 'good' ? (
+                          <Sparkles className="w-3 h-3" />
+                        ) : (
+                          <AlertTriangle className="w-3 h-3" />
+                        )}
+                        <span>{fit.label} · {fit.score}/100</span>
                       </span>
                     )}
+                    <span className="text-[#94A3B8]">
+                      {sizeMb} MB · {(model.min_ram_mb / 1024).toFixed(1)}GB RAM · {vramRecommended}
+                    </span>
                   </div>
 
-                  {/* Best For Pills */}
-                  {model.best_for && model.best_for.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-mono uppercase text-[#64748B]">Best For</div>
+                  <p className="text-xs text-[#CBD5E1] leading-relaxed line-clamp-2">
+                    {model.description}
+                  </p>
+
+                  {expandedIds.has(model.id) && (
+                    <div className="space-y-3 pt-2 border-t border-[#1E2633]">
+                      {fit?.reason && (
+                        <p className="text-[11px] text-[#94A3B8] leading-snug">{fit.reason}</p>
+                      )}
+                      {model.runtime_requirement && (
+                        <div className="text-[11px] font-mono text-[#94A3B8]">
+                          Runtime: <span className="text-white">{RUNTIME_LABELS[model.runtime_requirement] || model.runtime_requirement}</span>
+                        </div>
+                      )}
+                      {model.best_for && model.best_for.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {model.best_for.map((use) => (
+                            <span
+                              key={use}
+                              className="text-[10px] px-2 py-0.5 rounded bg-[#0B0E14] text-[#CBD5E1] border border-[#242E3D]"
+                            >
+                              {use}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {((model.pros && model.pros.length > 0) || (model.cons && model.cons.length > 0)) && (
+                        <div className="grid grid-cols-1 gap-1 bg-[#0B0E14] border border-[#1E2633] rounded p-2.5 text-[11px]">
+                          {model.pros?.map((p) => (
+                            <div key={p} className="flex items-start space-x-1.5 text-emerald-300/90">
+                              <Check className="w-3 h-3 mt-0.5 shrink-0" />
+                              <span>{p}</span>
+                            </div>
+                          ))}
+                          {model.cons?.map((c) => (
+                            <div key={c} className="flex items-start space-x-1.5 text-amber-300/80">
+                              <span className="font-mono font-bold shrink-0">−</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-1">
-                        {model.best_for.map((use) => (
+                        {model.supported_languages.map((lang) => (
                           <span
-                            key={use}
-                            className="text-[10px] px-2 py-0.5 rounded bg-[#0B0E14] text-[#CBD5E1] border border-[#242E3D]"
+                            key={lang}
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1A222D] text-[#94A3B8]"
                           >
-                            {use}
+                            {lang}
                           </span>
                         ))}
                       </div>
+                      {model.docs_url && (
+                        <a
+                          href={model.docs_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            if (isTauriRuntime()) {
+                              e.preventDefault();
+                              void openExternalUrl(model.docs_url!);
+                            }
+                          }}
+                          className="w-full inline-flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-sky-300 hover:text-sky-200 border border-[#242E3D] font-mono text-[11px] transition-colors"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Official Docs &amp; Model Card</span>
+                        </a>
+                      )}
                     </div>
                   )}
-
-                  {/* Pros & Cons */}
-                  {((model.pros && model.pros.length > 0) || (model.cons && model.cons.length > 0)) && (
-                    <div className="grid grid-cols-1 gap-1.5 bg-[#0B0E14] border border-[#1E2633] rounded p-2.5 text-[11px]">
-                      {model.pros?.map((p) => (
-                        <div key={p} className="flex items-start space-x-1.5 text-emerald-300/90">
-                          <Check className="w-3 h-3 mt-0.5 shrink-0" />
-                          <span>{p}</span>
-                        </div>
-                      ))}
-                      {model.cons?.map((c) => (
-                        <div key={c} className="flex items-start space-x-1.5 text-amber-300/80">
-                          <span className="font-mono font-bold shrink-0">−</span>
-                          <span>{c}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Supported Languages */}
-                  <div className="flex flex-wrap gap-1">
-                    {model.supported_languages.map((lang) => (
-                      <span
-                        key={lang}
-                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1A222D] text-[#94A3B8]"
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-[#242E3D] space-y-2">
-                  {model.docs_url && (
-                    <a
-                      href={model.docs_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => {
-                        if (isTauriRuntime()) {
-                          e.preventDefault();
-                          void openExternalUrl(model.docs_url!);
-                        }
-                      }}
-                      className="w-full inline-flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-sky-300 hover:text-sky-200 border border-[#242E3D] font-mono text-[11px] transition-colors"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Official Docs &amp; Model Card</span>
-                    </a>
-                  )}
-                  {isInstalled ? (
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-mono text-emerald-400/90 flex items-center space-x-1.5 min-w-0">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                        <span className="truncate">{model.local_path || 'active weights'}</span>
+                <div className="mt-4 pt-3 border-t border-[#242E3D] flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    {isInstalled ? (
+                      <div className="flex items-center justify-between">
+                        <div className="text-[11px] font-mono text-emerald-400/90 flex items-center space-x-1.5 min-w-0">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          <span className="truncate">{model.local_path || 'Ready'}</span>
+                        </div>
+                        <button
+                          onClick={() => handleUninstall(model.id)}
+                          className={`p-1.5 rounded transition-colors ${
+                            confirmUninstallId === model.id
+                              ? 'text-rose-300 bg-rose-500/20'
+                              : 'text-[#64748B] hover:text-rose-400 hover:bg-rose-500/10'
+                          }`}
+                          title={confirmUninstallId === model.id ? 'Click again to confirm uninstall' : 'Uninstall local weights'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                    ) : (
                       <button
-                        onClick={() => handleUninstall(model.id)}
-                        className="p-1.5 rounded text-[#64748B] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Uninstall local weights"
+                        onClick={() => handleInstall(model.id)}
+                        disabled={isInstalling}
+                        className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono text-xs font-semibold transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {isInstalling ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Installing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Install ({sizeMb} MB)</span>
+                          </>
+                        )}
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleInstall(model.id)}
-                      disabled={isInstalling}
-                      className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono text-xs font-semibold transition-colors disabled:opacity-50"
-                    >
-                      {isInstalling ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Downloading weights...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Install Weights ({sizeMb} MB)</span>
-                        </>
-                      )}
-                    </button>
-                  )}
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(model.id)}
+                    className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-[#94A3B8] hover:text-white border border-[#242E3D] text-[11px] font-mono shrink-0"
+                  >
+                    <span>{expandedIds.has(model.id) ? 'Less' : 'More'}</span>
+                    {expandedIds.has(model.id) ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 </div>
               </div>
             );

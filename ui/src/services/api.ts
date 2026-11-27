@@ -304,16 +304,21 @@ export const api = {
       headers: getHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         text,
-        remove_fillers: options.remove_fillers ?? true,
-        fix_repetitions: options.fix_repetitions ?? true,
-        punctuation_pass: options.punctuation_pass ?? true,
+        strip_fillers: options.remove_fillers ?? true,
+        strip_hallucinations: options.fix_repetitions ?? true,
+        fix_punctuation: options.punctuation_pass ?? true,
       }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Text refinement failed' }));
       throw new Error(err.detail || 'Text refinement failed');
     }
-    return res.json();
+    const data = await res.json();
+    return {
+      refined_text: data.refined_text ?? text,
+      removed_fillers: Number(data.fillers_removed ?? data.removed_fillers ?? 0),
+      cleaned_repetitions: Number(data.hallucination_loops_removed ?? data.cleaned_repetitions ?? 0),
+    };
   },
 
   async speechToSpeech(payload: {

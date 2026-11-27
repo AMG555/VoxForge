@@ -829,6 +829,23 @@ pub struct InstallNativeRuntimeRequest {
     pub target: String,
 }
 
+const EMBEDDED_NEURAL_SIDECAR_PY: &str = include_str!("../../../../scripts/neural_sidecar.py");
+
+fn materialize_embedded_sidecar_to(data_dir: &Path) -> std::io::Result<PathBuf> {
+    let target = data_dir.join("scripts").join("neural_sidecar.py");
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let needs_write = match std::fs::read_to_string(&target) {
+        Ok(existing) => existing != EMBEDDED_NEURAL_SIDECAR_PY,
+        Err(_) => true,
+    };
+    if needs_write {
+        std::fs::write(&target, EMBEDDED_NEURAL_SIDECAR_PY)?;
+    }
+    Ok(target)
+}
+
 fn find_sidecar_script() -> Option<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
@@ -848,8 +865,12 @@ fn find_sidecar_script() -> Option<PathBuf> {
         if candidate.is_file() {
             return Some(candidate);
         }
+        let sibling = root.join("neural_sidecar.py");
+        if sibling.is_file() {
+            return Some(sibling);
+        }
     }
-    None
+    materialize_embedded_sidecar_to(&crate::server::resolve_default_data_dir()).ok()
 }
 
 pub(crate) fn suppress_console_window(cmd: &mut tokio::process::Command) {
@@ -1143,14 +1164,28 @@ pub async fn start_sidecar_handler(
                 problem_type: "https://voxforge.org/errors/sidecar-script-missing".to_string(),
                 title: "Sidecar Script Not Found".to_string(),
                 status: 404,
-                detail: "Could not locate scripts/neural_sidecar.py relative to the executable or working directory.".to_string(),
+                detail: "Could not locate or materialize scripts/neural_sidecar.py.".to_string(),
                 instance: "/v1/system/sidecar/start".to_string(),
             }),
         )
     })?;
 
-    let log_dir = PathBuf::from("logs");
-    let _ = std::fs::create_dir_all(&log_dir);
+    let log_dir = crate::server::resolve_default_data_dir().join("logs");
+    if let Err(e) = std::fs::create_dir_all(&log_dir) {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ProblemDetails {
+                problem_type: "https://voxforge.org/errors/sidecar-log-failed".to_string(),
+                title: "Sidecar Launch Error".to_string(),
+                status: 500,
+                detail: format!(
+                    "Failed to create sidecar log directory {}: {e}",
+                    log_dir.display()
+                ),
+                instance: "/v1/system/sidecar/start".to_string(),
+            }),
+        ));
+    }
     let log_path = log_dir.join(format!("neural_sidecar_{port}.log"));
     let log_file_out = std::fs::File::create(&log_path).map_err(|e| {
         (
@@ -1748,5 +1783,21 @@ f82d8e7479d0c4d0a55eb522abc4eed38bdc926a6f56c1f46c37ae59e3f79f0f  voxforge-windo
         assert!(resolve_native_piper_archive_url("linux", "x86_64")
             .unwrap()
             .ends_with("piper_linux_x86_64.tar.gz"));
+    }
+
+    #[test]
+    fn test_embedded_sidecar_script_materializes() {
+        let dir =
+            std::env::temp_dir().join(format!("voxforge_sidecar_test_{}", uuid::Uuid::new_v4()));
+        let path = materialize_embedded_sidecar_to(&dir).unwrap();
+        assert!(path.is_file());
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("--backend"));
+        assert!(content.contains("--port"));
+        assert_eq!(content, EMBEDDED_NEURAL_SIDECAR_PY);
+        // Re-running is idempotent
+        let path2 = materialize_embedded_sidecar_to(&dir).unwrap();
+        assert_eq!(path, path2);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

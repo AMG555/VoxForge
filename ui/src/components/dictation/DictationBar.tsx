@@ -47,6 +47,8 @@ export const DictationBar: React.FC<DictationBarProps> = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const liveSpeechTextRef = useRef<string>('');
 
   const isMountedRef = useRef<boolean>(true);
 
@@ -101,14 +103,54 @@ export const DictationBar: React.FC<DictationBarProps> = ({
     try {
       setStatusMessage('Accessing studio microphone...');
       audioChunksRef.current = [];
+      liveSpeechTextRef.current = '';
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setStatusMessage('Microphone API unavailable in this environment.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 24000,
           echoCancellation: aecEnabled,
           noiseSuppression: true,
         },
       });
+
+      // Start Web Speech API live recognizer alongside recording as a zero-Python fallback
+      const SpeechRec =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRec) {
+        try {
+          const rec = new SpeechRec();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = 'en-US';
+          let finalized = '';
+          rec.onresult = (evt: any) => {
+            let interim = '';
+            for (let i = evt.resultIndex; i < evt.results.length; i++) {
+              const seg = evt.results[i][0]?.transcript || '';
+              if (evt.results[i].isFinal) {
+                finalized = `${finalized} ${seg}`.trim();
+              } else {
+                interim = `${interim} ${seg}`.trim();
+              }
+            }
+            const combined = `${finalized} ${interim}`.trim();
+            liveSpeechTextRef.current = combined;
+            if (isMountedRef.current && combined) {
+              setRefinedTranscript(combined);
+            }
+          };
+          rec.onerror = () => {};
+          rec.start();
+          recognitionRef.current = rec;
+        } catch {
+          recognitionRef.current = null;
+        }
+      }
 
       // Set up WebAudio analyser for live RMS waveform meter
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -172,10 +214,48 @@ export const DictationBar: React.FC<DictationBarProps> = ({
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+      recognitionRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+  };
+
+  const applyRefinement = async (draftText: string) => {
+    const trimmed = draftText.trim();
+    if (!trimmed) return;
+    setStatusMessage('Cleaning verbal fillers & loops...');
+    const refinement = await api.refineText(trimmed, {
+      remove_fillers: removeFillers,
+      fix_repetitions: fixRepetitions,
+      punctuation_pass: true,
+    });
+    if (!isMountedRef.current) return;
+    setRefinedTranscript(refinement.refined_text);
+    setRemovedCount((refinement.removed_fillers || 0) + (refinement.cleaned_repetitions || 0));
+    setStatusMessage('Refinement complete! Copy or click "Send to Voice Lab".');
+  };
+
+  const handleManualRefine = async () => {
+    const current = refinedTranscript || rawTranscript;
+    if (!current.trim() || isProcessing) return;
+    try {
+      setIsProcessing(true);
+      await applyRefinement(current);
+    } catch (err: any) {
+      if (isMountedRef.current) {
+        setStatusMessage(`Refinement error: ${err?.message || 'Failed to clean text'}`);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsProcessing(false);
+      }
+    }
   };
 
   const processRecordedAudio = async () => {
@@ -183,36 +263,36 @@ export const DictationBar: React.FC<DictationBarProps> = ({
 
     try {
       setIsProcessing(true);
-      setStatusMessage('Preprocessing audio & transcribing via Whisper...');
+      setStatusMessage('Transcribing speech...');
       const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-      // Preprocess through studio audio processor to get clean WAV base64
-      const preprocessed = await AudioProcessor.preprocessForCloning(rawBlob);
+      let text = '';
+      try {
+        const preprocessed = await AudioProcessor.preprocessForCloning(rawBlob);
+        const transcription = await api.transcribeAudio(preprocessed.wavBase64);
+        if (!isMountedRef.current) return;
+        if (transcription.source === 'neural-sidecar' && transcription.text.trim()) {
+          text = transcription.text.trim();
+        }
+      } catch {
+        // Ignore preprocessing/server error if live Web Speech captured transcript
+      }
 
-      // Transcribe via ASR
-      const transcription = await api.transcribeAudio(preprocessed.wavBase64);
-      if (!isMountedRef.current) return;
-      const text = transcription.text.trim();
+      if (!text) {
+        text = liveSpeechTextRef.current.trim();
+      }
+
       setRawTranscript(text);
 
       if (!text) {
-        setStatusMessage('No clear speech detected in recorded audio.');
+        setStatusMessage(
+          'Whisper sidecar (:9000) is offline and browser Web Speech did not detect words. Start Whisper Sidecar in Model Catalog for offline speech-to-text, or type directly below.'
+        );
         setIsProcessing(false);
         return;
       }
 
-      // Automatically refine text through verbal filler remover & repetition filter
-      setStatusMessage('Refining text & stripping verbal fillers...');
-      const refinement = await api.refineText(text, {
-        remove_fillers: removeFillers,
-        fix_repetitions: fixRepetitions,
-        punctuation_pass: true,
-      });
-
-      if (!isMountedRef.current) return;
-      setRefinedTranscript(refinement.refined_text);
-      setRemovedCount(refinement.removed_fillers + refinement.cleaned_repetitions);
-      setStatusMessage('Transcription & neural text refinement complete!');
+      await applyRefinement(text);
     } catch (err: any) {
       if (!isMountedRef.current) return;
       console.error('Dictation processing error:', err);
@@ -261,7 +341,7 @@ export const DictationBar: React.FC<DictationBarProps> = ({
                 </span>
               </div>
               <p className="text-[10px] text-[#94A3B8] font-mono">
-                Real-time Whisper capture with verbal filler & hallucination cleaner
+                Speak into mic -&gt; clean verbal fillers -&gt; copy or send into Voice Lab
               </p>
             </div>
           </div>
@@ -360,57 +440,74 @@ export const DictationBar: React.FC<DictationBarProps> = ({
         )}
 
         {/* Refined Output Box */}
-        {(refinedTranscript || rawTranscript) && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-[#94A3B8] font-mono">
-              <span className="flex items-center space-x-1 text-white">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Refined Transcript:</span>
-                {removedCount > 0 && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                    Cleaned {removedCount} fillers/loops
-                  </span>
-                )}
-              </span>
-              <span>{(refinedTranscript || rawTranscript).split(/\s+/).filter(Boolean).length} words</span>
-            </div>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between text-[11px] text-[#94A3B8] font-mono">
+            <span className="flex items-center space-x-1 text-white">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Transcript &amp; Cleanup Draft:</span>
+              {removedCount > 0 && (
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  Cleaned {removedCount} fillers/loops
+                </span>
+              )}
+            </span>
+            <span>{(refinedTranscript || rawTranscript).split(/\s+/).filter(Boolean).length} words</span>
+          </div>
 
-            <div className="bg-[#0B0E14] p-3.5 rounded-xl border border-[#242E3D] text-sm text-[#F8FAFC] leading-relaxed font-sans max-h-36 overflow-y-auto select-text">
-              {refinedTranscript || rawTranscript}
-            </div>
+          <textarea
+            rows={3}
+            value={refinedTranscript || rawTranscript}
+            onChange={(e) => setRefinedTranscript(e.target.value)}
+            className="w-full bg-[#0B0E14] p-3.5 rounded-xl border border-[#242E3D] focus:border-amber-500 focus:outline-none text-sm text-[#F8FAFC] leading-relaxed font-sans resize-none"
+            placeholder="Speak with Push-to-Talk above, or paste/type rough speech text here and click Clean Fillers..."
+          />
 
-            {/* Actions Toolbar */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-medium transition-colors"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied!' : 'Copy to Clipboard'}</span>
-                </button>
-
-                {onSendToVoiceLab && (
-                  <button
-                    onClick={() => onSendToVoiceLab(refinedTranscript || rawTranscript)}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white text-xs font-medium transition-colors"
-                  >
-                    <span>Send to Voice Lab</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+          {/* Actions Toolbar */}
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleManualRefine}
+                disabled={isProcessing || !(refinedTranscript || rawTranscript).trim()}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-40 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Clean Fillers</span>
+              </button>
 
               <button
-                onClick={handleClear}
-                className="text-[#94A3B8] hover:text-red-400 p-1.5 rounded-lg hover:bg-[#1A222D] transition-colors"
-                title="Clear transcript"
+                type="button"
+                onClick={handleCopy}
+                disabled={!(refinedTranscript || rawTranscript).trim()}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 text-amber-300 border border-amber-500/30 text-xs font-medium transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
               </button>
+
+              {onSendToVoiceLab && (
+                <button
+                  type="button"
+                  disabled={!(refinedTranscript || rawTranscript).trim()}
+                  onClick={() => onSendToVoiceLab(refinedTranscript || rawTranscript)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#1A222D] hover:bg-[#242E3D] disabled:opacity-40 text-[#94A3B8] hover:text-white text-xs font-medium transition-colors"
+                >
+                  <span>Send to Voice Lab</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-[#94A3B8] hover:text-red-400 p-1.5 rounded-lg hover:bg-[#1A222D] transition-colors"
+              title="Clear transcript"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

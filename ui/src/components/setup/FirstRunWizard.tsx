@@ -201,7 +201,7 @@ export const FirstRunWizard: React.FC = () => {
       setRemoteTestResult({
         reachable: res.reachable,
         message: res.reachable
-          ? `Connected to VoxForge v${res.version || '0.7.2'} at ${res.url}`
+          ? `Connected to VoxForge v${res.version || '0.7.3'} at ${res.url}`
           : res.error || 'Remote host unreachable',
       });
     } catch (err: any) {

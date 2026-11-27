@@ -19,7 +19,7 @@ export interface SetupState {
 const initialState: SetupState = {
   isDesktop: false,
   desktopPlatform: 'web',
-  desktopVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.7.2',
+  desktopVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.7.3',
   serverBaseUrl: '',
   isWizardOpen: false,
   selectedProfile: 'rust_core',

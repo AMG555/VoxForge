@@ -76,6 +76,12 @@ pub struct AcousticFeatures {
     /// Measured amplitude micro-shimmer percentage (cycle-to-cycle amplitude instability).
     #[serde(default = "default_shimmer")]
     pub shimmer_percent: f32,
+    /// Normalized 8-bin pitch contour (semitone deviations around `f0_mean_hz`).
+    #[serde(default)]
+    pub f0_contour_8: Vec<f32>,
+    /// Active voiced syllable loudness spread (P90 - P20 in dB).
+    #[serde(default = "default_energy_dynamic_range")]
+    pub energy_dynamic_range_db: f32,
 }
 
 fn default_jitter() -> f32 {
@@ -95,6 +101,9 @@ fn default_hnr() -> f32 {
 }
 fn default_shimmer() -> f32 {
     2.5
+}
+fn default_energy_dynamic_range() -> f32 {
+    8.0
 }
 
 pub struct ProsodyMirror;
@@ -118,6 +127,8 @@ impl ProsodyMirror {
                 formant_f3_hz: 2600.0,
                 hnr_db: 18.0,
                 shimmer_percent: 2.5,
+                f0_contour_8: Vec::new(),
+                energy_dynamic_range_db: 8.0,
             };
         }
 
@@ -351,6 +362,34 @@ impl ProsodyMirror {
                 (500.0, 1500.0, 2600.0, 0.0)
             };
 
+        // 8-bin chronological F0 contour in semitones relative to f0_mean_hz
+        let f0_contour_8 = if f0_estimates.len() >= 8 {
+            let mut contour = Vec::with_capacity(8);
+            let n = f0_estimates.len();
+            for b in 0..8 {
+                let start = (b * n) / 8;
+                let end = (((b + 1) * n) / 8).max(start + 1).min(n);
+                let slice = &f0_estimates[start..end];
+                let bin_mean = slice.iter().sum::<f32>() / slice.len() as f32;
+                let st = (12.0 * (bin_mean / f0_mean_hz.max(50.0)).log2()).clamp(-6.0, 6.0);
+                contour.push(st);
+            }
+            contour
+        } else {
+            Vec::new()
+        };
+
+        // Voiced syllabic energy dynamic range (P90 - P20 in dB)
+        let energy_dynamic_range_db = if voiced_amplitudes.len() >= 4 {
+            let mut amps = voiced_amplitudes.clone();
+            amps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let p20 = amps[(amps.len() * 20 / 100).min(amps.len() - 1)].max(1.0);
+            let p90 = amps[(amps.len() * 90 / 100).min(amps.len() - 1)].max(p20);
+            (20.0 * (p90 / p20).log10()).clamp(2.0, 18.0)
+        } else {
+            8.0
+        };
+
         AcousticFeatures {
             f0_mean_hz,
             f0_std_semitones,
@@ -366,6 +405,8 @@ impl ProsodyMirror {
             formant_f3_hz,
             hnr_db,
             shimmer_percent,
+            f0_contour_8,
+            energy_dynamic_range_db,
         }
     }
 
@@ -428,5 +469,26 @@ mod tests {
         let director = ProsodyMirror::features_to_director(&features);
         assert!(director.energy >= -1.0 && director.energy <= 1.0);
         assert!(director.formality >= -1.0 && director.formality <= 1.0);
+        assert_eq!(features.f0_contour_8.len(), 8);
+    }
+
+    #[test]
+    fn test_prosody_mirror_captures_expressive_contour_and_dynamic_range() {
+        let sr = 24000u32;
+        let len = (sr as usize) * 2;
+        let mut samples = Vec::with_capacity(len);
+        let mut phase = 0.0f32;
+        for i in 0..len {
+            let progress = i as f32 / len as f32;
+            let f0 = 150.0 + progress * 80.0; // rising contour from 150Hz to 230Hz
+            let env = if (i / 3000) % 2 == 0 { 1.0 } else { 0.3 }; // stressed vs unstressed
+            phase += 2.0 * std::f32::consts::PI * f0 / sr as f32;
+            samples.push((phase.sin() * 14000.0 * env) as i16);
+        }
+
+        let features = ProsodyMirror::analyze(&samples, sr);
+        assert_eq!(features.f0_contour_8.len(), 8);
+        assert!(features.f0_contour_8[7] > features.f0_contour_8[0] + 3.0);
+        assert!(features.energy_dynamic_range_db > 6.0);
     }
 }

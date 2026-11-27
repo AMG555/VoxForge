@@ -5,6 +5,7 @@ import { Logo } from './common/Logo';
 import { AgentBeacon } from './common/AgentBeacon';
 import { getApiBaseUrl } from '../services/api';
 import { openExternalUrl } from '../services/desktopBridge';
+import { useAppSelector } from '../store';
 
 interface NavigationProps {
   activeTab: 'workflows' | 'canvas' | 'timeline' | 'voices' | 'catalog' | 'hardware' | 'qa';
@@ -15,32 +16,35 @@ interface NavigationProps {
   updateInfo?: SystemUpdateInfo | null;
   onOpenUpdateCenter?: () => void;
   onOpenRuntimeSetup?: () => void;
+  onOpenApiDocs?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   setActiveTab,
-  hardware,
   onToggleDictation,
   isDictationOpen,
   updateInfo,
   onOpenUpdateCenter,
   onOpenRuntimeSetup,
+  onOpenApiDocs,
 }) => {
-  return (
-    <header className="h-14 border-b border-[#242E3D] bg-[#121820] flex items-center justify-between px-3 gap-2 select-none shrink-0 relative z-30">
-      <div className="flex items-center space-x-3 min-w-0 flex-1">
-        <Logo size={30} className="shrink-0" />
+  const isDesktop = useAppSelector((s) => s.setup.isDesktop);
 
-        <nav className="flex space-x-1 overflow-x-auto min-w-0">
+  return (
+    <header className="h-12 border-b border-[#242E3D] bg-[#121820] flex items-center justify-between px-3 gap-2 select-none shrink-0 relative z-30">
+      <div className="flex items-center space-x-2 min-w-0 flex-1">
+        {!isDesktop && <Logo size={28} className="shrink-0 mr-1" />}
+
+        <nav className="flex space-x-0.5 overflow-x-auto min-w-0">
           {[
             { id: 'workflows', label: 'Workflows', icon: LayoutGrid, title: 'Workflows & Projects Dashboard' },
-            { id: 'canvas', label: 'Pipeline Canvas', icon: GitFork, title: 'Infinite Visual DSP DAG Pipeline Builder' },
-            { id: 'timeline', label: 'Stories Timeline', icon: Music2, title: 'Stories Multi-Track Timeline (DAW)' },
+            { id: 'canvas', label: 'Canvas', icon: GitFork, title: 'Visual DSP DAG Pipeline Canvas' },
+            { id: 'timeline', label: 'Timeline', icon: Music2, title: 'Stories Multi-Track Timeline (DAW)' },
             { id: 'voices', label: 'Voice Lab', icon: Mic, title: 'Neural Speech & Voice Cloning Lab' },
-            { id: 'catalog', label: 'Model Catalog', icon: Layers, title: 'Model Catalog & Engine Packages' },
-            { id: 'hardware', label: 'Hardware & Engines', icon: Cpu, title: 'Hardware Profiler & Engine Status' },
-            { id: 'qa', label: 'A/B & QA Lab', icon: Scale, title: 'Double-Blind MOS Quality Benchmark' },
+            { id: 'catalog', label: 'Catalog', icon: Layers, title: 'Model Catalog & Engine Packages' },
+            { id: 'hardware', label: 'Hardware', icon: Cpu, title: 'Hardware Profiler & Engine Status' },
+            { id: 'qa', label: 'QA Lab', icon: Scale, title: 'Double-Blind MOS Quality Benchmark' },
           ].map(({ id, label, icon: Icon, title }) => {
             const isActive = activeTab === id;
             return (
@@ -65,16 +69,17 @@ export const Navigation: React.FC<NavigationProps> = ({
         </nav>
       </div>
 
-      <div className="flex items-center space-x-2 shrink-0">
+      <div className="flex items-center space-x-1.5 shrink-0">
         {onToggleDictation && (
           <button
+            type="button"
             onClick={onToggleDictation}
             className={`flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-mono whitespace-nowrap transition-colors border ${
               isDictationOpen
                 ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse'
                 : 'bg-[#1A222D] hover:bg-[#242E3D] text-[#94A3B8] hover:text-white border-[#242E3D]'
             }`}
-            title="VoxForge Push-to-Talk Dictation (Ctrl+Shift+D)"
+            title="Voice-to-Text Push-to-Talk Dictation (Ctrl+Shift+D)"
           >
             <Mic className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden sm:inline">Dictate</span>
@@ -102,15 +107,15 @@ export const Navigation: React.FC<NavigationProps> = ({
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
             )}
             <ArrowUpCircle className={`w-3.5 h-3.5 ${updateInfo?.update_available ? 'text-amber-400' : 'text-[#64748B]'}`} />
-            <span>
+            <span className="hidden md:inline">
               {updateInfo?.update_available && updateInfo.latest_version
-                ? `Update v${updateInfo.latest_version}`
+                ? `v${updateInfo.latest_version}`
                 : 'Updates'}
             </span>
           </button>
         )}
 
-        {onOpenRuntimeSetup && (
+        {!isDesktop && onOpenRuntimeSetup && (
           <button
             type="button"
             onClick={onOpenRuntimeSetup}
@@ -118,31 +123,21 @@ export const Navigation: React.FC<NavigationProps> = ({
             title="Configure Local Neural Runtime or Remote Connection"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden 2xl:inline">Runtime</span>
+            <span className="hidden lg:inline">Runtime</span>
           </button>
         )}
 
         <button
           type="button"
-          onClick={() => openExternalUrl(`${getApiBaseUrl()}/docs`)}
+          onClick={() =>
+            onOpenApiDocs ? onOpenApiDocs() : openExternalUrl(`${getApiBaseUrl()}/docs`)
+          }
           className="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-mono whitespace-nowrap text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-colors"
-          title="Interactive Scalar OpenAPI Reference"
+          title="Interactive API Reference"
         >
           <Activity className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">API Docs</span>
+          <span className="hidden md:inline">API Docs</span>
         </button>
-
-        {hardware && (
-          <div
-            className="hidden 2xl:flex items-center space-x-2 text-xs font-mono whitespace-nowrap text-[#94A3B8] bg-[#0B0E14] px-2.5 py-1 rounded border border-[#242E3D]"
-            title={`${hardware.hardware_tier} | ${hardware.registered_engines.length} Registered Engines`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{hardware.hardware_tier}</span>
-            <span className="text-[#3B485C]">|</span>
-            <span>{hardware.registered_engines.length} Engines</span>
-          </div>
-        )}
       </div>
     </header>
   );

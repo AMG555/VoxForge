@@ -125,6 +125,12 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         dragStartRef.current = { x: e.clientX, y: e.clientY };
         onPointerDown?.(e, node.id);
       }}
+      onPointerUp={(e) => {
+        if (isConnectingTarget) {
+          e.stopPropagation();
+          onConnectEnd?.(node.id);
+        }
+      }}
       onClick={(e) => {
         e.stopPropagation();
         if (dragStartRef.current) {
@@ -383,14 +389,14 @@ export const NodeCard: React.FC<NodeCardProps> = ({
         {node.node_type === 'audio_time_stretch' && (
           <div className="space-y-0.5 text-[11px]">
             <div className="flex items-center justify-between text-amber-300">
-              <span>Smart Fit Mode:</span>
+              <span>Stretch Ratio:</span>
               <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">
-                {node.params.fit_strategy || 'WSOLA Auto'}
+                {(node.params.stretch_ratio ?? node.params.speed_ratio ?? 1.0).toFixed(2)}x
               </span>
             </div>
             <div className="flex items-center justify-between text-[#94A3B8] text-[10px] font-mono">
-              <span>Floor / Split:</span>
-              <span>{node.params.max_speedup || '1.30x'} / {node.params.absorb_silence !== false ? 'Absorb Gaps' : 'Direct'}</span>
+              <span>Pitch Mode:</span>
+              <span>{node.params.preserve_pitch !== false ? 'WSOLA Lock' : 'Resample'}</span>
             </div>
           </div>
         )}

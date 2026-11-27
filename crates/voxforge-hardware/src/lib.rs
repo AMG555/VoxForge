@@ -71,4 +71,13 @@ mod tests {
         assert_eq!(decoded.gpus.len(), 1);
         assert!(decoded.gpus[0].has_cuda);
     }
+
+    #[test]
+    fn test_parse_nvidia_smi_csv_gtx_1650_4gb() {
+        let parsed = HardwareProbe::parse_nvidia_smi_csv("NVIDIA GeForce GTX 1650, 4096\n");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "NVIDIA GeForce GTX 1650");
+        assert_eq!(parsed[0].vram_mb, 4096);
+        assert!(parsed[0].has_cuda);
+    }
 }

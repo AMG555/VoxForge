@@ -28,7 +28,7 @@ impl Biquad {
         }
     }
 
-    fn low_shelf(sample_rate: f32, cutoff_hz: f32, gain_db: f32) -> Self {
+    pub(crate) fn low_shelf(sample_rate: f32, cutoff_hz: f32, gain_db: f32) -> Self {
         let mut b = Self::new();
         if gain_db.abs() < 0.01 {
             return b;
@@ -90,7 +90,7 @@ impl Biquad {
         b
     }
 
-    fn high_shelf(sample_rate: f32, cutoff_hz: f32, gain_db: f32) -> Self {
+    pub(crate) fn high_shelf(sample_rate: f32, cutoff_hz: f32, gain_db: f32) -> Self {
         let mut b = Self::new();
         if gain_db.abs() < 0.01 {
             return b;

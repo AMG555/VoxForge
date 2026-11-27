@@ -8,6 +8,7 @@ pub mod fit_planner;
 pub mod gapfill;
 pub mod leveler;
 pub mod limiter;
+pub mod modulation;
 pub mod profile;
 pub mod prosody;
 pub mod realism;
@@ -28,6 +29,7 @@ pub use fit_planner::{DubbingFitPlan, FitStrategy, SegmentTiming, SegmentType, S
 pub use gapfill::RoomToneGapFill;
 pub use leveler::PhraseLeveler;
 pub use limiter::BrickwallLimiter;
+pub use modulation::{InstructModulation, ModulationTransfer};
 pub use profile::MasteringProfile;
 pub use prosody::{AcousticFeatures, DirectorTaxonomy, ProsodyMirror};
 pub use realism::{HumanMicroTremor, NaturalBreath, SoftEnvelope, VocalTractResonator};

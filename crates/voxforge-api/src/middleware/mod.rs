@@ -228,7 +228,7 @@ pub async fn security_headers(req: Request, next: Next) -> Response {
         header::CONTENT_SECURITY_POLICY,
         if is_docs {
             HeaderValue::from_static(
-                "default-src 'self' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://fonts.scalar.com data:; img-src 'self' data: https:; connect-src 'self' https:;"
+                "default-src 'self' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://fonts.scalar.com data:; img-src 'self' data: https:; connect-src 'self' http: https:;"
             )
         } else {
             HeaderValue::from_static(

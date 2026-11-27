@@ -297,6 +297,87 @@ const DEFAULT_PRESETS: StoredWorkflow[] = [
     created_at: new Date('2026-01-01').toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: 'preset-dubbing',
+    name: 'Video Dubbing & Audio Mux',
+    category: 'Video Dubbing',
+    tags: ['dubbing', 'asr', 'time-stretch'],
+    nodes: [
+      {
+        id: 'dub-1',
+        name: 'Script / Transcript Input',
+        node_type: 'text_input',
+        params: {
+          text: 'Narrator: Welcome to this dubbed studio scene.\nGuest: Timing and vocal tone are synchronized automatically.',
+        },
+        position: { x: 60, y: 120 },
+      },
+      {
+        id: 'dub-2',
+        name: 'ASR Transcriber',
+        node_type: 'asr_transcriber',
+        params: { model: 'whisper-base', word_timestamps: true },
+        position: { x: 380, y: 120 },
+      },
+      {
+        id: 'dub-3',
+        name: 'Speaker Diarization',
+        node_type: 'diarization',
+        params: { max_speakers: 2, speaker_prefix: 'Speaker' },
+        position: { x: 700, y: 120 },
+      },
+      {
+        id: 'dub-4',
+        name: 'Voice Profile Assigner',
+        node_type: 'voice_assigner',
+        params: {
+          default_voice: 'en-US-AriaNeural',
+          speaker_map: { Narrator: 'en-US-AriaNeural', Guest: 'en-US-GuyNeural' },
+        },
+        position: { x: 1020, y: 120 },
+      },
+      {
+        id: 'dub-5',
+        name: 'Neural Synthesizer',
+        node_type: 'synthesizer',
+        params: { speed: 1.0, pitch: 0.0 },
+        position: { x: 1340, y: 120 },
+      },
+      {
+        id: 'dub-6',
+        name: 'Audio Time Stretch',
+        node_type: 'audio_time_stretch',
+        params: { stretch_ratio: 1.0, preserve_pitch: true },
+        position: { x: 1660, y: 120 },
+      },
+      {
+        id: 'dub-7',
+        name: 'Audio Track Muxer',
+        node_type: 'audio_mux',
+        params: { mix_mode: 'stereo_master', ducking_db: -12 },
+        position: { x: 1980, y: 120 },
+      },
+      {
+        id: 'dub-8',
+        name: 'Master Dub Sink',
+        node_type: 'output_sink',
+        params: {},
+        position: { x: 2300, y: 120 },
+      },
+    ],
+    edges: [
+      { id: 'de1', from_node: 'dub-1', to_node: 'dub-2' },
+      { id: 'de2', from_node: 'dub-2', to_node: 'dub-3' },
+      { id: 'de3', from_node: 'dub-3', to_node: 'dub-4' },
+      { id: 'de4', from_node: 'dub-4', to_node: 'dub-5' },
+      { id: 'de5', from_node: 'dub-5', to_node: 'dub-6' },
+      { id: 'de6', from_node: 'dub-6', to_node: 'dub-7' },
+      { id: 'de7', from_node: 'dub-7', to_node: 'dub-8' },
+    ],
+    sticky_notes: [],
+    created_at: new Date('2026-01-01').toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ];
 
 export class WorkflowStorage {
@@ -310,6 +391,13 @@ export class WorkflowStorage {
       }
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        const existingIds = new Set(parsed.map((w: StoredWorkflow) => w.id));
+        const missing = DEFAULT_PRESETS.filter((p) => !existingIds.has(p.id));
+        if (missing.length > 0) {
+          const merged = [...parsed, ...missing];
+          this.saveWorkflows(merged);
+          return merged;
+        }
         return parsed;
       }
       return DEFAULT_PRESETS;

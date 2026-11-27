@@ -89,7 +89,13 @@ impl PipelineExecutor {
             })?;
         }
 
-        // Format master audio buffer
+        // Format master audio buffer (auto-merge segments when AudioMerge/OutputSink omitted)
+        if ctx.master_audio_pcm.is_empty() && !ctx.audio_segments.is_empty() {
+            let refs: Vec<&[i16]> = ctx.audio_segments.iter().map(|s| s.as_slice()).collect();
+            ctx.master_audio_pcm =
+                AudioMerger::concatenate_with_pause(&refs, ctx.sample_rate.max(8000), 120);
+        }
+
         let wav_bytes = WavEncoder::encode_pcm16_to_wav(
             &ctx.master_audio_pcm,
             ctx.sample_rate.max(8000),
@@ -621,6 +627,45 @@ impl PipelineExecutor {
             }
 
             NodeType::AsrTranscriber => {
+                // When user runs a script-based dubbing workflow without an audio file, parse the
+                // supplied script text directly instead of feeding a dummy sawtooth signal into ASR.
+                if ctx.input_audio_pcm.is_empty() && ctx.master_audio_pcm.is_empty() {
+                    if let Some(ref raw_text) = ctx.raw_text {
+                        let lines: Vec<&str> = raw_text
+                            .lines()
+                            .map(|l| l.trim())
+                            .filter(|l| !l.is_empty())
+                            .collect();
+                        if !lines.is_empty() {
+                            ctx.segments = lines
+                                .into_iter()
+                                .map(|line| {
+                                    if let Some((spk, utt)) = line.split_once(':') {
+                                        ScriptSegment {
+                                            speaker: spk.trim().to_string(),
+                                            text: utt.trim().to_string(),
+                                            voice_id: None,
+                                            speed: None,
+                                            pitch: None,
+                                            target_duration_ms: None,
+                                        }
+                                    } else {
+                                        ScriptSegment {
+                                            speaker: "Narrator".to_string(),
+                                            text: line.to_string(),
+                                            voice_id: None,
+                                            speed: None,
+                                            pitch: None,
+                                            target_duration_ms: None,
+                                        }
+                                    }
+                                })
+                                .collect();
+                            return Ok(());
+                        }
+                    }
+                }
+
                 let model_id = node.params.get("model").and_then(|m| m.as_str());
                 let engine = if let Some(id) = model_id {
                     self.asr_registry.get(id).await
@@ -698,9 +743,17 @@ impl PipelineExecutor {
             NodeType::Diarization => {
                 let num_speakers = node
                     .params
-                    .get("num_speakers")
+                    .get("max_speakers")
+                    .or_else(|| node.params.get("num_speakers"))
                     .and_then(|n| n.as_u64())
-                    .unwrap_or(2) as usize;
+                    .unwrap_or(2)
+                    .max(1) as usize;
+                let speaker_prefix = node
+                    .params
+                    .get("speaker_prefix")
+                    .and_then(|s| s.as_str())
+                    .filter(|s| !s.trim().is_empty())
+                    .unwrap_or("SPEAKER");
                 let default_speaker = node
                     .params
                     .get("default_speaker")
@@ -712,7 +765,7 @@ impl PipelineExecutor {
                         || seg.speaker == "Narrator"
                         || seg.speaker.starts_with("SPEAKER_")
                     {
-                        seg.speaker = format!("SPEAKER_{:02}", i % num_speakers);
+                        seg.speaker = format!("{}_{:02}", speaker_prefix.trim(), i % num_speakers);
                     }
                 }
 
@@ -796,18 +849,39 @@ impl PipelineExecutor {
 
             NodeType::AudioTimeStretch => {
                 let wsola = voxforge_audio::dsp::WsolaTimeStretch::new(ctx.sample_rate);
+                let explicit_ratio = node
+                    .params
+                    .get("stretch_ratio")
+                    .or_else(|| node.params.get("speed_ratio"))
+                    .and_then(|v| v.as_f64())
+                    .map(|r| r.clamp(0.5, 2.0));
+
                 for (i, pcm) in ctx.audio_segments.iter_mut().enumerate() {
-                    if let Some(seg) = ctx.segments.get(i) {
-                        if let Some(target_ms) = seg.target_duration_ms {
-                            let current_samples = pcm.len();
-                            let target_samples =
-                                (target_ms as f64 / 1000.0 * ctx.sample_rate as f64) as usize;
-                            if target_samples > 0
-                                && current_samples > 0
-                                && target_samples != current_samples
-                            {
-                                *pcm = wsola.stretch_to_len(pcm, target_samples);
-                            }
+                    if pcm.is_empty() {
+                        continue;
+                    }
+                    let target_samples = ctx
+                        .segments
+                        .get(i)
+                        .and_then(|seg| seg.target_duration_ms)
+                        .map(|ms| (ms as f64 / 1000.0 * ctx.sample_rate as f64) as usize)
+                        .or_else(|| {
+                            explicit_ratio
+                                .filter(|&r| (r - 1.0).abs() > 0.02)
+                                .map(|r| ((pcm.len() as f64) / r).round() as usize)
+                        });
+                    if let Some(target) = target_samples {
+                        if target > 0 && target != pcm.len() {
+                            *pcm = wsola.stretch_to_len(pcm, target);
+                        }
+                    }
+                }
+                if !ctx.master_audio_pcm.is_empty() {
+                    if let Some(ratio) = explicit_ratio.filter(|&r| (r - 1.0).abs() > 0.02) {
+                        let target = ((ctx.master_audio_pcm.len() as f64) / ratio).round() as usize;
+                        if target > 0 && target != ctx.master_audio_pcm.len() {
+                            ctx.master_audio_pcm =
+                                wsola.stretch_to_len(&ctx.master_audio_pcm, target);
                         }
                     }
                 }

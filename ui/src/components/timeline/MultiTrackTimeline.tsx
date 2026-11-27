@@ -97,12 +97,30 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
   return new Blob([outBuffer], { type: 'audio/wav' });
 }
 
+function pickReadyDefaultVoice(
+  voices: Voice[],
+  preferredId: string,
+  indexFallback = 0
+): string {
+  const exact = voices.find((v) => v.id === preferredId);
+  if (exact) return exact.id;
+  const edgeVoices = voices.filter((v) => v.engine_id === 'edge-tts');
+  if (edgeVoices.length > 0) {
+    return edgeVoices[indexFallback % edgeVoices.length].id;
+  }
+  const usable = voices.filter((v) => v.engine_id !== 'mock-tts');
+  return usable[indexFallback % Math.max(1, usable.length)]?.id || preferredId;
+}
+
 export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }) => {
+  const defaultHostVoice = pickReadyDefaultVoice(voices, 'en-US-AriaNeural', 0);
+  const defaultGuestVoice = pickReadyDefaultVoice(voices, 'en-US-GuyNeural', 1);
+
   const [tracks, setTracks] = useState<TimelineTrack[]>([
     {
       id: 'track-1',
       name: 'Host (Julian Drake)',
-      voiceId: voices[0]?.id || 'en-US-AriaNeural',
+      voiceId: defaultHostVoice,
       color: '#F59E0B',
       volume: 0.9,
       pan: -0.15,
@@ -114,7 +132,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           startSec: 0.5,
           durationSec: 4.5,
           text: 'Welcome to VoxForge Studio. Today we examine neural synthesis and high-performance audio graphs.',
-          voiceId: voices[0]?.id || 'en-US-AriaNeural',
+          voiceId: defaultHostVoice,
           isSynthesized: false,
         },
         {
@@ -122,7 +140,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           startSec: 9.5,
           durationSec: 5.0,
           text: 'Notice how the multi-engine router seamlessly distributes workloads across local and remote clusters.',
-          voiceId: voices[0]?.id || 'en-US-AriaNeural',
+          voiceId: defaultHostVoice,
           isSynthesized: false,
         },
       ],
@@ -130,7 +148,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
     {
       id: 'track-2',
       name: 'Guest (Dr. Aris Vance)',
-      voiceId: voices[1]?.id || 'en-US-GuyNeural',
+      voiceId: defaultGuestVoice,
       color: '#38BDF8',
       volume: 0.85,
       pan: 0.2,
@@ -142,13 +160,14 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           startSec: 5.2,
           durationSec: 4.0,
           text: 'Indeed, Julian. Zero-latency streaming completely changes the ergonomics of interactive AI agents.',
-          voiceId: voices[1]?.id || 'en-US-GuyNeural',
+          voiceId: defaultGuestVoice,
           isSynthesized: false,
         },
       ],
     },
   ]);
 
+  const usableVoices = voices.filter((v) => v.engine_id !== 'mock-tts');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTimeSec, setCurrentTimeSec] = useState<number>(0);
   const [zoomPxPerSec, setZoomPxPerSec] = useState<number>(45);
@@ -168,7 +187,10 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
     }
   };
   const [masterAudioUrl, setMasterAudioUrl] = useState<string | null>(null);
+  const [isMasterDirty, setIsMasterDirty] = useState<boolean>(true);
   const [isAuditioningMaster, setIsAuditioningMaster] = useState<boolean>(false);
+  const [timelineStatus, setTimelineStatus] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [playingClipId, setPlayingClipId] = useState<string | null>(null);
   const [newClipText, setNewClipText] = useState<string>('');
   const [activeTrackIdForAdd, setActiveTrackIdForAdd] = useState<string>(tracks[0]?.id || '');
   const [draggedClip, setDraggedClip] = useState<{
@@ -180,6 +202,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
 
   const playheadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const masterAudioRef = useRef<HTMLAudioElement | null>(null);
+  const clipAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const totalDurationSec = Math.max(
     20,
@@ -209,6 +232,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
 
     const handleMouseUp = () => {
       setDraggedClip(null);
+      setIsMasterDirty(true);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -219,23 +243,27 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
     };
   }, [draggedClip, zoomPxPerSec]);
 
-  // Playhead scrubber simulation
+  // Synchronized Playhead Scrubber during Transport Play
   useEffect(() => {
     if (isPlaying) {
+      playheadIntervalRef.current = setInterval(() => {
+        if (masterAudioRef.current && !masterAudioRef.current.paused) {
+          setCurrentTimeSec(masterAudioRef.current.currentTime);
+        } else {
+          setCurrentTimeSec((prev) => {
+            if (prev >= totalDurationSec) {
+              setIsPlaying(false);
+              return 0;
+            }
+            return prev + 0.1;
+          });
+        }
+      }, 80);
+    } else {
       if (masterAudioRef.current && !masterAudioRef.current.paused) {
         masterAudioRef.current.pause();
         setIsAuditioningMaster(false);
       }
-      playheadIntervalRef.current = setInterval(() => {
-        setCurrentTimeSec((prev) => {
-          if (prev >= totalDurationSec) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return prev + 0.1;
-        });
-      }, 100);
-    } else {
       if (playheadIntervalRef.current) clearInterval(playheadIntervalRef.current);
     }
     return () => {
@@ -243,45 +271,128 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
     };
   }, [isPlaying, totalDurationSec]);
 
+  // Tear down stale audio elements only when URL actually changed (do not pause newly-started audio for the same URL)
   useEffect(() => {
+    if (
+      masterAudioRef.current &&
+      (!masterAudioUrl || masterAudioRef.current.src !== masterAudioUrl)
+    ) {
+      masterAudioRef.current.pause();
+      masterAudioRef.current = null;
+      setIsAuditioningMaster(false);
+    }
     return () => {
-      if (masterAudioRef.current) {
-        masterAudioRef.current.pause();
-        masterAudioRef.current = null;
-      }
       if (masterAudioUrl) URL.revokeObjectURL(masterAudioUrl);
     };
   }, [masterAudioUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (clipAudioRef.current) {
+        clipAudioRef.current.pause();
+        clipAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const startMasterPlaybackFrom = (url: string, startSec: number) => {
+    if (masterAudioRef.current) {
+      masterAudioRef.current.pause();
+    }
+    const audio = new Audio(url);
+    audio.currentTime = Math.max(0, startSec);
+    audio.onended = () => {
+      setIsAuditioningMaster(false);
+      setIsPlaying(false);
+      setCurrentTimeSec(0);
+    };
+    audio.onpause = () => {
+      if (masterAudioRef.current === audio) {
+        setIsAuditioningMaster(false);
+        setIsPlaying(false);
+      }
+    };
+    audio.ontimeupdate = () => {
+      setCurrentTimeSec(audio.currentTime);
+    };
+    masterAudioRef.current = audio;
+    setIsAuditioningMaster(true);
+    setIsPlaying(true);
+    audio.play().catch((e) => setTimelineStatus({ text: `Playback error: ${e.message}`, isError: true }));
+  };
+
+  const handleToggleTransportPlay = async () => {
+    if (isPlaying) {
+      if (masterAudioRef.current && !masterAudioRef.current.paused) {
+        masterAudioRef.current.pause();
+      }
+      setIsPlaying(false);
+      return;
+    }
+    if (masterAudioUrl && !isMasterDirty) {
+      startMasterPlaybackFrom(masterAudioUrl, currentTimeSec);
+      return;
+    }
+    const url = await handleRenderMaster();
+    if (url) {
+      startMasterPlaybackFrom(url, currentTimeSec);
+    }
+  };
+
   const toggleAuditionMaster = () => {
     if (!masterAudioUrl) return;
-    if (!masterAudioRef.current) {
-      masterAudioRef.current = new Audio(masterAudioUrl);
-      masterAudioRef.current.onended = () => setIsAuditioningMaster(false);
-      masterAudioRef.current.onpause = () => setIsAuditioningMaster(false);
-      masterAudioRef.current.ontimeupdate = () => {
-        if (masterAudioRef.current) {
-          setCurrentTimeSec(masterAudioRef.current.currentTime);
-        }
-      };
-    }
-    if (isAuditioningMaster) {
+    if (isAuditioningMaster && masterAudioRef.current) {
       masterAudioRef.current.pause();
       setIsAuditioningMaster(false);
+      setIsPlaying(false);
     } else {
-      if (isPlaying) setIsPlaying(false);
-      masterAudioRef.current.play().catch(console.error);
-      setIsAuditioningMaster(true);
+      startMasterPlaybackFrom(masterAudioUrl, 0);
+    }
+  };
+
+  const handleAuditionSingleClip = async (trackVoiceId: string, clip: TimelineClip) => {
+    if (clipAudioRef.current) {
+      clipAudioRef.current.pause();
+      clipAudioRef.current = null;
+      if (playingClipId === clip.id) {
+        setPlayingClipId(null);
+        return;
+      }
+    }
+    setPlayingClipId(clip.id);
+    setTimelineStatus({ text: `Synthesizing clip (${trackVoiceId})...` });
+    try {
+      let blob = clip.audioBlob;
+      if (!blob) {
+        blob = await api.synthesizeDirect({
+          input: clip.text,
+          voice: clip.voiceId || trackVoiceId,
+          speed: 1.0,
+        });
+      }
+      const clipUrl = URL.createObjectURL(blob);
+      const audio = new Audio(clipUrl);
+      clipAudioRef.current = audio;
+      audio.onended = () => {
+        setPlayingClipId(null);
+        URL.revokeObjectURL(clipUrl);
+      };
+      audio.play().catch(console.error);
+      setTimelineStatus(null);
+    } catch (err: any) {
+      setPlayingClipId(null);
+      setTimelineStatus({ text: err?.message || 'Clip synthesis failed', isError: true });
     }
   };
 
   const handleAddTrack = () => {
     const newIdx = tracks.length + 1;
     const color = DEFAULT_TRACK_COLORS[tracks.length % DEFAULT_TRACK_COLORS.length];
+    const pool = usableVoices.length > 0 ? usableVoices : voices;
     const newTrack: TimelineTrack = {
       id: `track-${Date.now()}`,
       name: `Speaker ${newIdx}`,
-      voiceId: voices[tracks.length % voices.length]?.id || 'en-US-AriaNeural',
+      voiceId: pickReadyDefaultVoice(pool, 'en-US-JennyNeural', tracks.length),
       color,
       volume: 0.85,
       pan: 0.0,
@@ -290,15 +401,23 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
       clips: [],
     };
     setTracks((prev) => [...prev, newTrack]);
+    setIsMasterDirty(true);
   };
 
   const handleDeleteTrack = (trackId: string) => {
-    setTracks((prev) => prev.filter((t) => t.id !== trackId));
+    setTracks((prev) => {
+      const next = prev.filter((t) => t.id !== trackId);
+      if (activeTrackIdForAdd === trackId) {
+        setActiveTrackIdForAdd(next[0]?.id || '');
+      }
+      return next;
+    });
+    setIsMasterDirty(true);
   };
 
   const handleAddClip = (trackId: string) => {
     if (!newClipText.trim()) return;
-    const targetTrack = tracks.find((t) => t.id === trackId);
+    const targetTrack = tracks.find((t) => t.id === trackId) || tracks[0];
     if (!targetTrack) return;
 
     const estimatedDuration = Math.max(2.0, newClipText.split(/\s+/).length / 2.8);
@@ -317,9 +436,10 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
     };
 
     setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, clips: [...t.clips, newClip] } : t))
+      prev.map((t) => (t.id === targetTrack.id ? { ...t, clips: [...t.clips, newClip] } : t))
     );
     setNewClipText('');
+    setIsMasterDirty(true);
   };
 
   const handleDeleteClip = (trackId: string, clipId: string) => {
@@ -328,12 +448,14 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
         t.id === trackId ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t
       )
     );
+    setIsMasterDirty(true);
   };
 
-  const handleRenderMaster = async () => {
+  const handleRenderMaster = async (): Promise<string | null> => {
     renderAbortRef.current?.abort();
     const controller = new AbortController();
     renderAbortRef.current = controller;
+    setTimelineStatus(null);
     try {
       setIsRenderingMaster(true);
       const anySoloed = tracks.some((t) => t.isSoloed);
@@ -342,6 +464,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
         .flatMap((t) =>
           t.clips.map((c) => ({
             ...c,
+            trackId: t.id,
             trackVolume: t.volume,
             trackPan: t.pan,
             trackVoiceId: t.voiceId,
@@ -349,22 +472,28 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
         )
         .sort((a, b) => a.startSec - b.startSec);
 
-      if (allActiveClips.length === 0) return;
+      if (allActiveClips.length === 0) {
+        setTimelineStatus({ text: 'No active unmuted clips on timeline to render.', isError: true });
+        return null;
+      }
 
-      const maxEndTime = Math.max(
-        ...allActiveClips.map((c) => c.startSec + (c.durationSec || 3.0))
-      );
       const sampleRate = 24000;
-      const offlineCtx = new (window.OfflineAudioContext ||
+      const decodeCtx = new (window.OfflineAudioContext ||
         (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
-          .webkitOfflineAudioContext)(
-        2,
-        Math.max(1, Math.ceil((maxEndTime + 1.0) * sampleRate)),
-        sampleRate
-      );
+          .webkitOfflineAudioContext)(1, sampleRate, sampleRate);
 
-      for (const clip of allActiveClips) {
-        if (controller.signal.aborted) return;
+      const decodedClips: Array<{
+        clip: typeof allActiveClips[0];
+        buffer: AudioBuffer;
+        blob: Blob;
+      }> = [];
+
+      for (let i = 0; i < allActiveClips.length; i++) {
+        const clip = allActiveClips[i];
+        if (controller.signal.aborted) return null;
+        setTimelineStatus({
+          text: `Synthesizing clip ${i + 1}/${allActiveClips.length}...`,
+        });
         let blob = clip.audioBlob;
         if (!blob) {
           blob = await api.synthesizeDirect({
@@ -374,61 +503,84 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
             signal: controller.signal,
           });
         }
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return null;
         const arrayBuf = await blob.arrayBuffer();
-        const audioBuffer = await offlineCtx.decodeAudioData(arrayBuf);
+        const audioBuffer = await decodeCtx.decodeAudioData(arrayBuf.slice(0));
+        decodedClips.push({ clip, buffer: audioBuffer, blob });
+      }
 
-        const source = offlineCtx.createBufferSource();
-        source.buffer = audioBuffer;
+      const actualEndTime = Math.max(
+        ...decodedClips.map((d) => d.clip.startSec + d.buffer.duration)
+      );
+      const mixCtx = new (window.OfflineAudioContext ||
+        (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext })
+          .webkitOfflineAudioContext)(
+        2,
+        Math.max(sampleRate, Math.ceil((actualEndTime + 0.5) * sampleRate)),
+        sampleRate
+      );
 
-        const gainNode = offlineCtx.createGain();
-        gainNode.gain.value = clip.trackVolume ?? 1.0;
+      for (const item of decodedClips) {
+        const source = mixCtx.createBufferSource();
+        source.buffer = item.buffer;
+
+        const gainNode = mixCtx.createGain();
+        gainNode.gain.value = item.clip.trackVolume ?? 1.0;
 
         let lastNode: AudioNode = gainNode;
-        if (typeof offlineCtx.createStereoPanner === 'function' && clip.trackPan !== 0) {
-          const panner = offlineCtx.createStereoPanner();
-          panner.pan.value = Math.max(-1, Math.min(1, clip.trackPan));
+        if (typeof mixCtx.createStereoPanner === 'function' && item.clip.trackPan !== 0) {
+          const panner = mixCtx.createStereoPanner();
+          panner.pan.value = Math.max(-1, Math.min(1, item.clip.trackPan));
           gainNode.connect(panner);
           lastNode = panner;
         }
 
         source.connect(gainNode);
-        lastNode.connect(offlineCtx.destination);
-        source.start(clip.startSec);
+        lastNode.connect(mixCtx.destination);
+        source.start(item.clip.startSec);
       }
 
-      const renderedBuffer = await offlineCtx.startRendering();
+      const renderedBuffer = await mixCtx.startRendering();
       const wavBlob = audioBufferToWav(renderedBuffer);
+
+      // Update clip durations & cached audio blobs cleanly
+      const cacheMap = new Map(
+        decodedClips.map((d) => [d.clip.id, { blob: d.blob, dur: d.buffer.duration }])
+      );
+      setTracks((prev) =>
+        prev.map((t) => ({
+          ...t,
+          clips: t.clips.map((c) => {
+            const hit = cacheMap.get(c.id);
+            return hit
+              ? {
+                  ...c,
+                  durationSec: Math.round(hit.dur * 10) / 10,
+                  audioBlob: hit.blob,
+                  isSynthesized: true,
+                }
+              : c;
+          }),
+        }))
+      );
 
       if (masterAudioUrl) URL.revokeObjectURL(masterAudioUrl);
       const url = URL.createObjectURL(wavBlob);
       setMasterAudioUrl(url);
-    } catch (err) {
-      if (isAbortError(err)) return;
-      console.error('Master multi-track mix error, falling back:', err);
-      try {
-        const anySoloed = tracks.some((t) => t.isSoloed);
-        const activeClips = tracks
-          .filter((t) => (anySoloed ? t.isSoloed && !t.isMuted : !t.isMuted))
-          .flatMap((t) => t.clips)
-          .sort((a, b) => a.startSec - b.startSec);
-
-        if (activeClips.length > 0 && !controller.signal.aborted) {
-          const fallbackBlob = await api.synthesizeDirect({
-            input: activeClips.map((c) => c.text).join(' ... '),
-            voice: activeClips[0].voiceId,
-            speed: 1.0,
-            signal: controller.signal,
-          });
-          if (controller.signal.aborted) return;
-          if (masterAudioUrl) URL.revokeObjectURL(masterAudioUrl);
-          setMasterAudioUrl(URL.createObjectURL(fallbackBlob));
-        }
-      } catch (fallbackErr) {
-        if (!isAbortError(fallbackErr)) {
-          console.error('Fallback synthesis failed:', fallbackErr);
-        }
+      setIsMasterDirty(false);
+      setTimelineStatus({ text: `Master mix rendered (${actualEndTime.toFixed(1)}s)` });
+      return url;
+    } catch (err: any) {
+      if (isAbortError(err)) {
+        setTimelineStatus({ text: 'Timeline render cancelled' });
+        return null;
       }
+      console.error('Master multi-track mix error:', err);
+      setTimelineStatus({
+        text: err?.message || 'Timeline synthesis failed — check selected track voice.',
+        isError: true,
+      });
+      return null;
     } finally {
       if (renderAbortRef.current === controller) {
         renderAbortRef.current = null;
@@ -462,9 +614,10 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           {/* Transport Controls */}
           <div className="flex items-center space-x-2 bg-[#0B0E14] px-3 py-1.5 rounded-lg border border-[#242E3D]">
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="p-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black transition-colors"
-              title={isPlaying ? 'Pause' : 'Play'}
+              onClick={handleToggleTransportPlay}
+              disabled={isRenderingMaster}
+              className="p-1.5 rounded bg-amber-500 hover:bg-amber-400 text-black transition-colors disabled:opacity-50"
+              title={isPlaying ? 'Pause' : 'Play Multi-Track Mix'}
             >
               {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
             </button>
@@ -516,7 +669,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           </button>
 
           <button
-            onClick={handleRenderMaster}
+            onClick={() => void handleRenderMaster()}
             disabled={isRenderingMaster}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs font-mono transition-colors shadow-sm disabled:opacity-50"
           >
@@ -559,7 +712,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
       </div>
 
       {/* Clip Addition Quick Bar */}
-      <div className="p-3 bg-[#0D1219] border-b border-[#242E3D] flex items-center space-x-3">
+      <div className="p-3 bg-[#0D1219] border-b border-[#242E3D] flex flex-wrap items-center gap-3">
         <span className="text-xs font-mono text-[#94A3B8] shrink-0">Insert Dialogue Line:</span>
         <select
           value={activeTrackIdForAdd}
@@ -580,7 +733,7 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
             if (e.key === 'Enter') handleAddClip(activeTrackIdForAdd);
           }}
           placeholder="Type dialogue line to place at current cursor position..."
-          className="flex-1 bg-[#121820] border border-[#242E3D] rounded px-3 py-1 text-xs text-white placeholder-[#64748B] focus:border-amber-500 focus:outline-none font-mono"
+          className="flex-1 min-w-[200px] bg-[#121820] border border-[#242E3D] rounded px-3 py-1 text-xs text-white placeholder-[#64748B] focus:border-amber-500 focus:outline-none font-mono"
         />
         <button
           onClick={() => handleAddClip(activeTrackIdForAdd)}
@@ -589,6 +742,17 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
           <Plus className="w-3 h-3" />
           <span>Add to Track</span>
         </button>
+        {timelineStatus && (
+          <span
+            className={`text-[11px] font-mono px-2.5 py-1 rounded border ${
+              timelineStatus.isError
+                ? 'bg-red-500/10 text-red-300 border-red-500/30'
+                : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+            }`}
+          >
+            {timelineStatus.text}
+          </span>
+        )}
       </div>
 
       {/* Main Multi-Track DAW Workspace */}
@@ -633,16 +797,29 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
                 <div>
                   <select
                     value={track.voiceId}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const nextVoice = e.target.value;
                       setTracks((prev) =>
                         prev.map((t) =>
-                          t.id === track.id ? { ...t, voiceId: e.target.value } : t
+                          t.id === track.id
+                            ? {
+                                ...t,
+                                voiceId: nextVoice,
+                                clips: t.clips.map((c) => ({
+                                  ...c,
+                                  voiceId: nextVoice,
+                                  audioBlob: undefined,
+                                  isSynthesized: false,
+                                })),
+                              }
+                            : t
                         )
-                      )
-                    }
+                      );
+                      setIsMasterDirty(true);
+                    }}
                     className="w-full bg-[#0B0E14] border border-[#242E3D] rounded px-2 py-1 text-[11px] font-mono text-[#CBD5E1] focus:border-amber-500 focus:outline-none"
                   >
-                    {voices.map((v) => (
+                    {(usableVoices.length > 0 ? usableVoices : voices).map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.name} ({v.language})
                       </option>
@@ -794,16 +971,40 @@ export const MultiTrackTimeline: React.FC<MultiTrackTimelineProps> = ({ voices }
                         <span className="font-bold truncate text-white" style={{ color: track.color }}>
                           {clip.durationSec.toFixed(1)}s
                         </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteClip(track.id, clip.id);
-                          }}
-                          className="text-[#64748B] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
-                          title="Remove Line"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center space-x-0.5">
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleAuditionSingleClip(track.voiceId, clip);
+                            }}
+                            className={`p-0.5 rounded transition-colors ${
+                              playingClipId === clip.id
+                                ? 'text-emerald-400'
+                                : 'text-[#94A3B8] hover:text-amber-300 opacity-0 group-hover:opacity-100'
+                            }`}
+                            title="Play Clip"
+                          >
+                            {playingClipId === clip.id ? (
+                              <Pause className="w-3 h-3 fill-current" />
+                            ) : (
+                              <Play className="w-3 h-3 fill-current" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClip(track.id, clip.id);
+                            }}
+                            className="text-[#64748B] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                            title="Remove Line"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
 
                       <p className="text-[11px] text-white line-clamp-2 leading-tight">

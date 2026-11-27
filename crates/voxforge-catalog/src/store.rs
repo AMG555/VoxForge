@@ -710,10 +710,19 @@ impl ModelCatalogStore {
         items
     }
 
+    /// Normalize engine-facing voice IDs (e.g. `en_US-lessac-medium`) to catalog IDs.
+    pub fn canonical_model_id(id: &str) -> &str {
+        match id {
+            "en_US-lessac-medium" => "piper-en-lessac-medium",
+            other => other,
+        }
+    }
+
     /// Look up a single catalog item by ID.
     pub async fn get(&self, id: &str) -> Option<CatalogItem> {
+        let canonical = Self::canonical_model_id(id);
         let map = self.items.read().await;
-        map.get(id).cloned()
+        map.get(canonical).cloned()
     }
 
     /// Look up a single catalog item with live host system-fit assessment.
@@ -730,9 +739,10 @@ impl ModelCatalogStore {
 
     /// Install/download a catalog model, validating host hardware constraints first.
     pub async fn install(&self, id: &str, hardware: &HardwareProfile) -> Result<CatalogItem> {
+        let canonical = Self::canonical_model_id(id).to_string();
         let mut map = self.items.write().await;
         let item = map
-            .get_mut(id)
+            .get_mut(&canonical)
             .ok_or_else(|| VoxForgeError::Engine(format!("Model '{id}' not found in catalog")))?;
 
         // Validate hardware RAM
@@ -752,7 +762,7 @@ impl ModelCatalogStore {
         }
 
         let models_dir = Self::models_dir();
-        let filename = Self::target_filename_for_model(id, item.format);
+        let filename = Self::target_filename_for_model(&canonical, item.format);
         let target_path = models_dir.join(&filename);
 
         // Attempt live download if URL is HTTP/HTTPS unless explicitly disabled (or test simulated mode)
@@ -869,9 +879,10 @@ impl ModelCatalogStore {
 
     /// Uninstall/remove local model weights.
     pub async fn uninstall(&self, id: &str) -> Result<CatalogItem> {
+        let canonical = Self::canonical_model_id(id);
         let mut map = self.items.write().await;
         let item = map
-            .get_mut(id)
+            .get_mut(canonical)
             .ok_or_else(|| VoxForgeError::Engine(format!("Model '{id}' not found in catalog")))?;
 
         if item.status != ModelStatus::Installed {
@@ -1056,5 +1067,14 @@ mod tests {
             chatterbox.system_fit.unwrap().tier,
             crate::models::SystemFitTier::Optimal
         );
+    }
+
+    #[tokio::test]
+    async fn test_piper_lessac_alias_resolution() {
+        let store = ModelCatalogStore::with_curated_models();
+        let via_engine_id = store.get("en_US-lessac-medium").await.unwrap();
+        let via_catalog_id = store.get("piper-en-lessac-medium").await.unwrap();
+        assert_eq!(via_engine_id.id, "piper-en-lessac-medium");
+        assert_eq!(via_engine_id.id, via_catalog_id.id);
     }
 }

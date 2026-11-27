@@ -1,4 +1,5 @@
-import { X, Sliders, Trash2, Wand2, Volume2, Mic, Copy, Clipboard, FileText, Layers, Gauge, Radio, Users } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Sliders, Trash2, Wand2, Volume2, Mic, Copy, Clipboard, FileText, Layers, Gauge, Radio, Users, ShieldCheck } from 'lucide-react';
 import { PipelineNode, Voice } from '../../types';
 
 interface NodeInspectorProps {
@@ -32,6 +33,11 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   onDuplicateSelected,
   onCopySelectedJson,
 }) => {
+  const [newSpeakerName, setNewSpeakerName] = useState('');
+  const [showAddSpeaker, setShowAddSpeaker] = useState(false);
+  const [inspectorHint, setInspectorHint] = useState<string | null>(null);
+  const usableVoices = voices.filter((v) => v.engine_id !== 'mock-tts');
+
   if (selectedNodes && selectedNodes.length > 1) {
     return (
       <div className="w-80 border-l border-[#242E3D] bg-[#121820]/95 backdrop-blur flex flex-col h-full text-[#F0F4F8] select-none z-30 shadow-2xl">
@@ -133,6 +139,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
 
   const handleAutoDetectSpeakers = () => {
     if (!allNodes) return;
+    setInspectorHint(null);
     const textInputs = allNodes.filter((n) => n.node_type === 'text_input');
     const discoveredSpeakers = new Set<string>();
 
@@ -160,13 +167,15 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
       const speakerList = Array.from(discoveredSpeakers);
       speakerList.forEach((spk, idx) => {
         if (!currentMap[spk]) {
-          const assignedVoice = voices[idx % voices.length]?.id || node.params.default_voice || 'en-US-AriaNeural';
+          const pool = usableVoices.length > 0 ? usableVoices : voices;
+          const assignedVoice = pool[idx % pool.length]?.id || node.params.default_voice || 'en-US-AriaNeural';
           currentMap[spk] = assignedVoice;
         }
       });
       handleChange('speaker_map', currentMap);
+      setInspectorHint(`Mapped ${speakerList.length} speaker(s) from script.`);
     } else {
-      alert('No speaker prefixes found in script! Format lines as "Speaker: Line" or "[Speaker] Line".');
+      setInspectorHint('No speaker prefixes found. Format script lines as "Speaker: Line".');
     }
   };
 
@@ -368,7 +377,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 onChange={(e) => handleChange('default_voice', e.target.value)}
                 className="w-full bg-[#0B0E14] border border-[#242E3D] rounded px-3 py-2 text-white text-xs focus:border-amber-500 focus:outline-none font-mono"
               >
-                {voices.map((v) => (
+                {(usableVoices.length > 0 ? usableVoices : voices).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name} ({v.language})
                   </option>
@@ -394,22 +403,59 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      const speaker = prompt('Enter Speaker Name (e.g. Captain, Nav, Host, Guest):');
-                      if (speaker && speaker.trim()) {
-                        const currentMap = node.params.speaker_map || {};
-                        handleChange('speaker_map', {
-                          ...currentMap,
-                          [speaker.trim()]: voices[0]?.id || 'en-US-AriaNeural',
-                        });
-                      }
-                    }}
-                    className="text-[10px] font-mono text-[#94A3B8] hover:text-white"
+                    onClick={() => setShowAddSpeaker((v) => !v)}
+                    className="text-[10px] font-mono text-[#94A3B8] hover:text-white px-1.5 py-0.5 rounded bg-[#1A222D] border border-[#242E3D]"
                   >
                     + Add
                   </button>
                 </div>
               </div>
+
+              {inspectorHint && (
+                <div className="text-[10px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
+                  {inspectorHint}
+                </div>
+              )}
+
+              {showAddSpeaker && (
+                <div className="flex items-center space-x-1.5 bg-[#0B0E14] p-2 rounded border border-amber-500/40">
+                  <input
+                    type="text"
+                    value={newSpeakerName}
+                    onChange={(e) => setNewSpeakerName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSpeakerName.trim()) {
+                        const pool = usableVoices.length > 0 ? usableVoices : voices;
+                        handleChange('speaker_map', {
+                          ...(node.params.speaker_map || {}),
+                          [newSpeakerName.trim()]: pool[0]?.id || 'en-US-AriaNeural',
+                        });
+                        setNewSpeakerName('');
+                        setShowAddSpeaker(false);
+                      }
+                    }}
+                    placeholder="Speaker name (e.g. Host)"
+                    className="flex-1 bg-[#121820] border border-[#242E3D] rounded px-2 py-1 text-xs text-white font-mono focus:border-amber-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newSpeakerName.trim()) return;
+                      const pool = usableVoices.length > 0 ? usableVoices : voices;
+                      handleChange('speaker_map', {
+                        ...(node.params.speaker_map || {}),
+                        [newSpeakerName.trim()]: pool[0]?.id || 'en-US-AriaNeural',
+                      });
+                      setNewSpeakerName('');
+                      setShowAddSpeaker(false);
+                    }}
+                    className="px-2 py-1 rounded bg-amber-500 text-black text-[10px] font-bold"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
 
               {node.params.speaker_map &&
                 Object.entries(node.params.speaker_map).map(([speaker, voiceId]) => (
@@ -438,7 +484,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                       }}
                       className="w-full bg-[#121820] border border-[#242E3D] rounded px-2 py-1 text-white text-[11px] font-mono"
                     >
-                      {voices.map((v) => (
+                      {(usableVoices.length > 0 ? usableVoices : voices).map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.name} ({v.language})
                         </option>
@@ -789,7 +835,7 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 onChange={(e) => handleChange('voice', e.target.value)}
                 className="w-full bg-[#0B0E14] border border-[#242E3D] rounded px-3 py-2 text-white text-xs focus:border-amber-500 focus:outline-none font-mono"
               >
-                {voices.map((v) => (
+                {(usableVoices.length > 0 ? usableVoices : voices).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name} ({v.language})
                   </option>
@@ -1093,6 +1139,75 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 value={node.params.ducking_db ?? -12}
                 onChange={(e) => handleChange('ducking_db', parseInt(e.target.value, 10))}
                 className="w-full accent-violet-500 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
+        {node.node_type === 'watermark' && (
+          <div className="space-y-4 bg-[#0B0E14] p-3.5 rounded-lg border border-[#242E3D]">
+            <div className="flex items-center space-x-2 text-emerald-400 font-semibold text-xs border-b border-[#242E3D] pb-2">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Provenance Audio Watermark</span>
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] font-mono text-[#94A3B8] mb-1">
+                <span>Embed Strength</span>
+                <span className="text-emerald-400 font-bold">
+                  {((node.params.strength ?? 0.0035) * 1000).toFixed(1)}‰
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.001"
+                max="0.012"
+                step="0.0005"
+                value={node.params.strength ?? 0.0035}
+                onChange={(e) => handleChange('strength', parseFloat(e.target.value))}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
+        {node.node_type === 'voice_conversion' && (
+          <div className="space-y-4 bg-[#0B0E14] p-3.5 rounded-lg border border-[#242E3D]">
+            <div className="flex items-center space-x-2 text-purple-400 font-semibold text-xs border-b border-[#242E3D] pb-2">
+              <Wand2 className="w-4 h-4" />
+              <span>Voice Morph & Warmth</span>
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] font-mono text-[#94A3B8] mb-1">
+                <span>Pitch Shift</span>
+                <span className="text-purple-400 font-bold">
+                  {node.params.pitch_shift_semitones ?? 0} st
+                </span>
+              </div>
+              <input
+                type="range"
+                min="-12"
+                max="12"
+                step="1"
+                value={node.params.pitch_shift_semitones ?? 0}
+                onChange={(e) => handleChange('pitch_shift_semitones', parseInt(e.target.value, 10))}
+                className="w-full accent-purple-500 cursor-pointer"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[11px] font-mono text-[#94A3B8] mb-1">
+                <span>Timbre Warmth</span>
+                <span className="text-purple-400 font-bold">
+                  {Math.round((node.params.timbre_warmth ?? 0.45) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={node.params.timbre_warmth ?? 0.45}
+                onChange={(e) => handleChange('timbre_warmth', parseFloat(e.target.value))}
+                className="w-full accent-purple-500 cursor-pointer"
               />
             </div>
           </div>

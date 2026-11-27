@@ -993,6 +993,19 @@ impl TtsEngine for Qwen3TtsEngine {
                 "spectral_tilt_db".to_string(),
                 format!("{:.2}", f.spectral_tilt_db),
             );
+            metadata.insert(
+                "energy_dynamic_range_db".to_string(),
+                format!("{:.2}", f.energy_dynamic_range_db),
+            );
+            if !f.f0_contour_8.is_empty() {
+                let contour_str = f
+                    .f0_contour_8
+                    .iter()
+                    .map(|v| format!("{v:.2}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                metadata.insert("f0_contour_8".to_string(), contour_str);
+            }
         }
         metadata.extend(request.metadata.clone());
 
@@ -1405,6 +1418,22 @@ impl Qwen3TtsEngine {
                 .metadata
                 .get("spectral_tilt_db")
                 .and_then(|s| s.parse::<f32>().ok());
+            let dyn_range = request
+                .profile
+                .metadata
+                .get("energy_dynamic_range_db")
+                .and_then(|s| s.parse::<f32>().ok())
+                .unwrap_or(8.0);
+            let contour_8: Vec<f32> = request
+                .profile
+                .metadata
+                .get("f0_contour_8")
+                .map(|raw| {
+                    raw.split(',')
+                        .filter_map(|p| p.trim().parse::<f32>().ok())
+                        .collect()
+                })
+                .unwrap_or_default();
 
             if let Some(f0_val) = f0 {
                 ref_features_opt = Some(voxforge_audio::dsp::AcousticFeatures {
@@ -1427,9 +1456,25 @@ impl Qwen3TtsEngine {
                     formant_f3_hz: f3.unwrap_or(2600.0),
                     hnr_db: hnr.unwrap_or(18.0),
                     shimmer_percent: shimmer.unwrap_or(2.5),
+                    f0_contour_8: contour_8,
+                    energy_dynamic_range_db: dyn_range,
                 });
             }
         }
+
+        let instruct_opt = request
+            .instruct
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                request
+                    .profile
+                    .metadata
+                    .get("instruct")
+                    .map(|s| s.as_str())
+                    .filter(|s| !s.trim().is_empty())
+            });
+        let instruct_mod = voxforge_audio::InstructModulation::from_str_opt(instruct_opt);
 
         // 4. Determine acoustic gender & base voice (honor explicit Female/Male choice over F0 inference)
         let acoustic_gender = resolve_cloned_profile_gender(
@@ -1440,8 +1485,8 @@ impl Qwen3TtsEngine {
         let fallback_voice =
             resolve_cross_lingual_base_voice(Some(&acoustic_gender), &request.text, &target_lang);
 
-        // 5. Calculate pitch delta matching the cloned speaker's exact fundamental pitch
-        let mut pitch_offset = request.pitch;
+        // 5. Calculate pitch delta matching the cloned speaker's exact fundamental pitch + instruct offset
+        let mut pitch_offset = request.pitch + instruct_mod.pitch_offset_st * 2.0;
         if let Some(ref f) = ref_features_opt {
             let nominal_base_f0 = nominal_base_voice_f0(fallback_voice);
             let target_f0 = f.f0_mean_hz.clamp(65.0, 420.0);
@@ -1455,8 +1500,8 @@ impl Qwen3TtsEngine {
             pitch_offset += (avg_centroid * 4.0).clamp(-6.0, 6.0);
         }
 
-        // 6. Natural speech cadence / tempo alignment
-        let speed = if (request.speed - 1.0).abs() < 0.05 {
+        // 6. Natural speech cadence / tempo alignment + instruct steering
+        let base_speed = if (request.speed - 1.0).abs() < 0.05 {
             if let Some(ref f) = ref_features_opt {
                 (f.syllable_rate / 4.2).clamp(0.85, 1.25)
             } else {
@@ -1465,23 +1510,67 @@ impl Qwen3TtsEngine {
         } else {
             request.speed
         };
+        let speed = (base_speed * instruct_mod.rate_scale).clamp(0.65, 1.50);
 
-        // 7. Base voice synthesis pass
-        // For long texts (>400 chars), split at sentence boundaries and stitch with cross-fades.
-        // Each sentence is synthesized individually so prosody resets naturally, then 50ms equal-power cross-fades blend seams.
+        // 7. Base voice synthesis pass with speaker-calibrated clause intonation & pause cadence
         let edge = crate::edge_tts::EdgeTtsEngine::new();
-        let mut chunk = if request.text.len() > 400 {
-            let sentences = split_text_to_sentences(&request.text);
-            let mut chunks: Vec<AudioChunk> = Vec::with_capacity(sentences.len());
-            for sentence in &sentences {
+        let ref_contour: &[f32] = ref_features_opt
+            .as_ref()
+            .map(|f| f.f0_contour_8.as_slice())
+            .unwrap_or(&[]);
+        let ref_f0_std = ref_features_opt
+            .as_ref()
+            .map(|f| f.f0_std_semitones)
+            .unwrap_or(1.5);
+        let ref_syl_rate = ref_features_opt
+            .as_ref()
+            .map(|f| f.syllable_rate)
+            .unwrap_or(4.2);
+
+        let sentences = split_text_to_sentences(&request.text);
+        let pause_ms = ((145.0 / (ref_syl_rate / 4.2).clamp(0.70, 1.40)) * instruct_mod.pause_scale)
+            .round()
+            .clamp(60.0, 380.0) as u32;
+
+        let mut chunk = if sentences.len() > 1 || request.text.len() > 400 {
+            let clause_total = sentences.len().max(1);
+            let mut chunks: Vec<AudioChunk> = Vec::with_capacity(clause_total);
+            for (idx, sentence) in sentences.iter().enumerate() {
                 if sentence.trim().is_empty() {
                     continue;
                 }
+                let progress = if clause_total <= 1 {
+                    0.5
+                } else {
+                    idx as f32 / (clause_total - 1) as f32
+                };
+                let contour_st = if ref_contour.is_empty() {
+                    0.0
+                } else {
+                    let pos = progress * (ref_contour.len() - 1) as f32;
+                    let i0 = pos.floor() as usize;
+                    let i1 = (i0 + 1).min(ref_contour.len() - 1);
+                    let frac = pos - i0 as f32;
+                    ref_contour[i0] + frac * (ref_contour[i1] - ref_contour[i0])
+                };
+                let trimmed_sent = sentence.trim();
+                let punct_bias = if trimmed_sent.ends_with('?') || trimmed_sent.ends_with('؟') {
+                    0.9 * (ref_f0_std / 1.8).clamp(0.6, 1.5)
+                } else if trimmed_sent.ends_with('!') {
+                    0.6 * (ref_f0_std / 1.8).clamp(0.6, 1.5)
+                } else if idx + 1 == clause_total {
+                    -0.5 * (ref_f0_std / 1.8).clamp(0.6, 1.5)
+                } else {
+                    0.0
+                };
+                let clause_pitch =
+                    (pitch_offset + contour_st * 0.45 + punct_bias).clamp(-45.0, 45.0);
+
                 let req = SynthesisRequest {
                     text: sentence.clone(),
                     voice_id: fallback_voice.to_string(),
                     speed,
-                    pitch: pitch_offset,
+                    pitch: clause_pitch,
                     format: request.format,
                 };
                 if let Ok(c) = edge.synthesize(&req).await {
@@ -1489,7 +1578,6 @@ impl Qwen3TtsEngine {
                 }
             }
             if chunks.is_empty() {
-                // Fallback to full text if chunking yielded nothing
                 let synth_req = SynthesisRequest {
                     text: request.text.clone(),
                     voice_id: fallback_voice.to_string(),
@@ -1502,14 +1590,11 @@ impl Qwen3TtsEngine {
                 let sample_rate = chunks[0].sample_rate;
                 let pcm_slices: Vec<&[i16]> =
                     chunks.iter().map(|c| c.pcm_data.as_slice()).collect();
-                // Studio standard: fade-out → 100ms silence gap → fade-in
-                // Avoids phase-mismatch clicks that equal-power overlap crossfade can produce
-                // when chunk boundaries fall on arbitrary phases of the speech waveform.
                 let stitched = voxforge_audio::AudioMerger::silence_gap_join(
                     &pcm_slices,
                     sample_rate,
                     20,
-                    100,
+                    pause_ms,
                 );
                 AudioChunk {
                     sample_rate,
@@ -1528,6 +1613,15 @@ impl Qwen3TtsEngine {
             };
             edge.synthesize(&synth_req).await?
         };
+
+        // 7b. VoiceStudio-grade pure-Rust prosody & modulation transfer (intonation span, contour,
+        // syllabic stress contrast, spectral tilt, and instruct delivery steering)
+        voxforge_audio::ModulationTransfer::apply(
+            &mut chunk.pcm_data,
+            chunk.sample_rate,
+            ref_features_opt.as_ref(),
+            instruct_opt,
+        );
 
         // 8. Formant & Spectral Timbre Morphing (match cloned speaker's frequency envelope)
         if let Some(ref ref_samples) = ref_pcm {
@@ -1678,10 +1772,13 @@ impl Qwen3TtsEngine {
         }
         voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
 
-        // 11c. Broadcast mastering pass (EQ, compressor, de-esser, peak safety).
-        // Broadcast mastering post-chain for perceptually uniform
-        // loudness and consistent spectral balance across synthesized clones.
-        voxforge_audio::MasteringProfile::Broadcast.apply(&mut chunk.pcm_data, chunk.sample_rate);
+        // 11c. Mastering pass calibrated for instruct profile (gentler Podcast mastering when whispering)
+        if instruct_mod.target_lufs < -17.5 {
+            voxforge_audio::MasteringProfile::Podcast.apply(&mut chunk.pcm_data, chunk.sample_rate);
+        } else {
+            voxforge_audio::MasteringProfile::Broadcast
+                .apply(&mut chunk.pcm_data, chunk.sample_rate);
+        }
 
         // 11d. Room-tone gap fill: replace digital-zero pauses with spectrally-shaped
         //      room tone from the take itself. Eliminates the gating artefact audible on
@@ -1766,12 +1863,16 @@ impl Qwen3TtsEngine {
             }
         }
 
-        // 15. EBU R128 / LUFS loudness normalization to -16 LUFS (podcast/voice standard).
-        //     Ensures consistent perceived loudness regardless of the reference recording level.
+        // 15. EBU R128 / LUFS loudness normalization calibrated to instruct target (e.g. -20.5 whisper vs -16 default)
+        let target_lufs = if (instruct_mod.target_lufs - (-16.0)).abs() > 0.25 {
+            instruct_mod.target_lufs
+        } else {
+            voxforge_audio::LUFS_TARGET_VOICE
+        };
         voxforge_audio::AudioNormalizer::lufs_normalize(
             &mut chunk.pcm_data,
             chunk.sample_rate,
-            voxforge_audio::LUFS_TARGET_VOICE,
+            target_lufs,
         );
         // Final brickwall to guard against any LUFS gain boost causing clipping (look-ahead)
         voxforge_audio::BrickwallLimiter::process_sr(&mut chunk.pcm_data, -0.5, chunk.sample_rate);
@@ -3007,5 +3108,67 @@ mod sentence_splitter_tests {
         let emb = Qwen3TtsEngine::extract_speaker_embedding(&pcm);
         assert_eq!(emb.len(), 512);
         assert!(emb.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_modulation_transfer_diverges_by_speaker_and_instruct() {
+        let sr = 24_000u32;
+        let len = (sr as usize) * 2;
+        let mut phase = 0.0f32;
+        let ref_pcm: Vec<i16> = (0..len)
+            .map(|i| {
+                let frac = i as f32 / len as f32;
+                let f0 = 135.0 + 95.0 * frac;
+                phase += 2.0 * std::f32::consts::PI * f0 / sr as f32;
+                let env = if (i / 4800) % 2 == 0 { 0.85 } else { 0.25 };
+                ((phase.sin() * 0.7 + (2.0 * phase).sin() * 0.25) * env * 14000.0)
+                    .round()
+                    .clamp(i16::MIN as f32, i16::MAX as f32) as i16
+            })
+            .collect();
+
+        let ref_features = voxforge_audio::ProsodyMirror::analyze(&ref_pcm, sr);
+        assert_eq!(ref_features.f0_contour_8.len(), 8);
+        assert!(ref_features.energy_dynamic_range_db > 1.0);
+
+        let flat_synth: Vec<i16> = (0..sr as usize)
+            .map(|i| {
+                let t = i as f32 / sr as f32;
+                ((2.0 * std::f32::consts::PI * 165.0 * t).sin() * 9000.0).round() as i16
+            })
+            .collect();
+
+        let urgent = voxforge_audio::InstructModulation::from_str_opt(Some("urgent cheerful"));
+        let whisper = voxforge_audio::InstructModulation::from_str_opt(Some("whisper soft"));
+        assert!(urgent.pitch_range_scale > whisper.pitch_range_scale);
+        assert!(whisper.breathiness_mix > urgent.breathiness_mix);
+
+        let mut out_urgent = flat_synth.clone();
+        voxforge_audio::ModulationTransfer::apply(
+            &mut out_urgent,
+            sr,
+            Some(&ref_features),
+            Some("urgent cheerful"),
+        );
+        let mut out_whisper = flat_synth;
+        voxforge_audio::ModulationTransfer::apply(
+            &mut out_whisper,
+            sr,
+            Some(&ref_features),
+            Some("whisper soft"),
+        );
+
+        assert_eq!(out_urgent.len(), sr as usize);
+        assert_eq!(out_whisper.len(), sr as usize);
+        let diff: i64 = out_urgent
+            .iter()
+            .zip(out_whisper.iter())
+            .map(|(a, b)| (*a as i64 - *b as i64).abs())
+            .sum();
+        assert!(
+            diff > 10_000,
+            "Urgent and whisper modulations must produce measurably distinct waveforms (diff={})",
+            diff
+        );
     }
 }

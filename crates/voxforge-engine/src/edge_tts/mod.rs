@@ -159,6 +159,117 @@ pub fn segment_malayalam_latin_runs(voice_id: &str, text: &str) -> Vec<(String, 
         .collect()
 }
 
+fn infer_edge_voice_gender(norm_voice: &str) -> Gender {
+    let lower = norm_voice.to_ascii_lowercase();
+    if [
+        "guy",
+        "christopher",
+        "andrew",
+        "brian",
+        "ryan",
+        "prabhat",
+        "william",
+        "midhun",
+        "madhur",
+        "valluvar",
+        "mohan",
+        "gagan",
+        "bashkar",
+        "dhwani_male",
+        "niranjan",
+        "henri",
+        "christoph",
+        "alvaro",
+        "diego",
+        "yunxi",
+        "keita",
+        "injoon",
+        "antonio",
+        "hamed",
+        "wanlung",
+    ]
+    .iter()
+    .any(|tok| lower.contains(tok))
+    {
+        Gender::Male
+    } else {
+        Gender::Female
+    }
+}
+
+/// Segment text across incompatible Unicode scripts for any Edge-TTS voice so selecting e.g.
+/// `en-US-AriaNeural` with Malayalam text routes non-Latin tokens cleanly to a matching neural
+/// voice of the same gender instead of returning an empty audio stream from Edge-TTS.
+pub fn segment_edge_tts_script_runs(voice_id: &str, text: &str) -> Vec<(String, String)> {
+    let norm_voice = normalize_edge_voice_id(voice_id);
+    if matches!(
+        norm_voice.as_str(),
+        "ml-IN-MidhunNeural" | "ml-IN-SobhanaNeural"
+    ) {
+        return segment_malayalam_latin_runs(&norm_voice, text);
+    }
+
+    let voice_locale = extract_locale_from_voice_id(&norm_voice);
+    let voice_prefix = voice_locale
+        .split('-')
+        .next()
+        .unwrap_or("en")
+        .to_ascii_lowercase();
+    let gender = infer_edge_voice_gender(&norm_voice);
+    let has_kana = text
+        .chars()
+        .any(|c| matches!(c as u32, 0x3040..=0x30FF | 0x31F0..=0x31FF));
+
+    let mut runs: Vec<(String, String)> = Vec::new();
+    for token in text.split_whitespace() {
+        let tok_script = crate::qwen3::detect_script_lang(token);
+        let has_latin = token.chars().any(|c| c.is_ascii_alphabetic());
+
+        let target_voice: Option<String> = if !tok_script.is_empty() {
+            if tok_script == voice_prefix
+                || (tok_script == "zh" && (voice_prefix == "ja" || has_kana))
+            {
+                Some(norm_voice.clone())
+            } else {
+                Some(
+                    crate::qwen3::resolve_cross_lingual_base_voice(
+                        Some(&gender),
+                        token,
+                        tok_script,
+                    )
+                    .to_string(),
+                )
+            }
+        } else if has_latin {
+            Some(norm_voice.clone())
+        } else {
+            None
+        };
+
+        let resolved = target_voice.unwrap_or_else(|| {
+            runs.last()
+                .map(|(v, _)| v.clone())
+                .unwrap_or_else(|| norm_voice.clone())
+        });
+
+        if let Some((last_voice, last_buf)) = runs.last_mut() {
+            if *last_voice == resolved {
+                if !last_buf.is_empty() {
+                    last_buf.push(' ');
+                }
+                last_buf.push_str(token);
+                continue;
+            }
+        }
+        runs.push((resolved, token.to_string()));
+    }
+
+    if runs.is_empty() {
+        return vec![(norm_voice, text.to_string())];
+    }
+    runs
+}
+
 pub fn format_edge_voice_name(voice_id: &str) -> String {
     if voice_id.starts_with("Microsoft Server Speech") {
         return voice_id.to_string();
@@ -648,7 +759,7 @@ impl TtsEngine for EdgeTtsEngine {
     }
 
     async fn synthesize(&self, request: &SynthesisRequest) -> Result<AudioChunk> {
-        let runs = segment_malayalam_latin_runs(&request.voice_id, &request.text);
+        let runs = segment_edge_tts_script_runs(&request.voice_id, &request.text);
         if runs.len() <= 1 {
             let (seg_voice, seg_text) = runs.into_iter().next().unwrap_or_else(|| {
                 (
@@ -807,6 +918,29 @@ mod tests {
                 ("ml-IN-MidhunNeural".to_string(), "വളരെ".to_string()),
                 ("en-IN-PrabhatNeural".to_string(), "cold".to_string()),
                 ("ml-IN-MidhunNeural".to_string(), "ആണ്".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_segment_edge_tts_script_runs_cross_script_fallback() {
+        let aria_ml = segment_edge_tts_script_runs("en-US-AriaNeural", "ഇപ്പോൾ നിങ്ങൾ സുഖമാണോ");
+        assert_eq!(
+            aria_ml,
+            vec![(
+                "ml-IN-SobhanaNeural".to_string(),
+                "ഇപ്പോൾ നിങ്ങൾ സുഖമാണോ".to_string()
+            )]
+        );
+
+        let guy_mixed = segment_edge_tts_script_runs("en-US-GuyNeural", "Hello ഇന്ന് weather നല്ലതാണ്");
+        assert_eq!(
+            guy_mixed,
+            vec![
+                ("en-US-GuyNeural".to_string(), "Hello".to_string()),
+                ("ml-IN-MidhunNeural".to_string(), "ഇന്ന്".to_string()),
+                ("en-US-GuyNeural".to_string(), "weather".to_string()),
+                ("ml-IN-MidhunNeural".to_string(), "നല്ലതാണ്".to_string()),
             ]
         );
     }

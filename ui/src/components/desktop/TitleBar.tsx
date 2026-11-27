@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, Square, X, SlidersHorizontal, Cpu } from 'lucide-react';
+import { Minus, Square, X, Cpu } from 'lucide-react';
 import {
   closeDesktopWindow,
   minimizeDesktopWindow,
@@ -21,9 +21,9 @@ export const TitleBar: React.FC = () => {
   const activeProfile = setupStatus?.config?.runtime_profile || 'rust_core';
   const profileLabel =
     activeProfile === 'full_cloning'
-      ? 'Native Rust + Full AI Sidecar'
+      ? 'Rust + Full Sidecar'
       : activeProfile === 'core_neural' && setupStatus?.managed_venv_ready
-        ? 'Native Rust + Neural Sidecar'
+        ? 'Rust + Neural Sidecar'
         : activeProfile === 'remote'
           ? 'Remote Server'
           : 'Native Rust Core';
@@ -45,7 +45,7 @@ export const TitleBar: React.FC = () => {
           type="button"
           onClick={() => dispatch(setWizardOpen(true))}
           className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-[#121820] hover:bg-[#1A222D] border border-[#242E3D] text-[10px] font-mono text-emerald-400 transition-colors"
-          title="Configure VoxForge Local Neural Runtime or Remote Connection"
+          title="Runtime & Optional AI Extensions Setup"
         >
           <Cpu className="w-3 h-3" />
           <span>{profileLabel}</span>
@@ -55,16 +55,6 @@ export const TitleBar: React.FC = () => {
       <div data-tauri-drag-region className="flex-1 h-full" />
 
       <div className="flex items-center h-full">
-        <button
-          type="button"
-          onClick={() => dispatch(setWizardOpen(true))}
-          className="h-full px-2.5 inline-flex items-center space-x-1.5 text-[11px] font-mono text-[#94A3B8] hover:text-white hover:bg-[#1A222D] transition-colors"
-          title="Runtime Setup Wizard"
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-          <span>Runtime Setup</span>
-        </button>
-
         <button
           type="button"
           onClick={minimizeDesktopWindow}

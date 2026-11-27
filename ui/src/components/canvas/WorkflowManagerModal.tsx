@@ -36,12 +36,14 @@ export const WorkflowManagerModal: React.FC<WorkflowManagerModalProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNameInput, setEditNameInput] = useState('');
+  const [modalNotice, setModalNotice] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const workflows = WorkflowStorage.getWorkflows();
 
-  const categories = ['All', 'Dialogue', 'Podcast', 'Radio', 'General'];
+  const categories = ['All', 'Dialogue', 'Podcast', 'Radio', 'Video Dubbing', 'General'];
 
   const filteredWorkflows = workflows.filter((w) => {
     const matchesSearch =
@@ -71,13 +73,18 @@ export const WorkflowManagerModal: React.FC<WorkflowManagerModalProps> = ({
   const handleDelete = (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (workflows.length <= 1) {
-      alert('Cannot delete the last remaining workflow.');
+      setModalNotice('Cannot delete the last remaining workflow.');
       return;
     }
-    if (confirm(`Delete workflow "${name}" permanently?`)) {
-      WorkflowStorage.deleteWorkflow(id);
-      onWorkflowListChange();
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      setModalNotice(`Click delete again on "${name}" to permanently delete.`);
+      return;
     }
+    WorkflowStorage.deleteWorkflow(id);
+    setConfirmDeleteId(null);
+    setModalNotice(null);
+    onWorkflowListChange();
   };
 
   const startEditing = (w: StoredWorkflow, e: React.MouseEvent) => {
@@ -198,7 +205,15 @@ export const WorkflowManagerModal: React.FC<WorkflowManagerModalProps> = ({
         </div>
 
         {/* Toolbar Filter */}
-        <div className="px-6 py-3 border-b border-[#242E3D] bg-[#121820] flex items-center justify-between gap-4 shrink-0">
+        <div className="px-6 py-3 border-b border-[#242E3D] bg-[#121820] flex flex-wrap items-center justify-between gap-3 shrink-0">
+          {modalNotice && (
+            <div className="w-full text-xs font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded flex items-center justify-between">
+              <span>{modalNotice}</span>
+              <button onClick={() => setModalNotice(null)} className="text-[#94A3B8] hover:text-white">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
           <div className="relative flex-1 max-w-sm">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" />
             <input

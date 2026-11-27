@@ -35,6 +35,8 @@ export const WorkflowsDashboard: React.FC<WorkflowsDashboardProps> = ({
   const [editNameInput, setEditNameInput] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importJsonInput, setImportJsonInput] = useState('');
+  const [notice, setNotice] = useState<{ text: string; type: 'info' | 'error' } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const refreshList = () => {
     setWorkflows(WorkflowStorage.getWorkflows());
@@ -63,13 +65,18 @@ export const WorkflowsDashboard: React.FC<WorkflowsDashboardProps> = ({
   const handleDelete = (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (workflows.length <= 1) {
-      alert('Cannot delete the last remaining workflow.');
+      setNotice({ text: 'Cannot delete the last remaining workflow.', type: 'error' });
       return;
     }
-    if (confirm(`Delete workflow "${name}" permanently?`)) {
-      WorkflowStorage.deleteWorkflow(id);
-      refreshList();
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      setNotice({ text: `Click delete again on "${name}" to confirm removal.`, type: 'info' });
+      return;
     }
+    WorkflowStorage.deleteWorkflow(id);
+    setConfirmDeleteId(null);
+    setNotice({ text: `Deleted "${name}".`, type: 'info' });
+    refreshList();
   };
 
   const startEditing = (w: StoredWorkflow, e: React.MouseEvent) => {
@@ -115,10 +122,10 @@ export const WorkflowsDashboard: React.FC<WorkflowsDashboardProps> = ({
         setImportJsonInput('');
         onOpenWorkflow(freshId);
       } else {
-        alert('Invalid workflow JSON structure. Must contain a "nodes" array.');
+        setNotice({ text: 'Invalid workflow JSON structure. Must contain a "nodes" array.', type: 'error' });
       }
     } catch (e: any) {
-      alert(`Failed to parse JSON: ${e.message}`);
+      setNotice({ text: `Failed to parse JSON: ${e.message}`, type: 'error' });
     }
   };
 
@@ -213,6 +220,20 @@ export const WorkflowsDashboard: React.FC<WorkflowsDashboardProps> = ({
       </div>
 
       <div className="max-w-7xl mx-auto w-full px-8 py-8 space-y-8 flex-1">
+        {notice && (
+          <div
+            className={`px-4 py-2.5 rounded-lg border text-xs font-mono flex items-center justify-between ${
+              notice.type === 'error'
+                ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+            }`}
+          >
+            <span>{notice.text}</span>
+            <button onClick={() => setNotice(null)} className="text-[#94A3B8] hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         {/* Quick-Start Templates Section (n8n Style) */}
         <div>
           <div className="flex items-center space-x-2 mb-4">

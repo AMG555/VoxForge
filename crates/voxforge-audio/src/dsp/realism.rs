@@ -8,10 +8,10 @@ use super::eq::Biquad;
 use std::f32::consts::PI;
 
 /// Lightweight deterministic xorshift PRNG for zero-allocation audio DSP loops.
-struct FastRng(u64);
+pub(crate) struct FastRng(u64);
 
 impl FastRng {
-    fn new(seed: u64) -> Self {
+    pub(crate) fn new(seed: u64) -> Self {
         Self(seed.max(1))
     }
 
@@ -23,7 +23,7 @@ impl FastRng {
     }
 
     /// Returns uniform sample in range [-1.0, 1.0].
-    fn next_bipolar(&mut self) -> f32 {
+    pub(crate) fn next_bipolar(&mut self) -> f32 {
         self.next_f32() * 2.0 - 1.0
     }
 }

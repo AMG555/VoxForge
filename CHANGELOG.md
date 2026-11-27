@@ -6,6 +6,24 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.3] — 2026-11-27
+
+### 🛠️ Desktop Runtime, GPU Telemetry & Bug Fixes
+- **Embedded Self-Healing Neural Sidecar Script**: Embedded `scripts/neural_sidecar.py` into `voxforge-api` via `include_str!` and materialized it automatically to `<data_dir>/scripts/neural_sidecar.py` (with writable `<data_dir>/logs` sidecar logs), fixing `"Could not locate scripts/neural_sidecar.py relative to the executable or working directory"` when clicking **Start Sidecar** in installed desktop builds. Also bundled `scripts/neural_sidecar.py` in Inno Setup (`voxforge.iss`) and release archives.
+- **Exact NVIDIA GPU & VRAM Detection (`nvidia-smi`)**: Replaced the hardcoded `8192 MB` `CUDA_PATH` guess in `voxforge-hardware` with real `nvidia-smi` telemetry, accurately reporting GPU model name and actual VRAM (e.g., `NVIDIA GeForce GTX 1650`, `4.0 GB VRAM`).
+- **Auto-Opening First-Run Runtime Wizard**: `App.tsx` now checks `/v1/system/setup-status` on boot so new installations open `FirstRunWizard` automatically after install until completed or dismissed.
+- **Edge-TTS Cross-Script Routing & Piper ID Resolution**: Segmented Edge-TTS requests by Unicode script so English neural voices (`AriaNeural`) cleanly route non-Latin script runs (such as Malayalam) to gender-matched Edge-TTS neural voices instead of returning empty streams. Added `en_US-lessac-medium` → `piper-en-lessac-medium` catalog alias resolution.
+
+### 🎙️ Expressive Modulation Transfer in Zero-Shot Cloning
+- **Pure-Rust `ModulationTransfer` (`voxforge-audio`)**: Captures 8-point F0 pitch contours (`f0_contour_8`) and dynamic energy range (`energy_dynamic_range_db`) in `ProsodyMirror::analyze` and persists them on cloned `VoiceProfile` metadata. Applies voiced-only Hann overlap-add pitch-span/contour modulation, syllabic stress contrast, spectral tilt shelves, `instruct` mood presets (`whisper`, `urgent`, `cheerful`, `storyteller`, `authoritative`, `calm`), and sentence-by-clause prosody phrasing in `qwen3.rs` so cross-lingual clones (including Malayalam) preserve expressive speaker cadence.
+
+### ✨ Studio Simplification, Canvas, Workflows, Timeline, Dictation & API Docs
+- **Streamlined Studio Header & Expandable Catalog/Hardware Cards**: Removed duplicate `[VF]` title-bar/nav branding, condensed top tabs, and tucked Model Catalog & Hardware pros/cons/languages/docs behind per-card **More / Less** toggles.
+- **Pipeline Canvas, Workflows & Stories Timeline**: Added the missing `Video Dubbing & Audio Mux` workflow preset, added `Watermark` & `Voice Conversion` canvas nodes, bypassed disabled nodes and cyclic loops safely in layout/execution, fixed `MultiTrackTimeline` Transport Play/sync audio playback, and replaced WebView2-broken `alert()`/`confirm()`/`prompt()` dialogs with inline UI controls.
+- **Dictate & Offline API Docs**: Fixed `/v1/audio/refine` payload serialization, added WebView2/Chromium `SpeechRecognition` live capture alongside Whisper sidecar transcription, and added both an in-app `ApiDocsModal` and zero-CDN offline `/docs` interactive explorer.
+
+---
+
 ## [0.7.2] — 2026-11-27
 
 ### 🛠️ Desktop WebView Boot Fix & Installer Polish

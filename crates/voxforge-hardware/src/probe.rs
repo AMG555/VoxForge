@@ -77,21 +77,22 @@ impl HardwareProbe {
     }
 
     fn detect_gpus(_os: &str) -> Vec<GpuAccelerator> {
-        let mut gpus = Vec::new();
+        let mut gpus = Self::query_nvidia_smi();
 
-        // Check for CUDA via environment or nvidia-smi presence
-        if let Ok(path) = std::env::var("CUDA_PATH") {
-            gpus.push(GpuAccelerator {
-                name: format!("NVIDIA CUDA Runtime ({})", path),
-                vram_mb: 8192,
-                has_cuda: true,
-                has_mps: false,
-                has_directml: false,
-            });
+        if gpus.is_empty() {
+            if let Ok(path) = std::env::var("CUDA_PATH") {
+                gpus.push(GpuAccelerator {
+                    name: format!("NVIDIA CUDA Runtime ({})", path),
+                    vram_mb: 4096,
+                    has_cuda: true,
+                    has_mps: false,
+                    has_directml: cfg!(target_os = "windows"),
+                });
+            }
         }
 
         #[cfg(target_os = "macos")]
-        if std::env::consts::ARCH == "aarch64" {
+        if gpus.is_empty() && std::env::consts::ARCH == "aarch64" {
             gpus.push(GpuAccelerator {
                 name: "Apple Silicon Neural Engine / Metal".to_string(),
                 vram_mb: 16384,
@@ -103,16 +104,74 @@ impl HardwareProbe {
 
         #[cfg(target_os = "windows")]
         if gpus.is_empty() {
-            // DirectML fallback capability on Windows
+            // DirectML fallback capability on Windows when no NVIDIA driver/nvidia-smi is present
             gpus.push(GpuAccelerator {
                 name: "DirectML GPU Hardware Adapter".to_string(),
-                vram_mb: 4096,
+                vram_mb: 2048,
                 has_cuda: false,
                 has_mps: false,
                 has_directml: true,
             });
         }
 
+        gpus
+    }
+
+    /// Query `nvidia-smi` for exact GPU model name(s) and VRAM capacity in MiB.
+    pub fn query_nvidia_smi() -> Vec<GpuAccelerator> {
+        let mut candidates: Vec<&str> = vec!["nvidia-smi"];
+        #[cfg(target_os = "windows")]
+        {
+            candidates.push(r"C:\Windows\System32\nvidia-smi.exe");
+            candidates.push(r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe");
+        }
+
+        for exe in candidates {
+            let mut cmd = std::process::Command::new(exe);
+            cmd.args([
+                "--query-gpu=name,memory.total",
+                "--format=csv,noheader,nounits",
+            ]);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            }
+            if let Ok(output) = cmd.output() {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let parsed = Self::parse_nvidia_smi_csv(&stdout);
+                    if !parsed.is_empty() {
+                        return parsed;
+                    }
+                }
+            }
+        }
+
+        Vec::new()
+    }
+
+    pub fn parse_nvidia_smi_csv(stdout: &str) -> Vec<GpuAccelerator> {
+        let mut gpus = Vec::new();
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Some((raw_name, raw_vram)) = trimmed.rsplit_once(',') {
+                let name = raw_name.trim();
+                let vram_mb = raw_vram.trim().parse::<u64>().unwrap_or(0);
+                if !name.is_empty() && vram_mb > 0 {
+                    gpus.push(GpuAccelerator {
+                        name: name.to_string(),
+                        vram_mb,
+                        has_cuda: true,
+                        has_mps: false,
+                        has_directml: cfg!(target_os = "windows"),
+                    });
+                }
+            }
+        }
         gpus
     }
 

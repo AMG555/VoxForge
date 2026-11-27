@@ -40,6 +40,8 @@ import {
   Search,
   Upload,
   Square,
+  ShieldCheck,
+  Wand2,
 } from 'lucide-react';
 import {
   PipelineNode,
@@ -61,7 +63,6 @@ import {
   StickyNoteData,
 } from '../../services/workflowStorage';
 import { api, isAbortError } from '../../services/api';
-import { AudioProcessor } from '../../services/audioProcessor';
 
 interface PipelineCanvasProps {
   voices: Voice[];
@@ -116,7 +117,7 @@ const NODE_TEMPLATES = [
     name: 'Speaker Diarization',
     category: 'Analysis',
     icon: <UserCheck className="w-3.5 h-3.5 text-cyan-400" />,
-    defaultParams: { num_speakers: 2 },
+    defaultParams: { max_speakers: 2, speaker_prefix: 'Speaker' },
   },
   {
     type: 'voice_assigner' as NodeType,
@@ -137,14 +138,28 @@ const NODE_TEMPLATES = [
     name: 'DSP Filter Chain',
     category: 'DSP Filter',
     icon: <Sliders className="w-3.5 h-3.5 text-pink-400" />,
-    defaultParams: { trim_silence: true, normalize: true },
+    defaultParams: { trim_silence: true, normalize_peak: 0.95 },
   },
   {
     type: 'audio_time_stretch' as NodeType,
     name: 'Audio Time Stretch',
     category: 'DSP Warp',
     icon: <Clock className="w-3.5 h-3.5 text-amber-400" />,
-    defaultParams: { speed_ratio: 1.05, preserve_pitch: true },
+    defaultParams: { stretch_ratio: 1.05, preserve_pitch: true },
+  },
+  {
+    type: 'voice_conversion' as NodeType,
+    name: 'Voice Morph / Pitch',
+    category: 'Voice Morph',
+    icon: <Wand2 className="w-3.5 h-3.5 text-purple-400" />,
+    defaultParams: { pitch_shift_semitones: 0, timbre_warmth: 0.45 },
+  },
+  {
+    type: 'watermark' as NodeType,
+    name: 'Audio Watermark',
+    category: 'Provenance',
+    icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />,
+    defaultParams: { payload: 0x5658, strength: 0.0035 },
   },
   {
     type: 'audio_merge' as NodeType,
@@ -158,7 +173,7 @@ const NODE_TEMPLATES = [
     name: 'Audio/Video Muxer',
     category: 'Video Dubbing',
     icon: <Film className="w-3.5 h-3.5 text-rose-400" />,
-    defaultParams: { format: 'mp4' },
+    defaultParams: { mix_mode: 'stereo_master', ducking_db: -12 },
   },
   {
     type: 'output_sink' as NodeType,
@@ -710,14 +725,18 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       }
     });
 
-    while (queue.length > 0) {
+    const maxIterations = Math.max(1, pipeline.nodes.length * pipeline.nodes.length);
+    let iterations = 0;
+    while (queue.length > 0 && iterations < maxIterations) {
+      iterations += 1;
       const u = queue.shift()!;
       const r = colRank.get(u) || 0;
       const targets = outgoing.get(u) || [];
       targets.forEach((v) => {
         const currentRank = colRank.get(v) || 0;
-        if (r + 1 > currentRank) {
-          colRank.set(v, r + 1);
+        const nextRank = Math.min(r + 1, pipeline.nodes.length);
+        if (nextRank > currentRank) {
+          colRank.set(v, nextRank);
           queue.push(v);
         }
       });
@@ -1330,9 +1349,14 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         setAudioUrl(null);
       }
 
-      // 1. Initial State: Waiting for all active nodes, Bypassed for disabled
       const activeNodes = pipeline.nodes.filter((n) => !n.disabled);
       const disabledNodes = pipeline.nodes.filter((n) => n.disabled);
+      const activeIds = new Set(activeNodes.map((n) => n.id));
+
+      if (activeNodes.length === 0) {
+        throw new Error('Enable at least one node before running this pipeline.');
+      }
+
       const initStates: Record<string, NodeExecutionState> = {};
 
       activeNodes.forEach((n) => {
@@ -1343,6 +1367,30 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       });
       setExecutionStates(initStates);
 
+      // Build executable graph excluding disabled nodes (bridging direct edges across bypassed steps)
+      const disabledIds = new Set(disabledNodes.map((n) => n.id));
+      let bridgedEdges = pipeline.edges.map((e) => ({ ...e }));
+      for (const dId of disabledIds) {
+        const incoming = bridgedEdges.filter((e) => e.to_node === dId);
+        const outgoing = bridgedEdges.filter((e) => e.from_node === dId);
+        const remaining = bridgedEdges.filter((e) => e.from_node !== dId && e.to_node !== dId);
+        incoming.forEach((inc) => {
+          outgoing.forEach((out) => {
+            if (inc.from_node !== out.to_node) {
+              remaining.push({
+                id: `${inc.id}-${out.id}`,
+                from_node: inc.from_node,
+                to_node: out.to_node,
+              });
+            }
+          });
+        });
+        bridgedEdges = remaining;
+      }
+      const activeEdges = bridgedEdges.filter(
+        (e) => activeIds.has(e.from_node) && activeIds.has(e.to_node)
+      );
+
       // Compute topological ordering for active nodes so animation follows true DAG flow
       const inDegree = new Map<string, number>();
       const adj = new Map<string, string[]>();
@@ -1350,11 +1398,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
         inDegree.set(n.id, 0);
         adj.set(n.id, []);
       });
-      pipeline.edges.forEach((e) => {
-        if (inDegree.has(e.from_node) && inDegree.has(e.to_node)) {
-          inDegree.set(e.to_node, (inDegree.get(e.to_node) || 0) + 1);
-          adj.get(e.from_node)!.push(e.to_node);
-        }
+      activeEdges.forEach((e) => {
+        inDegree.set(e.to_node, (inDegree.get(e.to_node) || 0) + 1);
+        adj.get(e.from_node)!.push(e.to_node);
       });
 
       const queue: string[] = [];
@@ -1371,9 +1417,9 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
           if (newDeg === 0) queue.push(v);
         });
       }
-      activeNodes.forEach((n) => {
-        if (!topoOrder.includes(n.id)) topoOrder.push(n.id);
-      });
+      if (topoOrder.length !== activeNodes.length) {
+        throw new Error('Cycle detected in pipeline wires. Remove circular connections before running.');
+      }
 
       const sortedActiveNodes = topoOrder
         .map((id) => activeNodes.find((n) => n.id === id))
@@ -1381,49 +1427,32 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
 
       const startTime = performance.now();
 
-      // 2. Animate step-by-step progression through stages in topological order
-      for (let i = 0; i < sortedActiveNodes.length; i++) {
-        if (controller.signal.aborted) {
-          throw new DOMException('Pipeline execution cancelled', 'AbortError');
-        }
-        const node = sortedActiveNodes[i];
-        // Mark current node running
+      // Mark active DAG stages queued -> running while real backend executes
+      sortedActiveNodes.forEach((node) => {
         setExecutionStates((prev) => ({
           ...prev,
           [node.id]: { status: 'running' },
         }));
+      });
+      setActiveEdgeIds(new Set(activeEdges.map((e) => e.id)));
 
-        // Light up incoming edges with energy pulse
-        const incomingEdges = pipeline.edges.filter((e) => e.to_node === node.id);
-        setActiveEdgeIds(new Set(incomingEdges.map((e) => e.id)));
+      const executablePipeline: StoredWorkflow = {
+        ...pipeline,
+        nodes: activeNodes,
+        edges: activeEdges,
+      };
 
-        // Simulated latency step
-        const stepDelay = Math.floor(Math.random() * 80 + 50);
-        await new Promise((r) => setTimeout(r, stepDelay));
-        if (controller.signal.aborted) {
-          throw new DOMException('Pipeline execution cancelled', 'AbortError');
-        }
-
-        // Mark current node success
-        setExecutionStates((prev) => ({
-          ...prev,
-          [node.id]: { status: 'success', latencyMs: stepDelay },
-        }));
-      }
-
-      // 3. Dispatch real backend pipeline execution with standalone fallback
-      let blob: Blob;
-      try {
-        blob = await api.executePipeline(pipeline, undefined, controller.signal);
-      } catch (err) {
-        if (isAbortError(err)) throw err;
-        console.warn('Backend execution offline or error; generating studio synthesis sample:', err);
-        const sample = await AudioProcessor.createDemoReferenceSample('broadcaster');
-        blob = sample.wavBlob;
-      }
+      const blob = await api.executePipeline(executablePipeline, undefined, controller.signal);
 
       const totalElapsed = Math.round(performance.now() - startTime);
+      const perNodeMs = Math.max(1, Math.round(totalElapsed / Math.max(1, sortedActiveNodes.length)));
       setExecutionTotalMs(totalElapsed);
+
+      const doneStates: Record<string, NodeExecutionState> = { ...initStates };
+      sortedActiveNodes.forEach((node) => {
+        doneStates[node.id] = { status: 'success', latencyMs: perNodeMs };
+      });
+      setExecutionStates(doneStates);
 
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
@@ -1432,7 +1461,17 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({
       if (isAbortError(err)) {
         showToast('Pipeline execution cancelled', 'info');
       } else {
-        showToast(`Pipeline Execution Notice: ${err.message}`, 'error');
+        const errMsg = err?.message || 'Pipeline execution failed';
+        setExecutionStates((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((k) => {
+            if (next[k]?.status === 'running' || next[k]?.status === 'waiting') {
+              next[k] = { status: 'error', message: errMsg };
+            }
+          });
+          return next;
+        });
+        showToast(`Pipeline Error: ${errMsg}`, 'error');
       }
     } finally {
       if (pipelineAbortRef.current === controller) {

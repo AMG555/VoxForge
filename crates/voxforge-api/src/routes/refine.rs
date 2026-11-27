@@ -19,11 +19,11 @@ static SPACE_REGEX: LazyLock<Regex> =
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefineTextRequest {
     pub text: String,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "remove_fillers")]
     pub strip_fillers: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "punctuation_pass")]
     pub fix_punctuation: bool,
-    #[serde(default = "default_true")]
+    #[serde(default = "default_true", alias = "fix_repetitions")]
     pub strip_hallucinations: bool,
     #[serde(default)]
     pub persona_prompt: Option<String>,

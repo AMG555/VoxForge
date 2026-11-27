@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { HardwareInfo, RuntimeStatusResponse, SystemUpdateInfo } from '../../types';
 import { isTauriRuntime, openExternalUrl } from '../../services/desktopBridge';
@@ -137,7 +139,17 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
 }) => {
   const [runtimes, setRuntimes] = useState<RuntimeStatusResponse | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [expandedEngines, setExpandedEngines] = useState<Set<string>>(new Set());
   const [actionNotice, setActionNotice] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const toggleEngineDetails = (engineId: string) => {
+    setExpandedEngines((prev) => {
+      const next = new Set(prev);
+      if (next.has(engineId)) next.delete(engineId);
+      else next.add(engineId);
+      return next;
+    });
+  };
 
   const refreshRuntimes = async () => {
     try {
@@ -318,58 +330,36 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
 
               const ref = ENGINE_REFERENCE_MAP[engineId];
               const fit = assessEngineSystemFit(engineId, hardware);
+              const isExpanded = expandedEngines.has(engineId);
 
               return (
-                <div key={engineId} className="px-4 py-4 space-y-3 hover:bg-[#1A222D]/40 transition-colors">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                <div key={engineId} className="px-4 py-3.5 space-y-2.5 hover:bg-[#1A222D]/40 transition-colors">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-start space-x-3 min-w-0 flex-1">
                       {isReady ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                       ) : (
                         <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                       )}
-                      <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-mono font-bold text-white">{ref?.name || baseDesc.name}</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#0B0E14] text-[#94A3B8] border border-[#242E3D]">
-                            {engineId}
-                          </span>
                           <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${getFitBadgeClasses(fit.tier)}`}>
                             {fit.label}
                           </span>
                           {ref && (
                             <span className="text-[10px] font-mono text-[#64748B]">
-                              {ref.footprint} · {ref.license}
+                              {ref.footprint}
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-[#CBD5E1] leading-relaxed">
+                        <p className="text-[11px] text-[#CBD5E1] line-clamp-1">
                           {ref?.description || baseDesc.description}
-                        </p>
-                        <p className="text-[10px] font-mono text-[#94A3B8]">
-                          System Check: <span className="text-white">{fit.reason}</span>
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center flex-wrap gap-2 flex-shrink-0 self-start">
-                      {ref?.docsUrl && (
-                        <a
-                          href={ref.docsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => {
-                            if (isTauriRuntime()) {
-                              e.preventDefault();
-                              void openExternalUrl(ref.docsUrl);
-                            }
-                          }}
-                          className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-sky-300 border border-[#242E3D] transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Official Docs</span>
-                        </a>
-                      )}
+                    <div className="flex items-center flex-wrap gap-2 flex-shrink-0">
                     {engineId === 'kokoro' && runtimes && !runtimes.kokoro_sidecar.running && (
                       runtimes.python_packages.kokoro ? (
                         <button
@@ -401,7 +391,7 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
                         className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40"
                       >
                         {busyAction === 'install-piper' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                        <span>Install Native Piper (No Python)</span>
+                        <span>Install Native Piper</span>
                       </button>
                     )}
                     {engineId === 'qwen3-tts' && runtimes && !runtimes.neural_sidecar.running && runtimes.python_packages.omnivoice && (
@@ -428,34 +418,66 @@ export const HardwareInspector: React.FC<HardwareInspectorProps> = ({
                     >
                       {statusBadge.label}
                     </span>
+                    {ref && (
+                      <button
+                        type="button"
+                        onClick={() => toggleEngineDetails(engineId)}
+                        className="inline-flex items-center space-x-1 text-[10px] font-mono px-2 py-1 rounded bg-[#0B0E14] hover:bg-[#1A222D] text-[#94A3B8] hover:text-white border border-[#242E3D]"
+                      >
+                        <span>{isExpanded ? 'Less' : 'More'}</span>
+                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                    )}
                     </div>
                   </div>
 
-                  {ref && (
-                    <div className="ml-7 grid grid-cols-1 md:grid-cols-3 gap-2.5 bg-[#0B0E14] border border-[#1E2633] rounded-lg p-2.5 text-[11px]">
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-mono uppercase text-emerald-400">Pros</div>
-                        {ref.pros.map((p) => (
-                          <div key={p} className="flex items-start space-x-1 text-[#CBD5E1]">
-                            <Check className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
-                            <span>{p}</span>
-                          </div>
-                        ))}
+                  {ref && isExpanded && (
+                    <div className="ml-7 space-y-2.5 bg-[#0B0E14] border border-[#1E2633] rounded-lg p-3 text-[11px]">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-[#94A3B8]">
+                        <span>System Check: <span className="text-white">{fit.reason}</span></span>
+                        {ref.docsUrl && (
+                          <a
+                            href={ref.docsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (isTauriRuntime()) {
+                                e.preventDefault();
+                                void openExternalUrl(ref.docsUrl);
+                              }
+                            }}
+                            className="inline-flex items-center space-x-1 text-sky-300 hover:text-sky-200"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Official Docs</span>
+                          </a>
+                        )}
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-mono uppercase text-amber-400">Cons</div>
-                        {ref.cons.map((c) => (
-                          <div key={c} className="flex items-start space-x-1 text-[#94A3B8]">
-                            <span className="font-mono font-bold text-amber-400 shrink-0">−</span>
-                            <span>{c}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-[10px] font-mono uppercase text-sky-400">Best For</div>
-                        {ref.bestFor.map((b) => (
-                          <div key={b} className="text-[#CBD5E1]">• {b}</div>
-                        ))}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-mono uppercase text-emerald-400">Pros</div>
+                          {ref.pros.map((p) => (
+                            <div key={p} className="flex items-start space-x-1 text-[#CBD5E1]">
+                              <Check className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
+                              <span>{p}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-mono uppercase text-amber-400">Cons</div>
+                          {ref.cons.map((c) => (
+                            <div key={c} className="flex items-start space-x-1 text-[#94A3B8]">
+                              <span className="font-mono font-bold text-amber-400 shrink-0">−</span>
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-mono uppercase text-sky-400">Best For</div>
+                          {ref.bestFor.map((b) => (
+                            <div key={b} className="text-[#CBD5E1]">• {b}</div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}

@@ -72,6 +72,15 @@ impl PiperTtsEngine {
         self
     }
 
+    /// Map engine voice IDs to exact Model Catalog IDs when naming differs.
+    fn catalog_id_for_voice(voice_id: &str) -> &str {
+        if voice_id == "en_US-lessac-medium" {
+            "piper-en-lessac-medium"
+        } else {
+            voice_id
+        }
+    }
+
     /// Resolve onnx model path for the given voice_id (strictly per-voice so German/French voices never silently speak English Lessac).
     fn resolve_model_path(&self, voice_id: &str) -> Option<PathBuf> {
         let mut candidates = vec![
@@ -488,22 +497,24 @@ impl TtsEngine for PiperTtsEngine {
                     }
                 }
             }
+            let catalog_id = Self::catalog_id_for_voice(&req.voice_id);
             return Err(VoxForgeError::Engine(format!(
-                "Piper model for '{}' is not installed locally. Please download '{}' in Model Catalog.",
-                req.voice_id, req.voice_id
+                "Piper model weights for '{}' are not installed locally. Download '{}' in Model Catalog.",
+                req.voice_id, catalog_id
             )));
         }
 
         let has_model = self.resolve_model_path(&req.voice_id).is_some();
+        let catalog_id = Self::catalog_id_for_voice(&req.voice_id);
         if has_model {
             Err(VoxForgeError::Engine(format!(
-                "Piper runtime ('piper' CLI / python 'piper-tts' package) is not installed locally for '{}'. Install the Piper runtime from Model Catalog / Hardware & Engines or start VOXFORGE_PIPER_URL.",
+                "Piper runtime ('piper' CLI) is not installed locally for '{}'. Install Native Piper from Model Catalog / Hardware & Engines or start VOXFORGE_PIPER_URL.",
                 req.voice_id
             )))
         } else {
             Err(VoxForgeError::Engine(format!(
-                "Piper runtime and model for '{}' are not installed locally. Install the Piper runtime and download '{}' in Model Catalog.",
-                req.voice_id, req.voice_id
+                "Piper runtime and model weights for '{}' are not installed locally. Install Native Piper and download '{}' in Model Catalog.",
+                req.voice_id, catalog_id
             )))
         }
     }
@@ -585,6 +596,7 @@ mod tests {
         );
         let err_msg = res.unwrap_err().to_string();
         assert!(err_msg.contains("not installed locally"));
+        assert!(err_msg.contains("piper-en-lessac-medium"));
     }
 
     #[test]
