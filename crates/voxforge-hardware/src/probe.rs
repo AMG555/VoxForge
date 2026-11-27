@@ -119,6 +119,7 @@ impl HardwareProbe {
 
     /// Query `nvidia-smi` for exact GPU model name(s) and VRAM capacity in MiB.
     pub fn query_nvidia_smi() -> Vec<GpuAccelerator> {
+        #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
         let mut candidates: Vec<&str> = vec!["nvidia-smi"];
         #[cfg(target_os = "windows")]
         {
