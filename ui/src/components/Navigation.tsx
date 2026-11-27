@@ -118,7 +118,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             title="Configure Local Neural Runtime or Remote Connection"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden xl:inline">Runtime</span>
+            <span className="hidden 2xl:inline">Runtime</span>
           </button>
         )}
 
